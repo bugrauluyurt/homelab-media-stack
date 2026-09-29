@@ -11,6 +11,26 @@ Each entry says what you see, why it happens, and what to do.
 - **Fix:** `scripts/stack-up` re-attaches them (it runs at boot), or
   `docker compose up -d --force-recreate qbittorrent slskd`, then `scripts/sync-port`.
 
+## VPN fails shortly after torrents start, then recovers about an hour later
+- **Observed:** two Netherlands endpoints connected initially, then lost NAT-PMP and WireGuard
+  connectivity after qBittorrent started. Lower connection limits and queueing did not prevent it.
+  With DHT disabled, the original endpoint stayed connected during validation at the usual upload
+  cap, with queueing off and the original peer limits restored. A later 10-minute test that
+  re-enabled DHT on the established session also stayed healthy, with downloads and uploads.
+  This did not reproduce the failure and does not prove DHT alone caused it.
+- **Suspected cause:** an upstream traffic-triggered restriction, consistent with reports about
+  Proton's anti-abuse system. DHT, startup bursts and transient provider issues remain hypotheses;
+  the provider-side reason is not confirmed. Do not assume every timeout is this issue.
+- **Current policy:** DHT stays enabled for a longer owner-observed trial. `sync-port` does not
+  override it and `health-check` does not flag it. No extra watcher, scheduler or timed restart
+  was added; existing monitoring and VPN recovery remain active. If a failure is reported,
+  capture evidence before considering DHT-off as a precaution, not a proven fix. Do not replace
+  credentials or lower bandwidth or peer limits without evidence and approval. A blocked tunnel
+  can take time to recover even after traffic stops.
+- **Check:** read WireGuard handshake age, tunnel traffic, forwarded port and the live `dht`
+  preference. Validate beyond the previous failure window with the downloaders running, not just
+  an initial Docker healthy status. Never bypass the VPN to restore connectivity.
+
 ## Forwarded port out of sync
 - **Cause:** Proton assigns a new port on every reconnect.
 - **Fix:** `scripts/sync-port`. A 15-minute timer also does it. An "up command

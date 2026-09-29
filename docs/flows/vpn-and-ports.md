@@ -71,6 +71,11 @@ is copied into `$CONFIG_ROOT/qbittorrent/qBittorrent/` before the first start, a
   page can reply; a qBittorrent bound there would send tracker traffic outside the tunnel, where the
   firewall drops it, and every tracker would report "Operation not permitted". Bound to the tunnel
   address, traffic goes through `tun0`, and it can't leak if the tunnel disappears.
+- **DHT remains enabled.** A successful DHT-on retest did not reproduce the earlier tunnel
+  failures, so DHT alone is not a confirmed cause. `sync-port` leaves the DHT preference alone
+  and `health-check` does not require it off. For a recurring outage, inspect the tunnel and
+  traffic evidence before changing peer discovery or replacing VPN credentials. See the
+  [troubleshooting notes](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/ai/homelab-plugin/skills/stack-logs/references/known-issues.md#vpn-fails-shortly-after-torrents-start-then-recovers-about-an-hour-later).
 - **Login-free networks.** The Docker network (`172.16.0.0/12`: the arr apps, Homepage) and the
   tailnet (`100.64.0.0/10`: your phone) skip the login, so the apps need no stored credential. The
   home network always has to log in; `health-check` fails if a login-free range overlaps
