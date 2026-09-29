@@ -1,7 +1,7 @@
 # Security
 
 Please report security problems privately: open the repository's **Security** tab and choose
-**Report a vulnerability**. Don't open a public issue for them.
+[**Report a vulnerability**](https://github.com/bugrauluyurt/homelab-media-stack/security/advisories/new). Don't open a public issue for them.
 
 Include what you found, how to reproduce it, and which release or commit you ran. You'll get a
 reply within a week.
@@ -20,7 +20,16 @@ each other is in [docs/security.md](docs/security.md).
 Releases are immutable and signed by GitHub:
 
 ```bash
-gh release verify v2.0.0 -R bugrauluyurt/homelab-media-stack
+gh release verify v2.3.0 -R bugrauluyurt/homelab-media-stack
+```
+
+From v2.3.0 each release carries its source archive and the archive's signed build provenance,
+which names the workflow and commit that built it:
+
+```bash
+gh release download v2.3.0 -R bugrauluyurt/homelab-media-stack
+gh attestation verify homelab-media-stack-2.3.0.tar.gz --bundle homelab-media-stack-2.3.0.tar.gz.intoto.jsonl \
+  -R bugrauluyurt/homelab-media-stack
 ```
 
 Needle, the music player the stack pulls, publishes its images with build provenance:

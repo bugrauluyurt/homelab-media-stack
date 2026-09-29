@@ -51,13 +51,13 @@ flowchart TD
     nxt -->|no| close["Close the release PR, if one is open"]
     nxt -->|yes| cut["changelog.py cut on branch release/next: CHANGELOG.md and plugin.json"]
     cut --> pr["Pull request 'Release vX.Y.Z' opened or updated"]
-    pr -->|"you merge it"| push
+    pr -->|"you approve and merge it"| push
     push --> rel["release workflow"]
     rel --> tag{"Tag vX.Y.Z already exists?"}
     tag -->|yes| skip["Nothing to release"]
     tag -->|no| checks["Checks: scripts/check"]
-    checks --> draft["Draft release with the changelog notes"]
-    draft --> publish["Publish: the tag is locked and an attestation signed"]
+    checks --> draft["Draft release with the notes, the source archive and its signed provenance"]
+    draft --> publish["Publish: the tag and assets are locked and an attestation signed"]
 ```
 
 On every push to `main`, two workflows run:
@@ -66,27 +66,37 @@ On every push to `main`, two workflows run:
    version. If `## Unreleased` is empty, it closes any open release pull request and stops.
    Otherwise it cuts the release on the branch `release/next` (the changelog section and the
    `version` in `ai/homelab-plugin/plugin.json`), force-pushes that branch, and opens or updates
-   the pull request **Release vX.Y.Z**, with the notes as its description.
+   the pull request **Release vX.Y.Z**, with the notes as its description. A pull request opened
+   with the workflow's own token starts no workflows, so it also starts CI on `release/next`
+   itself; the `checks` result shows on the pull request like any other.
 2. **release** (`.github/workflows/release.yml`) reads the version from `plugin.json`. If the
    tag `vX.Y.Z` already exists, there is nothing new and it stops; that is the case for every
    ordinary push. Otherwise it runs the full checks (`scripts/check`, the same as CI), creates a
-   **draft** release titled "homelab-media-stack X.Y.Z" with the changelog notes, then publishes
-   it as the latest release.
+   **draft** release titled "homelab-media-stack X.Y.Z" with the changelog notes, attaches the
+   source archive `homelab-media-stack-X.Y.Z.tar.gz` and its signed build provenance
+   (`.intoto.jsonl`, the attestation that names this workflow and commit), then publishes it as
+   the latest release.
 
 Draft first, then publish, because GitHub's immutable releases act at publication: they lock the
-tag to its commit and sign a release attestation. Nobody can move the tag or swap the release's
-contents afterwards.
+tag to its commit and the assets to the release, and sign a release attestation. Nobody can move
+the tag or swap the release's contents afterwards, which is also why the assets go up while the
+release is still a draft.
 
 ## How to release
 
 1. Merge changes to `main`, each with its changelog line under `## Unreleased`.
 2. Open the pull request **Release vX.Y.Z**. Check the version and read the notes: they are what
    people will see.
-3. Merge it. That is the release: the release workflow checks, drafts and publishes `vX.Y.Z`.
+3. Approve it, then merge it. `main` takes a pull request only with a passing `checks` run and
+   an approval from someone other than its author; the bot opened this one, so your approval
+   counts. The merge is the release: the release workflow checks, drafts and publishes `vX.Y.Z`.
 4. Verify it if you like:
 
 ```bash
 gh release verify vX.Y.Z -R bugrauluyurt/homelab-media-stack
+gh release download vX.Y.Z -R bugrauluyurt/homelab-media-stack
+gh attestation verify homelab-media-stack-X.Y.Z.tar.gz \
+  --bundle homelab-media-stack-X.Y.Z.tar.gz.intoto.jsonl -R bugrauluyurt/homelab-media-stack
 ```
 
 After the merge, `## Unreleased` is empty again, so release-pr closes nothing and waits for the

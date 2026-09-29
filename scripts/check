@@ -75,7 +75,7 @@ diagrams() {
   return $status
 }
 
-docs_site() { in_docker -e HOME=/tmp "$PYTHON" sh -c 'pip install -q --user -r docs/requirements.txt 2>/dev/null && ~/.local/bin/zensical build --strict --clean'; }
+docs_site() { in_docker -e HOME=/tmp "$PYTHON" sh -c 'pip install -q --user --require-hashes -r docs/requirements.txt 2>/dev/null && ~/.local/bin/zensical build --strict --clean'; }
 
 # Every script and systemd file needs its own heading in the reference pages.
 docs_cover_every_file() {
