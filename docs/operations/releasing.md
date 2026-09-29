@@ -66,9 +66,8 @@ On every push to `main`, two workflows run:
    version. If `## Unreleased` is empty, it closes any open release pull request and stops.
    Otherwise it cuts the release on the branch `release/next` (the changelog section and the
    `version` in `ai/homelab-plugin/plugin.json`), force-pushes that branch, and opens or updates
-   the pull request **Release vX.Y.Z**, with the notes as its description. A pull request opened
-   with the workflow's own token starts no workflows, so it also starts CI on `release/next`
-   itself; the `checks` result shows on the pull request like any other.
+   the pull request **Release vX.Y.Z**, with the notes as its description. GitHub holds CI on a
+   pull request the workflow's own token opened until a maintainer approves the run.
 2. **release** (`.github/workflows/release.yml`) reads the version from `plugin.json`. If the
    tag `vX.Y.Z` already exists, there is nothing new and it stops; that is the case for every
    ordinary push. Otherwise it runs the full checks (`scripts/check`, the same as CI), creates a
@@ -87,10 +86,20 @@ release is still a draft.
 1. Merge changes to `main`, each with its changelog line under `## Unreleased`.
 2. Open the pull request **Release vX.Y.Z**. Check the version and read the notes: they are what
    people will see.
-3. Approve it, then merge it. `main` takes a pull request only with a passing `checks` run and
-   an approval from someone other than its author; the bot opened this one, so your approval
-   counts. The merge is the release: the release workflow checks, drafts and publishes `vX.Y.Z`.
-4. Verify it if you like:
+3. Start its CI: the pull request says a workflow is awaiting approval; choose **Approve
+   workflows to run**, or from a terminal:
+
+   ```bash
+   run=$(gh run list -R bugrauluyurt/homelab-media-stack --branch release/next --event pull_request \
+     --limit 1 --json databaseId --jq '.[0].databaseId')
+   gh api -X POST repos/bugrauluyurt/homelab-media-stack/actions/runs/$run/approve
+   ```
+
+4. Once `checks` passes, approve the pull request, then merge it. `main` takes a pull request
+   only with a passing `checks` run and an approval from someone other than its author; the bot
+   opened this one, so your approval counts. The merge is the release: the release workflow
+   checks, drafts and publishes `vX.Y.Z`.
+5. Verify it if you like:
 
 ```bash
 gh release verify vX.Y.Z -R bugrauluyurt/homelab-media-stack
