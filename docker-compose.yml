@@ -777,4 +777,4 @@ networks:
     name: arr
     ipam:
       config:
-        - subnet: 172.18.0.0/16
+        - subnet: ${ARR_SUBNET:-172.18.0.0/16}

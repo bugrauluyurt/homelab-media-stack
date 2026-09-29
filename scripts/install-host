@@ -66,6 +66,23 @@ fi
 sudo -n true 2>/dev/null ||
   problems+=("$STACK_USER needs passwordless sudo: echo '$STACK_USER ALL=(ALL) NOPASSWD: ALL' | sudo tee /etc/sudoers.d/homelab-media-stack")
 
+# The arr network needs a subnet no other Docker network uses, with Prowlarr's fixed address inside it.
+subnet_problems=$(docker network ls -q 2>/dev/null | xargs -r docker network inspect -f '{{.Name}} {{range .IPAM.Config}}{{.Subnet}} {{end}}' 2>/dev/null |
+  python3 -c '
+import ipaddress, sys
+wanted, prowlarr_ip = ipaddress.ip_network(sys.argv[1]), sys.argv[2]
+if prowlarr_ip and ipaddress.ip_address(prowlarr_ip) not in wanted:
+    print(f"PROWLARR_IP {prowlarr_ip} is outside ARR_SUBNET {wanted}")
+for line in sys.stdin:
+    name, *subnets = line.split()
+    clash = next((s for s in subnets if ":" not in s and name != "arr" and ipaddress.ip_network(s).overlaps(wanted)), None)
+    if clash:
+        print(f"ARR_SUBNET {wanted} overlaps Docker network {name} ({clash}): set a free /16 such as 172.28.0.0/16 in .env, and a PROWLARR_IP inside it")
+' "${ARR_SUBNET:-172.18.0.0/16}" "${PROWLARR_IP:-}")
+while read -r subnet_problem; do
+  [ -n "$subnet_problem" ] && problems+=("$subnet_problem")
+done <<< "$subnet_problems"
+
 id -nG "$STACK_USER" | grep -qw docker ||
   problems+=("$STACK_USER is not in the docker group: sudo usermod -aG docker $STACK_USER, then log in again")
 
