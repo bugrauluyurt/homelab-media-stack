@@ -5,6 +5,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    commit-message:
+      prefix: build
+      include: scope
 
   # Only Needle: the other images follow :latest through scripts/update, and a pinned major
   # such as postgres:16 must not move without a data migration.
@@ -12,6 +15,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    commit-message:
+      prefix: build
+      include: scope
     allow:
       - dependency-name: ghcr.io/bugrauluyurt/needle
 
@@ -19,3 +25,6 @@ updates:
     directory: /docs
     schedule:
       interval: monthly
+    commit-message:
+      prefix: build
+      include: scope

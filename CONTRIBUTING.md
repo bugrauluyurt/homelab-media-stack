@@ -14,10 +14,11 @@ there are the review checklist.
 
 1. Fork, branch, and change the smallest thing that solves the problem.
 2. Keep configure scripts idempotent: a second run prints only `=` lines.
-3. Add a line under `## Unreleased` in [CHANGELOG.md](CHANGELOG.md), under the heading that
-   matches the change (`### Added`, `### Changed`, `### Fixed`, `### Security`, `### Removed`,
-   `### Breaking`). The heading decides the next version; see
-   [docs/operations/releasing.md](docs/operations/releasing.md).
+3. Add your changelog entry as a file, `changelog.d/<name>.<heading>.md`, instead of editing
+   `CHANGELOG.md` ([format](changelog.d/README.md)). The heading (`added`, `changed`, `fixed`,
+   `security`, `removed`, `breaking`) decides the next version; see
+   [docs/operations/releasing.md](docs/operations/releasing.md). One file per change means your
+   pull request never conflicts with another one over the changelog.
 4. Run `scripts/check` (Docker is enough: every tool runs in a container). CI runs the same.
 5. Enable the hooks once: `git config core.hooksPath .githooks`. `pre-commit` keeps secrets
    out of commits, and `commit-msg` checks the commit message format below.
@@ -72,14 +73,14 @@ a fresh install stopped at the setup wizard.
 Not `Fixed stuff`, `update glance.yml` or `Improve security and docs`: none has a type, and none
 says what changed for the user.
 
-The type doesn't pick the version: the `CHANGELOG.md` heading does
-([releasing](docs/operations/releasing.md)). A `feat` usually pairs with `### Added` and a `fix`
-with `### Fixed`.
+The type doesn't pick the version: the heading in the `changelog.d/` file name does
+([releasing](docs/operations/releasing.md)). A `feat` usually pairs with `.added.md` and a `fix`
+with `.fixed.md`.
 
 ## Pull requests
 
 Pull requests are squash-merged, so the pull request **title** becomes the commit on `main`: write
-it in the same format. A pull request merges into `main` once it is up to date with `main`, its
+it in the same format. The **PR title** check runs the commit hook on it. A pull request merges into `main` once it is up to date with `main`, its
 `checks` run passes and a maintainer approves it; maintainers merge their own through the admin
 bypass.
 

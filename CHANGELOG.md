@@ -2,38 +2,10 @@
 
 What changed in each release. The stack uses [semantic versioning](https://semver.org): a major
 version means you need to change your setup (a renamed setting, a removed module, a new mount),
-a minor version adds features, and a patch fixes bugs. Write new entries under **Unreleased**,
-under the heading that matches the change; the headings decide the next version, and merging
-the release pull request publishes it ([how releases work](docs/operations/releasing.md)).
-
-## Unreleased
-
-### Added
-- The troubleshooting notes cover game searches that always take 30 seconds: one slow indexer
-  holds Questarr to its timeout, and switching it off in Prowlarr fixes it.
-- A copy of `glance/youtube-channels.json` in `$CONFIG_ROOT/glance/` replaces the repository's
-  sample, so your pinned YouTube channels stay out of git.
-
-### Changed
-- Glance's subreddits, stock list and pinned YouTube channels are now generic samples; edit them
-  in `glance/glance.yml` and `glance/youtube-channels.json`.
-
-### Fixed
-- Grafana's network panels show the server's real traffic. node-exporter now runs on the host
-  network; in a container network it counted only its own container. `configure-uptime-kuma.py`
-  updates the URL of a monitor whose service moved, so re-run it after updating.
-- The plugin description, script messages and comments say "the server" instead of "the Pi",
-  since the stack runs on any supported machine.
-- Glance's YouTube rows show videos again. YouTube's RSS feed answers 404 for hours at a time, so
-  `sync-youtube.py` now fetches the latest uploads hourly, through the Data API once you are signed
-  in, and keeps a channel's last videos when it can't be read. `arr-youtube.timer` runs hourly
-  instead of weekly; rerun `install-host` to pick up the new schedule.
-
-### Security
-- `.gitignore` and the pre-commit hook also keep `.env.*` copies (`.env.bak`, `.env.local`) and
-  `*.local.*` files out of commits, not only `.env` itself.
-- `render-scraparr-config` and `backup-config` create the scraparr config and the restic key file
-  private from the start, instead of making them private right after writing.
+a minor version adds features, and a patch fixes bugs. A change records its entry as a file in
+[`changelog.d/`](changelog.d/README.md), named for the heading that matches it; the headings decide the
+next version, and merging the release pull request writes the entries here and publishes it
+([how releases work](docs/operations/releasing.md)).
 
 ## 2.3.0 - 2026-09-29
 

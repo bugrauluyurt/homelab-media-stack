@@ -6,25 +6,25 @@ ready, and merging that pull request is the release.
 
 ## The version comes from the changelog
 
-`CHANGELOG.md` has a `## Unreleased` section at the top. Every change that matters to someone
-running the stack adds a line there, under the heading that describes it. The headings decide
-the next version, following [semantic versioning](https://semver.org):
+Every change that matters to someone running the stack adds one file to `changelog.d/`, named
+`<name>.<heading>.md`, holding its entry. Pull requests never edit `CHANGELOG.md` itself: each
+brings its own file, so two of them can't conflict over the changelog, and a release can't
+conflict with a pull request still open. The headings decide the next version, following
+[semantic versioning](https://semver.org):
 
-| Heading under `## Unreleased` | Bump | Use it when |
+| Heading in the file name | Bump | Use it when |
 |---|---|---|
-| `### Breaking` or `### Removed` | Major (`1.4.2` to `2.0.0`) | People must change their setup: a renamed setting, a removed module, a new mount |
-| `### Added`, `### Changed` or `### Deprecated` | Minor (`1.4.2` to `1.5.0`) | A new feature, or different behaviour that needs no action |
-| `### Fixed` or `### Security` | Patch (`1.4.2` to `1.4.3`) | A bug fix or a security fix |
+| `breaking` or `removed` | Major (`1.4.2` to `2.0.0`) | People must change their setup: a renamed setting, a removed module, a new mount |
+| `added`, `changed` or `deprecated` | Minor (`1.4.2` to `1.5.0`) | A new feature, or different behaviour that needs no action |
+| `fixed` or `security` | Patch (`1.4.2` to `1.4.3`) | A bug fix or a security fix |
 
-The highest bump present wins: one `### Removed` among ten `### Fixed` lines makes a major
-release. A heading outside this list fails the release pull request, and so do notes with no
-heading at all. The current version is the `version` field of
-`ai/homelab-plugin/plugin.json`.
+The highest bump present wins: one `.removed.md` among ten `.fixed.md` files makes a major
+release. A misnamed file, or one whose entry isn't a `- ` bullet, fails `scripts/check` and so
+the pull request. The current version is the `version` field of `ai/homelab-plugin/plugin.json`.
 
-```markdown
-## Unreleased
+```text
+changelog.d/uptime-kuma-recreated.fixed.md
 
-### Fixed
 - Uptime Kuma no longer reports a recreated container as down.
 ```
 
@@ -37,9 +37,9 @@ python3 scripts/changelog.py next ai/homelab-plugin/plugin.json   # the next ver
 python3 scripts/changelog.py notes 1.4.2                          # the notes of a released version
 ```
 
-Its third command, `cut <version> <version-file>...`, moves the Unreleased notes under a new
-heading with the version and today's date, leaves an empty `## Unreleased` above it, and sets the
-version in each file. The release workflow runs it; you don't need to. The same `changelog.py`
+Its third command, `cut <version> <version-file>...`, writes the entries into `CHANGELOG.md` under
+a new heading with the version and today's date (headings in a fixed order, entries sorted by file
+name), deletes the files, and sets the version in each file. The release workflow runs it; you don't need to. The same `changelog.py`
 lives in the Needle repository; keep the two copies identical.
 
 ## The whole flow
@@ -47,7 +47,7 @@ lives in the Needle repository; keep the two copies identical.
 ```mermaid
 flowchart TD
     push["A push to main"] --> rpr["release-pr workflow"]
-    rpr --> nxt{"changelog.py next: anything under Unreleased?"}
+    rpr --> nxt{"changelog.py next: any files in changelog.d?"}
     nxt -->|no| close["Close the release PR, if one is open"]
     nxt -->|yes| cut["changelog.py cut on branch release/next: CHANGELOG.md and plugin.json"]
     cut --> pr["Pull request 'chore(release): vX.Y.Z' opened or updated"]
@@ -63,9 +63,9 @@ flowchart TD
 On every push to `main`, two workflows run:
 
 1. **release-pr** (`.github/workflows/release-pr.yml`) asks `changelog.py next` for the next
-   version. If `## Unreleased` is empty, it closes any open release pull request and stops.
-   Otherwise it cuts the release on the branch `release/next` (the changelog section and the
-   `version` in `ai/homelab-plugin/plugin.json`), force-pushes that branch, and opens or updates
+   version. If `changelog.d/` holds no entries, it closes any open release pull request and stops.
+   Otherwise it cuts the release on the branch `release/next` (the new `CHANGELOG.md` section, the
+   entry files removed, and the `version` in `ai/homelab-plugin/plugin.json`), force-pushes that branch, and opens or updates
    the pull request **chore(release): vX.Y.Z**, with the notes as its description. GitHub holds CI on a
    pull request the workflow's own token opened until a maintainer approves the run.
 2. **release** (`.github/workflows/release.yml`) reads the version from `plugin.json`. If the
@@ -83,7 +83,7 @@ release is still a draft.
 
 ## How to release
 
-1. Merge changes to `main`, each with its changelog line under `## Unreleased`.
+1. Merge changes to `main`, each with its entry in `changelog.d/`.
 2. Open the pull request **chore(release): vX.Y.Z**. Check the version and read the notes: they are what
    people will see.
 3. Start its CI: the pull request says a workflow is awaiting approval; choose **Approve
@@ -108,21 +108,21 @@ gh attestation verify homelab-media-stack-X.Y.Z.tar.gz \
   --bundle homelab-media-stack-X.Y.Z.tar.gz.intoto.jsonl -R bugrauluyurt/homelab-media-stack
 ```
 
-After the merge, `## Unreleased` is empty again, so release-pr closes nothing and waits for the
+After the merge, `changelog.d/` is empty again, so release-pr closes nothing and waits for the
 next change.
 
 ## Changing the bump
 
 The release pull request is regenerated on every push to `main` (its branch is force-pushed), so
-edits made inside it are lost. To change the version, fix the headings on `main`: move an entry
-from `### Changed` to `### Fixed` for a patch, or add a `### Breaking` entry for a major release.
+edits made inside it are lost. To change the version, rename the files on `main`: turn a
+`.changed.md` into `.fixed.md` for a patch, or add a `.breaking.md` entry for a major release.
 The pull request follows on that push.
 
 ## Hotfixes
 
-A hotfix is the same flow. Merge the fix to `main` with its entry under `### Fixed` (or
-`### Security`); if nothing else is waiting under `## Unreleased`, the release pull request
-proposes a patch version. Merge it.
+A hotfix is the same flow. Merge the fix to `main` with a `.fixed.md` (or `.security.md`) entry;
+if nothing else is waiting in `changelog.d/`, the release pull request proposes a patch version.
+Merge it.
 
 If other, unreleased changes are already waiting, they go out in the same release, at the highest
 bump among them. Release those first, or wait for them to be ready: there is no separate hotfix
