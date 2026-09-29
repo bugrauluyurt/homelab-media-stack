@@ -9,6 +9,8 @@ the release pull request publishes it ([how releases work](docs/operations/relea
 ## Unreleased
 
 ### Added
+- The troubleshooting notes cover game searches that always take 30 seconds: one slow indexer
+  holds Questarr to its timeout, and switching it off in Prowlarr fixes it.
 - A copy of `glance/youtube-channels.json` in `$CONFIG_ROOT/glance/` replaces the repository's
   sample, so your pinned YouTube channels stay out of git.
 
