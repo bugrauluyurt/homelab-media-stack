@@ -8,7 +8,7 @@ description: Troubleshoot a misbehaving media-stack service (Jellyfin, Seerr, Ra
 Read-only diagnosis. Propose fixes; don't apply them without asking.
 
 ```bash
-STACK=${ARR_STACK_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}; [ -x "$STACK/scripts/health-check" ] || STACK=~/arr-stack
+STACK=${MEDIA_STACK_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}; [ -x "$STACK/scripts/health-check" ] || STACK=~/homelab-media-stack
 cd "$STACK"
 docker compose ps --format '{{.Name}} {{.Status}}'            # what's running
 docker logs --since 30m <service> 2>&1 | grep -iE 'error|warn|fatal|exception' | tail -30

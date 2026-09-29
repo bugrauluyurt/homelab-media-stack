@@ -5,6 +5,6 @@ set -uo pipefail
 . "$(dirname "$0")/stack-env.sh"
 
 unit=$1
-notify "arr-stack: $unit failed" warning "$(journalctl -u "$unit" -n 8 --no-pager -o cat 2>/dev/null | tail -c 1500)
+notify "media stack: $unit failed" warning "$(journalctl -u "$unit" -n 8 --no-pager -o cat 2>/dev/null | tail -c 1500)
 
 Details: journalctl -u $unit"

@@ -504,7 +504,7 @@ Keeps Glance's YouTube channel lists in step with your subscriptions, read throu
 
 ### notify-failure
 
-The `OnFailure=` handler: pushes "arr-stack: `<unit>` failed" with the unit's last 8 log lines (at most 1500 characters) to ntfy. Without `NTFY_TOPIC` it does nothing.
+The `OnFailure=` handler: pushes "media stack: `<unit>` failed" with the unit's last 8 log lines (at most 1500 characters) to ntfy. Without `NTFY_TOPIC` it does nothing.
 
 - **File:** [`scripts/notify-failure`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/notify-failure)
 - **Runs:** [`arr-notify-failure@.service`](systemd.md#arr-notify-failureservice), started with the failed unit's name when `arr-stack`, `arr-firewall`, `arr-backup`, `arr-updates` or `arr-youtube` fails.
@@ -640,7 +640,7 @@ Accounts for SFTPGo, the read-only games download page, through its REST API as 
 
 ### aliases.zsh
 
-Terminal shortcuts, sourced from `~/.zshrc` or `~/.bashrc`: `arr` (managarr), `qbt` (qbt-tui), `dock` (lazydocker), `stack` (go to the repository), `health`, `update`, `indexers`, `leaktest` and `storage-off`. The paths use `ARR_STACK_DIR`, default `~/arr-stack`. [Terminal](../operations/terminal.md) covers the tools.
+Terminal shortcuts, sourced from `~/.zshrc` or `~/.bashrc`: `arr` (managarr), `qbt` (qbt-tui), `dock` (lazydocker), `stack` (go to the repository), `health`, `update`, `indexers`, `leaktest` and `storage-off`. The paths use `MEDIA_STACK_DIR`, default `~/homelab-media-stack`. [Terminal](../operations/terminal.md) covers the tools.
 
 - **File:** [`scripts/aliases.zsh`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/aliases.zsh)
 

@@ -138,7 +138,7 @@ environment in `$STATE_ROOT/venv` with `python-socketio`.
 [`arr-health.timer`](../reference/systemd.md#arr-healthtimer) runs `scripts/health-check --notify` at
 00:20, 06:20, 12:20 and 18:20 (up to 10 minutes later), as the stack user, only while the media drive
 is mounted: the whole stack is down while the drive is off. Any failing check is pushed to ntfy as
-**"arr-stack: N health check(s) failing"**, listing each one.
+**"media stack: N health check(s) failing"**, listing each one.
 
 It prints sections with an `OK` or `FAIL` per check and exits 0 only when nothing failed. Checks of a
 module that is switched off are skipped. A few of the less obvious ones, and why they exist:
@@ -200,7 +200,7 @@ own copy.
 ## notify-failure: when a scheduled job fails
 
 The units below have `OnFailure=arr-notify-failure@%n.service`. When one fails,
-`scripts/notify-failure` pushes **"arr-stack: *unit* failed"** with the unit's last eight log lines
+`scripts/notify-failure` pushes **"media stack: *unit* failed"** with the unit's last eight log lines
 and the `journalctl` command for the rest.
 
 | Unit | Job |

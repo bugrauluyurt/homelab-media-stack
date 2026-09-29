@@ -68,7 +68,7 @@ The timers run `health-check` and the firewall with `sudo`, unattended, so the s
 passwordless sudo and the docker group. `install-host` checks both and prints the fix:
 
 ```bash
-echo '<user> ALL=(ALL) NOPASSWD: ALL' | sudo tee /etc/sudoers.d/arr-stack
+echo '<user> ALL=(ALL) NOPASSWD: ALL' | sudo tee /etc/sudoers.d/homelab-media-stack
 sudo usermod -aG docker <user>        # then log in again
 ```
 
@@ -252,7 +252,7 @@ opens Glance's Lab page in every new tab with the cursor in its search box. It a
 permissions. Chrome keeps the cursor in the address bar on an extension's new-tab page, so
 `newtab.js` opens Lab as a fresh tab in the same spot and closes the blank one.
 
-1. Copy the folder to your computer, for example `scp -r <host>:arr-stack/host/chrome-new-tab ~/`.
+1. Copy the folder to your computer, for example `scp -r <host>:homelab-media-stack/host/chrome-new-tab ~/`.
 2. In `newtab.js`, replace `YOUR_HOSTNAME` with the server's name (or its Tailscale address).
 3. In Chrome, open `chrome://extensions`, switch on **Developer mode** (top right), press **Load
    unpacked** and pick the folder.

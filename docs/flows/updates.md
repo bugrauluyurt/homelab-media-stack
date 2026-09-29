@@ -67,7 +67,7 @@ anything. It does not need the media drive, so it runs while the stack is powere
 5. Updates it has not reported before go to ntfy in one message, one line per service:
 
    ```
-   arr-stack: 2 update(s) available
+   media stack: 2 update(s) available
    jellyfin: 10.11.2 -> 11.0.0  MAJOR
    sonarr: 4.0.15 -> 4.0.16
    Apply with: update
@@ -124,12 +124,12 @@ What it does, in order:
      it (slskd only when the music module is on). The script then force-recreates them, waits up
      to three minutes for gluetun to be healthy and runs `scripts/sync-port`, because the new
      tunnel usually brings a new forwarded port (see [VPN and ports](vpn-and-ports.md)).
-   - If recreating fails, ntfy gets **"arr-stack: update failed"** and the script exits.
+   - If recreating fails, ntfy gets **"media stack: update failed"** and the script exits.
    - The updated images are marked `current` in the state file and the metrics are rewritten.
 4. **Health check.** Freshly recreated apps can take a minute to answer, so the first
    `health-check` runs quietly. If it fails, the script gives the updated containers up to two
    minutes to finish starting, waits 30 seconds more, and runs it again with output. If it
-   still fails, ntfy gets **"arr-stack: health check failed after update"** with the rollback
+   still fails, ntfy gets **"media stack: health check failed after update"** with the rollback
    command, and `update` exits non-zero.
 
 After a Jellyfin update, the health check also confirms every Jellyfin plugin is still

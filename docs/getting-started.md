@@ -81,7 +81,7 @@ tailscale ip -4        # this is TAILSCALE_IP
 The account that runs the stack needs both:
 
 ```bash
-echo "$USER ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/arr-stack
+echo "$USER ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/homelab-media-stack
 sudo usermod -aG docker "$USER"      # then log out and in again
 ```
 
@@ -93,12 +93,12 @@ why SSH is locked to keys, to the tailnet and to pinned sources. See
 ## Clone the repository
 
 ```bash
-git clone https://github.com/bugrauluyurt/homelab-media-stack.git ~/arr-stack
-cd ~/arr-stack
+git clone https://github.com/bugrauluyurt/homelab-media-stack.git ~/homelab-media-stack
+cd ~/homelab-media-stack
 git config core.hooksPath .githooks
 ```
 
-`~/arr-stack` is the default path of the terminal aliases in `scripts/aliases.zsh` (`ARR_STACK_DIR`
+`~/homelab-media-stack` is the default path of the terminal aliases in `scripts/aliases.zsh` (`MEDIA_STACK_DIR`
 overrides it); the scripts themselves work from any path. The hook blocks commits that contain keys (see
 [Security: secrets](security.md#secrets)).
 
@@ -186,7 +186,7 @@ with `openssl rand -hex 24`.
 | [`UMASK`](reference/configuration.md#umask) | Keep `002`, so every app can import the others' files |
 | [`TZ`](reference/configuration.md#tz), [`WEATHER_LOCATION`](reference/configuration.md#weather_location) | Your time zone; the town for Glance's weather |
 | [`DATA_ROOT`](reference/configuration.md#data_root) | A folder inside `STORAGE_MOUNT`, such as `/mnt/storage/data` |
-| [`CONFIG_ROOT`](reference/configuration.md#config_root) | App settings on the system disk, outside the repo, such as `/home/<you>/arr-stack-data/config` |
+| [`CONFIG_ROOT`](reference/configuration.md#config_root) | App settings on the system disk, outside the repo, such as `/home/<you>/homelab-media-stack-data/config` |
 | [`LAN_CIDR`](reference/configuration.md#lan_cidr) | Your home network, such as `192.168.1.0/24` |
 | [`PROWLARR_IP`](reference/configuration.md#prowlarr_ip), [`QBIT_PORT`](reference/configuration.md#qbit_port) | Keep the defaults unless they clash |
 | [`COMPOSE_PROFILES`](reference/configuration.md#compose_profiles) | Your modules, see [Pick your modules](#pick-your-modules) |

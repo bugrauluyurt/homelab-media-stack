@@ -10,7 +10,7 @@ explicit yes first**, and check that nothing is playing (see the `stack-update`
 skill for the Jellyfin sessions check).
 
 ```bash
-STACK=${ARR_STACK_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}; [ -x "$STACK/scripts/health-check" ] || STACK=~/arr-stack
+STACK=${MEDIA_STACK_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}; [ -x "$STACK/scripts/health-check" ] || STACK=~/homelab-media-stack
 ```
 
 ## Power the drive off safely

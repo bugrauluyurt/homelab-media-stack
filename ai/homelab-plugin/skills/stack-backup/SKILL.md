@@ -17,7 +17,7 @@ Each run then copies the snapshots to a second repository on the system disk,
 media drive dies. `docs/flows/backups.md` has the full picture.
 
 ```bash
-STACK=${ARR_STACK_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}; [ -x "$STACK/scripts/health-check" ] || STACK=~/arr-stack
+STACK=${MEDIA_STACK_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}; [ -x "$STACK/scripts/health-check" ] || STACK=~/homelab-media-stack
 ```
 
 ## Status (safe)

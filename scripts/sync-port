@@ -51,11 +51,11 @@ if ! valid_port; then
 
   restart_vpn
   if ! valid_port; then
-    notify "arr-stack: VPN still has no forwarded port" warning "Proton gave no forwarded port, and restarting the VPN didn't help. Torrents still run through the VPN but get no incoming peers. The next automatic try is in $((HEAL_EVERY / 3600)) hours; see docs/flows/vpn-and-ports.md."
+    notify "media stack: VPN still has no forwarded port" warning "Proton gave no forwarded port, and restarting the VPN didn't help. Torrents still run through the VPN but get no incoming peers. The next automatic try is in $((HEAL_EVERY / 3600)) hours; see docs/flows/vpn-and-ports.md."
     exit 1
   fi
 
-  notify "arr-stack: VPN forwarded port restored" white_check_mark "Proton gave no forwarded port for $((MISSING_LIMIT / 60))+ minutes, so the VPN was restarted automatically. New port: $port. Torrents and Soulseek paused for about a minute."
+  notify "media stack: VPN forwarded port restored" white_check_mark "Proton gave no forwarded port for $((MISSING_LIMIT / 60))+ minutes, so the VPN was restarted automatically. New port: $port. Torrents and Soulseek paused for about a minute."
 fi
 rm -f "$MISSING_SINCE"
 

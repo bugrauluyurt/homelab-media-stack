@@ -64,7 +64,7 @@ fi
 
 # The timers run health-check and the firewall checks with sudo, unattended.
 sudo -n true 2>/dev/null ||
-  problems+=("$STACK_USER needs passwordless sudo: echo '$STACK_USER ALL=(ALL) NOPASSWD: ALL' | sudo tee /etc/sudoers.d/arr-stack")
+  problems+=("$STACK_USER needs passwordless sudo: echo '$STACK_USER ALL=(ALL) NOPASSWD: ALL' | sudo tee /etc/sudoers.d/homelab-media-stack")
 
 id -nG "$STACK_USER" | grep -qw docker ||
   problems+=("$STACK_USER is not in the docker group: sudo usermod -aG docker $STACK_USER, then log in again")

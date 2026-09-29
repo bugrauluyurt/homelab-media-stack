@@ -10,7 +10,7 @@ rollback needs the user's explicit yes, every time.** Before running anything,
 show what will change (which services, which images).
 
 ```bash
-STACK=${ARR_STACK_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}; [ -x "$STACK/scripts/health-check" ] || STACK=~/arr-stack
+STACK=${MEDIA_STACK_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}; [ -x "$STACK/scripts/health-check" ] || STACK=~/homelab-media-stack
 ```
 
 ## 1. See what's available (safe)

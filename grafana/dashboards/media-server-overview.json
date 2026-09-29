@@ -4,7 +4,7 @@
   "title": "Media Server: Overview",
   "description": "Host CPU, memory, temperature, storage and network history. No per-container CPU attribution.",
   "tags": [
-    "arr-stack",
+    "homelab-media-stack",
     "overview"
   ],
   "timezone": "browser",

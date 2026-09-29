@@ -145,7 +145,7 @@ recreate=("${services[@]}")
 # qBittorrent and slskd share gluetun's network namespace and lose it when gluetun is recreated.
 [[ " ${services[*]} " == *" gluetun "* ]] && recreate+=(qbittorrent) && { ! service_enabled slskd || recreate+=(slskd); }
 docker compose up -d "${recreate[@]}" || {
-  notify "arr-stack: update failed" warning "Recreating ${services[*]} failed. Check with scripts/health-check; roll back with scripts/update --rollback <service>."
+  notify "media stack: update failed" warning "Recreating ${services[*]} failed. Check with scripts/health-check; roll back with scripts/update --rollback <service>."
   echo "recreate failed - roll back with: update --rollback <service>"; exit 1; }
 
 if [[ " ${recreate[*]} " == *" gluetun "* ]]; then
@@ -167,7 +167,7 @@ echo "[4/4] health check"
 }
 "$REPO/scripts/health-check" && exit 0
 
-notify "arr-stack: health check failed after update" warning "Updated ${services[*]}, then scripts/health-check failed. Roll back with scripts/update --rollback <service>."
+notify "media stack: health check failed after update" warning "Updated ${services[*]}, then scripts/health-check failed. Roll back with scripts/update --rollback <service>."
 echo
 echo "Health check failed. To undo:  update --rollback <service>   (restores its settings too; --image-only to keep them)"
 exit 1

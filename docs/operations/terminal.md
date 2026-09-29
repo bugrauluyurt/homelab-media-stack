@@ -15,7 +15,7 @@ them in zsh or bash.
 | `leaktest` | `scripts/leak-test` | Proves torrent traffic exits through the VPN ([VPN and ports](../flows/vpn-and-ports.md)) |
 | `indexers` | `scripts/check-indexers` | Which indexers work ([Indexers](indexers.md#testing-indexers-check-indexers)) |
 | `storage-off` | `scripts/storage-off` | Stops the stack and unmounts the media drive before you switch it off ([Storage and boot](../flows/storage-and-boot.md)) |
-| `stack` | `cd $ARR_STACK_DIR` | Jump to the repository |
+| `stack` | `cd $MEDIA_STACK_DIR` | Jump to the repository |
 | `qbt` | qbt-tui | What is downloading: torrents, speed, peers, progress |
 | `arr` | managarr | Radarr, Sonarr and Lidarr: library, queue, history, blocklist |
 | `dock` | lazydocker | Every container: status, logs, CPU and memory, restart |
@@ -28,12 +28,12 @@ The aliases are plain `alias` lines, so zsh and bash both read them. Add one lin
 startup file:
 
 ```bash
-echo 'source ~/arr-stack/scripts/aliases.zsh' >> ~/.zshrc     # zsh
-echo 'source ~/arr-stack/scripts/aliases.zsh' >> ~/.bashrc    # bash
+echo 'source ~/homelab-media-stack/scripts/aliases.zsh' >> ~/.zshrc     # zsh
+echo 'source ~/homelab-media-stack/scripts/aliases.zsh' >> ~/.bashrc    # bash
 ```
 
-Open a new shell (or `source` the file) to use them. They point at `~/arr-stack` unless
-`ARR_STACK_DIR` is set before the `source` line (`export ARR_STACK_DIR=/path/to/homelab-media-stack`).
+Open a new shell (or `source` the file) to use them. They point at `~/homelab-media-stack` unless
+`MEDIA_STACK_DIR` is set before the `source` line (`export MEDIA_STACK_DIR=/path/to/homelab-media-stack`).
 
 ## The tools
 

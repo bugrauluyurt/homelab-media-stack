@@ -180,7 +180,7 @@ flowchart TD
   end
 
   subgraph system["System disk"]
-    repo["the repository, e.g. ~/arr-stack"]
+    repo["the repository, e.g. ~/homelab-media-stack"]
     config["CONFIG_ROOT: one folder per app"]
     state["state/, next to CONFIG_ROOT"]
     mirror["/var/backups/arr-stack/restic"]
