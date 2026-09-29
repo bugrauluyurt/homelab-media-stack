@@ -648,12 +648,13 @@ Terminal shortcuts, sourced from `~/.zshrc` or `~/.bashrc`: `arr` (managarr), `q
 
 ### changelog.py
 
-Release tooling for this repository, not part of the server. The headings under `## Unreleased` in `CHANGELOG.md` decide the next version: `Breaking` or `Removed` bump the major version, `Added`, `Changed` or `Deprecated` the minor, `Fixed` or `Security` the patch; the highest bump present wins. [Releasing](../operations/releasing.md) is the procedure.
+Release tooling for this repository, not part of the server. Every change adds its entry as `changelog.d/<name>.<heading>.md`, and those headings decide the next version: `Breaking` or `Removed` bump the major version, `Added`, `Changed` or `Deprecated` the minor, `Fixed` or `Security` the patch; the highest bump present wins. [Releasing](../operations/releasing.md) is the procedure.
 
 - **File:** [`scripts/changelog.py`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/changelog.py)
-- **Subcommands:** `next <version-file>` prints the next version (nothing when Unreleased is empty); `cut <version> <version-file>...` moves the Unreleased notes under the version and writes it into each JSON version file; `notes <version>` prints a released version's notes.
-- **Runs:** the release-pr and release GitHub workflows; by hand.
-- **Changes:** `CHANGELOG.md` and the version files, with `cut` only.
+- **Subcommands:** `next <version-file>` prints the next version (nothing when `changelog.d/` is empty) and rejects a misnamed entry; `cut <version> <version-file>...` writes the entries into `CHANGELOG.md` under the version, deletes them, and writes the version into each JSON version file; `notes <version>` prints a released version's notes.
+- **Runs:** the release-pr and release GitHub workflows, `scripts/check`; by hand.
+- **Changes:** `CHANGELOG.md`, `changelog.d/` and the version files, with `cut` only.
+- **Why:** one file per change, so two pull requests never edit the same lines of `CHANGELOG.md`.
 
 ### check
 

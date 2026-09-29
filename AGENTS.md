@@ -63,9 +63,10 @@ Operating skills live in `ai/homelab-plugin/skills/` (linked into `.claude/skill
   `scripts/health-check` on the server. health-check writes a test file on the drive and starts
   throwaway containers, so keep it for validating changes rather than read-only investigations.
 - A new script or unit gets an entry in the reference pages; `scripts/check` fails without one.
-- Every user-visible change adds a line under `## Unreleased` in `CHANGELOG.md`, under the heading
-  that matches it (Breaking or Removed, Added, Changed or Deprecated, Fixed or Security). The headings
-  decide the next version; merging the bot's release PR publishes it (`docs/operations/releasing.md`).
+- Every user-visible change adds its entry as `changelog.d/<name>.<heading>.md`, never an edit to
+  `CHANGELOG.md` (headings: breaking or removed, added, changed or deprecated, fixed or security;
+  `changelog.d/README.md` has the format). The headings decide the next version; merging the bot's
+  release PR writes them into `CHANGELOG.md` and publishes it (`docs/operations/releasing.md`).
 - Edit skills only under `ai/homelab-plugin/skills/`. They reach Codex with the next release, which
   sets `version` in `ai/homelab-plugin/plugin.json`.
 - Commits and pull request titles follow Conventional Commits (`type(scope): summary`, at most

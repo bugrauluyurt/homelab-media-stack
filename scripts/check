@@ -98,6 +98,7 @@ step "shell syntax" shell_syntax
 step "shellcheck" shellcheck
 step "ruff" ruff
 step "unit tests" unit_tests
+step "changelog entries" python3 scripts/changelog.py next ai/homelab-plugin/plugin.json
 step "compose configs (every profile, none, GPU overlay)" compose_configs
 step "secrets (gitleaks)" secrets
 step "reference covers every script and unit" docs_cover_every_file
