@@ -6,7 +6,7 @@
   --hms-amber: #F0A038;
   --hms-amber-text: #9A5A06;
   --hms-muted: #5B6385;
-  --hms-guide: #D9DEEC;
+  --hms-divider: #D9DEEC;
   --hms-display: "Bricolage Grotesque", var(--md-text-font-family);
 
   --md-primary-fg-color: var(--hms-ink);
@@ -18,7 +18,7 @@
   --hms-ink: #E8ECF6;
   --hms-amber-text: #F0A038;
   --hms-muted: #A3AACB;
-  --hms-guide: #2A2E55;
+  --hms-divider: #2A2E55;
 
   --md-accent-fg-color: var(--hms-amber-text);
   --md-typeset-a-color: #AEB5F0;
@@ -42,12 +42,12 @@
   font-weight: 600;
 }
 
-/* Right-hand table of contents: groups read as groups, entries sit on a guide line under them. */
+/* Right-hand table of contents: groups read as groups, their entries indented beneath them. */
 .md-nav--secondary .md-nav__title {
   font-family: var(--hms-display);
   font-size: 0.72rem;
   color: var(--hms-muted);
-  border-bottom: 1px solid var(--hms-guide);
+  border-bottom: 1px solid var(--hms-divider);
   padding-bottom: 0.5rem;
   margin-bottom: 0.4rem;
 }
@@ -64,15 +64,11 @@
 
 .md-nav--secondary .md-nav__item .md-nav {
   margin: 0.1rem 0 0.5rem 0.8rem;
-  border-left: 1px solid var(--hms-guide);
 }
 
 .md-nav--secondary .md-nav__item .md-nav .md-nav__link {
   font-size: 0.66rem;
   color: var(--hms-muted);
-  margin-left: -1px;
-  border-left: 2px solid transparent;
-  border-radius: 0;
   padding: 0.12rem 0.6rem;
 }
 
@@ -81,15 +77,11 @@
   color: var(--hms-amber-text);
 }
 
-.md-nav--secondary .md-nav__item .md-nav .md-nav__link--active {
-  border-left-color: var(--hms-amber);
-}
-
 /* Left navigation: each section opens with a divider and a display-face title. */
 .md-nav--primary .md-nav__item--section {
   margin-top: 0.9rem;
   padding-top: 0.7rem;
-  border-top: 1px solid var(--hms-guide);
+  border-top: 1px solid var(--hms-divider);
 }
 
 .md-nav--primary .md-nav__item--section > .md-nav__link {
@@ -107,5 +99,4 @@
   color: var(--hms-ink);
   font-weight: 600;
   background-color: color-mix(in srgb, var(--hms-amber) 18%, transparent);
-  box-shadow: inset 3px 0 0 var(--hms-amber);
 }
