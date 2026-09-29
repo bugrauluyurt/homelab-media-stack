@@ -188,7 +188,7 @@ with `openssl rand -hex 24`.
 | [`DATA_ROOT`](reference/configuration.md#data_root) | A folder inside `STORAGE_MOUNT`, such as `/mnt/storage/data` |
 | [`CONFIG_ROOT`](reference/configuration.md#config_root) | App settings on the system disk, outside the repo, such as `/home/<you>/homelab-media-stack-data/config` |
 | [`LAN_CIDR`](reference/configuration.md#lan_cidr) | Your home network, such as `192.168.1.0/24` |
-| [`PROWLARR_IP`](reference/configuration.md#prowlarr_ip), [`QBIT_PORT`](reference/configuration.md#qbit_port) | Keep the defaults unless they clash |
+| [`ARR_SUBNET`](reference/configuration.md#arr_subnet), [`PROWLARR_IP`](reference/configuration.md#prowlarr_ip), [`QBIT_PORT`](reference/configuration.md#qbit_port) | Keep the defaults unless they clash; `install-host` reports a subnet another Docker network already uses |
 | [`COMPOSE_PROFILES`](reference/configuration.md#compose_profiles) | Your modules, see [Pick your modules](#pick-your-modules) |
 | [`MEDIA_CPUS`](reference/configuration.md#media_cpus) | Cores Jellyfin, Plex and Byparr may each use; below your core count |
 | [`HOMEPAGE_ALLOWED_HOSTS`](reference/configuration.md#homepage_allowed_hosts) | Every `host:3000` you open Homepage on; SABnzbd and Jellyfin's plugins reuse this list |

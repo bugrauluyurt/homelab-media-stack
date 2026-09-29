@@ -199,6 +199,13 @@ Each entry says what you see, why it happens, and what to do.
   into `sabnzbd.ini` with the container stopped. SABnzbd silently ignores API changes to
   that setting. `health-check` verifies the tailnet is listed.
 
+## "Pool overlaps with other one on this address space" when the stack starts
+- **Cause:** another Docker network on the machine already uses the `arr` network's subnet.
+  Docker gives `172.18.0.0/16`, the default `ARR_SUBNET`, to the first other compose project.
+- **Fix:** `scripts/install-host` names the clashing network. Set a free `/16` as `ARR_SUBNET` in
+  `.env` (for example `172.28.0.0/16`) and move `PROWLARR_IP` into it (`172.28.0.200`), then
+  start the stack and re-run `configure-questarr.py`, which stores Prowlarr's address.
+
 ## An app won't open from home Wi-Fi, only Jellyfin, Seerr and the games page do
 - **This is by design:** the host firewall (`scripts/firewall`) lets the home network
   reach only Jellyfin (8096), Seerr (5055) and the games page (8090); SSH and SFTP (2022)
