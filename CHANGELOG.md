@@ -8,6 +8,8 @@ the release pull request publishes it ([how releases work](docs/operations/relea
 
 ## Unreleased
 
+## 2.1.0 - 2026-09-29
+
 ### Changed
 - The documented checkout is `~/homelab-media-stack`: the terminal aliases and the skills look there
   unless `MEDIA_STACK_DIR` says otherwise (it replaces `ARR_STACK_DIR`), and the example
