@@ -36,13 +36,15 @@ flowchart LR
   needle -->|"moves songs"| singles
   navidrome -.->|"reads"| music & singles
   needle -->|"song lookup"| mb["musicbrainz.org"]
+  needle -.->|"discovery playlists"| lb["ListenBrainz"]
+  navidrome -.->|"your listens"| lb
   app -.->|optional| spotify["Spotify"]
 ```
 
 | Piece | Where | What it keeps |
 |---|---|---|
 | Navidrome | `navidrome` container, port 4533 | Library index, users, playlists, likes. Two libraries: **Music Library** on `/music` (Lidarr's albums) and **Singles** on `/singles` (Needle's songs), both mounted read-only. Settings in `$CONFIG_ROOT/navidrome` |
-| Needle | `needle` container, published on `127.0.0.1:4535` only, reached over HTTPS through Tailscale Serve | `$CONFIG_ROOT/needle/needle.db`: play history, requests, account photos, Spotify sign-in, and what each person may do. It holds the Lidarr and slskd keys so no browser ever sees them |
+| Needle | `needle` container, published on `127.0.0.1:4535` only, reached over HTTPS through Tailscale Serve | `$CONFIG_ROOT/needle/needle.db`: play history, requests, account photos, Spotify sign-in, ListenBrainz tokens, and what each person may do. It holds the Lidarr and slskd keys so no browser ever sees them |
 | Lidarr | `lidarr` container, port 8686 | Which albums you want. Searches Soulseek, Usenet and torrents, imports into `$DATA_ROOT/media/music` |
 | slskd | `slskd`, inside gluetun's network, reached as `gluetun:5030` | The Soulseek client. Downloads to `$DATA_ROOT/soulseek/downloads` (unfinished files in `soulseek/incomplete`) and shares `media/music` back to the network |
 | Albums on disk | `$DATA_ROOT/media/music` | Lidarr's albums. Needle never writes here |
@@ -236,9 +238,59 @@ flowchart LR
 
 Details are in [Needle's architecture](https://github.com/bugrauluyurt/needle/blob/main/docs/architecture.md#spotify).
 
+## Discovery (ListenBrainz)
+
+[ListenBrainz](https://listenbrainz.org) turns what you play into weekly playlists: **Weekly
+Exploration** (songs you haven't heard), **Weekly Jams** and **Daily Jams** (songs you like, and
+more like them). Needle 1.6 and later shows them on Home under *Made for you by ListenBrainz* and
+fetches the songs you don't have through slskd, like any other single song.
+
+```mermaid
+flowchart LR
+  subgraph server["The server"]
+    needle["needle"]
+    navidrome["navidrome"]
+    subgraph vpn["gluetun's network"]
+      slskd["slskd"]
+    end
+    singles[("media/singles")]
+  end
+  lb["api.listenbrainz.org"]
+  navidrome -->|"your listens, as you play"| lb
+  needle -->|"your weekly playlists"| lb
+  needle -->|"Get N missing"| slskd
+  slskd ==>|"VPN tunnel"| soulseek["Soulseek network"]
+  needle -->|"moves songs"| singles
+  navidrome -.->|"reads"| singles
+```
+
+1. **Each listener connects their own account** in Needle, *Settings, ListenBrainz*, with their
+   ListenBrainz user token ([Listening to music](../using/music.md#discovery-with-listenbrainz)).
+   Nothing in `.env` or the compose file changes.
+2. **Navidrome sends the listens.** With the token linked in Navidrome (*Settings, Personal,
+   ListenBrainz*), Navidrome scrobbles every song played through it, from Needle or any Subsonic
+   app. Needle never sends listens itself, so nothing counts twice. When the listener types their
+   Navidrome password while connecting, Needle signs in to Navidrome once to link the token and
+   then drops the password: it is never stored or logged.
+3. **Needle reads the playlists.** It asks ListenBrainz at most once a second, keeps the list of
+   playlists for an hour and each playlist for a day, and matches every song to the library by its
+   MusicBrainz recording ID, then by title and artist.
+4. **Missing songs come from Soulseek.** *Get N missing* on a playlist asks slskd for up to 50
+   songs, two downloads at a time, inside the VPN. They land in `media/singles` and show up after
+   Navidrome's next scan. Only people allowed to request music see the button.
+5. **Save as playlist** writes the songs you have to a Navidrome playlist.
+
+Needle's *Settings, Connections* shows **ListenBrainz (discovery)**: working when Navidrome sent a
+listen in the last 7 days, a warning with the fix when it hasn't.
+
+Lidarr and Tubifarry are unchanged by this. A later option is Lidarr's nightly branch with
+Tubifarry 2.2, which adds synced `.lrc` lyrics and a Queue Cleaner for stuck downloads; it stays
+on the current versions until that is worth the move off Lidarr's stable releases.
+
 ## What's backed up
 
-The nightly backup covers `$CONFIG_ROOT`, so Navidrome's database and `needle.db` are safe. The
+The nightly backup covers `$CONFIG_ROOT`, so Navidrome's database and `needle.db` (with the
+ListenBrainz tokens) are safe. The
 music itself, including `media/singles`, isn't backed up; it can be fetched again. See
 [Backups](backups.md).
 
