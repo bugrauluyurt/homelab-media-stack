@@ -104,6 +104,12 @@ Each entry says what you see, why it happens, and what to do.
   check Byparr is healthy (`docker inspect -f '{{.State.Health.Status}}' byparr`).
 - **Nothing found for an old or obscure title:** public trackers are patchy; no setting fixes
   that. A tracker with an account, added to Prowlarr, is the real fix.
+- **Every game search in Questarr takes 30 s:** Questarr waits for all indexers, up to 30 s. One
+  that answers slowly instead of failing (Knaben, September 2026) holds every search to that limit,
+  and Prowlarr's backoff doesn't catch it. Questarr's log names it ("error searching indexer" after
+  a timeout). Switch it off in Prowlarr (edit the indexer, untick **Enable**), then re-run
+  `scripts/configure-questarr.py`, which copies the on/off state into Questarr. Turn it back on
+  once Prowlarr's **Test** answers in a few seconds.
 
 ## Releases shown as rejected
 - **Cause:** usually TRaSH's quality rules: a low-quality or unknown release group, or a file
