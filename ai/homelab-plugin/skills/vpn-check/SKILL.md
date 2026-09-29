@@ -5,8 +5,8 @@ description: Verify that all torrent and Soulseek traffic goes through the Proto
 
 # VPN and kill-switch check
 
-Read-only. P2P from the home IP isn't allowed where the user lives, so treat any leak
-as urgent and say so plainly.
+Read-only. P2P must never leave from the home IP, so treat any leak as urgent and
+say so plainly.
 
 ## 1. Exit IP and forwarded port
 

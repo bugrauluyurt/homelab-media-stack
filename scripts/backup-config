@@ -161,8 +161,9 @@ def main(extra_tags):
     # Kept beside the repo too, so a dead NVMe (and its .env) cannot leave these backups unreadable.
     key = ENV["RESTIC_PASSWORD"] + "\n"
     if not KEYFILE.exists() or KEYFILE.read_text() != key:
-        KEYFILE.write_text(key)
+        KEYFILE.touch(mode=0o600)
         KEYFILE.chmod(0o600)
+        KEYFILE.write_text(key)
 
     if not (REPO / "config").exists():
         restic("init")
