@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 """Host firewall for IPv4 and IPv6. Run as root.
 
-From the home network the Pi answers only on Jellyfin, Seerr and the games page (plus
+From the home network the server answers only on Jellyfin, Seerr and the games page (plus
 DHCP, mDNS and Tailscale); SSH and every other port answer only on the tailnet.
 
   firewall         apply (only rebuilds when the wanted rules changed)

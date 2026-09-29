@@ -1,12 +1,12 @@
 // Tailscale access policy for this stack. Tailscale keeps the live copy: paste
 // this into https://login.tailscale.com/admin/acls/file (JSON editor), with the
-// placeholder emails replaced, then tag the Pi: Machines → the Pi → ⋯ →
+// placeholder emails replaced, then tag the server: Machines → the server → ⋯ →
 // Edit ACL tags → tag:media.
 //
 // - You (every device you sign in to) reach everything.
 // - Each viewer (a Member of your tailnet, listed in group:viewers) reaches only
 //   Jellyfin (8096), Seerr (5055), Questarr (5000), game downloads (8090 web,
-//   2022 SFTP) and Needle (4535, music) on the Pi, and none of your other devices.
+//   2022 SFTP) and Needle (4535, music) on the server, and none of your other devices.
 //   Navidrome itself (4533) stays closed: Needle passes music through. Access follows the person:
 //   don't tag their devices, or they stop counting as that person.
 // - The Pi is tagged, so it owns nothing and may start no connections: if it

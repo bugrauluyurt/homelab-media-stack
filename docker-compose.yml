@@ -554,7 +554,7 @@ services:
       <<: *hc
       test: ["CMD", "curl", "-f", "http://localhost:11011/health"]
 
-  # Mounting the real socket, even :ro, gives full control of Docker (root on the Pi), so clients use this.
+  # Mounting the real socket, even :ro, gives full control of Docker (root on the host), so clients use this.
   # It answers read-only endpoints only (POST=0) and publishes no port.
   socket-proxy:
     <<: *common

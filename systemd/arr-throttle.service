@@ -1,5 +1,5 @@
 [Unit]
-Description=Cap qBittorrent while someone is watching or the Pi is overloaded
+Description=Cap qBittorrent while someone is watching or the server is overloaded
 # The whole stack is down while the drive is off; nothing to throttle then.
 ConditionPathIsMountPoint=@STORAGE_MOUNT@
 After=arr-stack.service

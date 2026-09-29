@@ -17,6 +17,8 @@ the release pull request publishes it ([how releases work](docs/operations/relea
   in `glance/glance.yml` and `glance/youtube-channels.json`.
 
 ### Fixed
+- The plugin description, script messages and comments say "the server" instead of "the Pi",
+  since the stack runs on any supported machine.
 - Glance's YouTube rows show videos again. YouTube's RSS feed answers 404 for hours at a time, so
   `sync-youtube.py` now fetches the latest uploads hourly, through the Data API once you are signed
   in, and keeps a channel's last videos when it can't be read. `arr-youtube.timer` runs hourly

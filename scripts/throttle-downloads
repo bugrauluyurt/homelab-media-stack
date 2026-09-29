@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cap qBittorrent while someone is watching or the Pi is overloaded; run every minute by arr-throttle.timer.
+"""Cap qBittorrent while someone is watching or the server is overloaded; run every minute by arr-throttle.timer.
 
 Uploads always stay capped at 10 Mbps. Downloads get the alternative speed limit while anyone
 plays in Jellyfin or Plex or the 5-minute load is LOAD_ON or more, until nobody watches and

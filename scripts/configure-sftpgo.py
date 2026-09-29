@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Set up SFTPGo, the read-only games download page: start it, lock its admin
-to the Pi, and create your login from GAMES_USER / GAMES_PASSWORD in .env.
+to the server, and create your login from GAMES_USER / GAMES_PASSWORD in .env.
 Viewers' logins come from add-viewer.py. Idempotent: a second run changes nothing.
 """
 import subprocess
@@ -23,7 +23,7 @@ for folder in (USENET_GAMES, CONFIG / "sftpgo"):
 subprocess.run(["docker", "compose", "up", "-d", "sftpgo"], cwd=REPO, check=True, capture_output=True)
 wait_ready()
 
-print(f"  {'+ admin limited' if lock_admin(admin()) else '= admin limited'} to the Pi and Docker")
+print(f"  {'+ admin limited' if lock_admin(admin()) else '= admin limited'} to the server and Docker")
 
 if login_works(user, password):
     print(f"  {ensure(user)} games login '{user}' (read-only)")
