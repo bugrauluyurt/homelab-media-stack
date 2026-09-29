@@ -38,6 +38,9 @@ if req("/System/Info/Public")["StartupWizardCompleted"]:
 req("/Startup/Configuration", {"UICulture": "en-US", "MetadataCountryCode": "US",
                                "PreferredMetadataLanguage": "en"})
 
+# Jellyfin 12 creates the first user only when the wizard reads it; the POST then names it.
+req("/Startup/User")
+
 try:
     req("/Startup/User", {"Name": USER, "Password": PW})
     print(f"  + created admin user '{USER}'")
