@@ -89,7 +89,9 @@ How it works, and what to know when you change it:
   request at a time, so every subreddit shares one combined feed (`r/a+b+c/.rss`), refreshed
   every two hours. Add a subreddit by extending the `+` list, never with a second Reddit feed.
 - **Samples to edit:** the subreddits, the stock list (`&stocks` in `glance/glance.yml`) and the
-  pinned YouTube channels ship as generic examples; replace them with your own.
+  pinned YouTube channels ship as generic examples; replace them with your own. Keep your pins out
+  of the repository by copying `glance/youtube-channels.json` to `$CONFIG_ROOT/glance/`: when that
+  copy exists, the sync reads it instead.
 - **Pending updates and the last backup** reach Glance through Prometheus: `check-updates`,
   `update` and `backup-config` write them as metrics, which node-exporter exports, so Grafana has
   their history too.
@@ -106,7 +108,7 @@ Every hour (`arr-youtube.timer`) `sync-youtube.py` writes the lists to
 `$CONFIG_ROOT/glance/youtube-*.yml` and each tab's newest 25 videos to
 `$CONFIG_ROOT/glance/youtube/<tab>.json`, which Glance reads from `/assets/youtube/` and draws like
 its own videos widget. The sync reads your subscriptions, most relevant first, keeps the **pinned** channels in
-`glance/youtube-channels.json` that you still follow, and fills the remaining slots (the limits are
+`glance/youtube-channels.json` (or your copy in `$CONFIG_ROOT/glance/`) that you still follow, and fills the remaining slots (the limits are
 in the same file) with channels whose YouTube topic tags say gaming, technology or business.
 Unsubscribe and a channel disappears; subscribe and it shows up if it fits a row. Put a channel
 under `skip` to keep it out, or pin it to force its row. Until you sign in, the pinned lists are
