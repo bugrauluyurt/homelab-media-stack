@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+# Report which stack images have a newer build upstream for this machine's architecture, pushing each new one to ntfy once.
+# Notify only: it never pulls or restarts. arr-updates.timer runs it daily; health-check reads the result.
+
+set -uo pipefail
+. "$(dirname "$0")/stack-env.sh"
+cd "$REPO" || exit 1
+
+STATE="$STATE_ROOT/updates"
+mkdir -p "$(dirname "$STATE")"
+
+ARCH=$(docker version -f '{{.Server.Arch}}')
+export ARCH
+
+# Compare this architecture's manifest, not the multi-arch index: the index changes when any architecture rebuilds.
+platform_digest() {
+  docker buildx imagetools inspect "$1" --format '{{json .Manifest}}' 2>/dev/null | python3 -c '
+import json, os, sys
+d = json.load(sys.stdin)
+ms = d.get("manifests")
+if not ms:
+    print(d.get("digest", ""))
+else:
+    print(next((m["digest"] for m in ms if m["platform"].get("os") == "linux"
+                and m["platform"].get("architecture") == os.environ["ARCH"]), ""))' 2>/dev/null
+}
+
+# Version label of a local image, or with --remote of the tag's build for this architecture upstream. Unversioned
+# images fall back to their build date, so an update never reads "latest -> latest".
+version_of() {
+  if [ "${2:-}" = --remote ]; then
+    docker buildx imagetools inspect "$1" --format '{{json .Image}}' 2>/dev/null
+  else
+    docker image inspect "$1" --format '{{json .}}' 2>/dev/null
+  fi | python3 -c '
+import json, os, sys
+d = json.load(sys.stdin)
+if isinstance(d, list):
+    d = d[0]
+cfg = d.get("linux/" + os.environ["ARCH"], d)
+labels = (cfg.get("config") or cfg.get("Config") or {}).get("Labels") or {}
+v = labels.get("org.opencontainers.image.version") or labels.get("build_version") or ""
+if v in ("", "latest", "main", "master"):
+    built = labels.get("org.opencontainers.image.created") or cfg.get("created") or cfg.get("Created") or ""
+    v = "built-" + built[:10] if built else "?"
+print(v)' 2>/dev/null || echo "?"
+}
+
+check() {
+  local img=$1 repo local_idx mine now
+  repo=${img%:*}
+  local_idx=$(docker image inspect -f '{{range .RepoDigests}}{{println .}}{{end}}' "$img" 2>/dev/null \
+              | grep -m1 @ | cut -d@ -f2)
+  mine=$(platform_digest "$repo@$local_idx")
+  now=$(platform_digest "$img")
+
+  if [ -z "$mine" ] || [ -z "$now" ]; then echo "unknown $img"
+  elif [ "$mine" = "$now" ]; then echo "current $img"
+  else echo "update $img $(version_of "$img") $(version_of "$img" --remote)"
+  fi
+}
+
+export -f platform_digest version_of check
+
+images=$(docker compose ps --format '{{.Image}}' | sort -u)
+results=$(printf '%s\n' $images | xargs -P 6 -I{} bash -c 'check "$@"' _ {})
+
+{
+  echo "checked=$(date -Iseconds)"
+  printf '%s\n' "$results" | sort
+} > "$STATE"
+write_update_metrics
+
+updates=$(printf '%s\n' "$results" | awk '$1=="update"{print $2}')
+
+NOTIFIED="$STATE.notified"
+new=$(comm -13 <(sort -u "$NOTIFIED" 2>/dev/null) <(printf '%s\n' $updates | sort -u) | grep .)
+printf '%s\n' $updates > "$NOTIFIED"
+
+if [ -n "$new" ]; then
+  body=$(printf '%s\n' "$results" | python3 -c '
+import json, re, sys
+services = json.loads(sys.argv[1])["services"]
+new = set(sys.argv[2].split())
+major = lambda v: (re.match(r"v?(\d+)", v) or [None, None])[1]
+for line in sys.stdin:
+    kind, img, *ver = line.split()
+    if kind != "update" or img not in new:
+        continue
+    old, now = (ver + ["?", "?"])[:2]
+    names = ", ".join(n for n, s in services.items() if s.get("image") == img) or img
+    flag = "  MAJOR" if major(old) and major(now) and major(old) != major(now) else ""
+    print(f"{names}: {old} -> {now}{flag}")
+' "$(docker compose config --format json)" "$new")
+  notify "arr-stack: $(printf '%s\n' $new | wc -l) update(s) available" package "$body
+Apply with: update"
+fi
+
+unknown=$(printf '%s\n' "$results" | awk '$1=="unknown"{print $2}')
+echo "$(printf '%s\n' "$results" | grep -c '^current') current, $(printf '%s\n' "$updates" | grep -c .) with updates"
+printf '%s\n' "$results" | awk '$1=="update"{printf "  update available: %s  %s -> %s\n", $2, $3, $4}'
+[ -n "$unknown" ] && printf '  could not check:  %s\n' $unknown
+[ -n "$updates" ] && echo "  apply with:       $REPO/scripts/update   (all, or name services)"
+exit 0

@@ -1,0 +1,12 @@
+{
+  "name": "homelab-media-stack",
+  "owner": { "name": "Bugra Uluyurt" },
+  "plugins": [
+    {
+      "name": "homelab",
+      "source": { "source": "local", "path": "./ai/homelab-plugin" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "category": "Productivity"
+    }
+  ]
+}

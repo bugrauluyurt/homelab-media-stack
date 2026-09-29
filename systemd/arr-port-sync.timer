@@ -1,0 +1,9 @@
+[Unit]
+Description=Periodically reconcile the Proton forwarded port
+
+[Timer]
+OnBootSec=90sec
+OnUnitActiveSec=15min
+
+[Install]
+WantedBy=timers.target

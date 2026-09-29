@@ -1,0 +1,9 @@
+{
+  "manifest_version": 3,
+  "name": "Glance Lab new tab",
+  "description": "Opens Glance's Lab page in every new tab.",
+  "version": "1.1",
+  "chrome_url_overrides": {
+    "newtab": "newtab.html"
+  }
+}

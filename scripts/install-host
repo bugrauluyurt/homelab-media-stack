@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+# Install the host side of the stack: systemd units and udev rules from systemd/ (with .env values
+# filled into their @PLACEHOLDERS@), plus the SSH hardening and Docker defaults from host/.
+# Checks prerequisites first and prints the package command for anything missing. Safe to re-run.
+
+set -euo pipefail
+. "$(dirname "$0")/stack-env.sh"
+
+STACK_GROUP=$(id -gn "$STACK_USER")
+STORAGE_UNIT=$(systemd-escape --path --suffix=mount "$STORAGE_MOUNT")
+
+# Debian keeps smartctl, hdparm and sshd in sbin, outside a normal user's PATH.
+PATH="$PATH:/usr/sbin:/sbin"
+
+os_family=$(. /etc/os-release; case " ${ID:-} ${ID_LIKE:-} " in
+  *" arch "*) echo arch ;;
+  *" debian "* | *" ubuntu "*) echo debian ;;
+  *) echo other ;;
+esac)
+
+# check | Debian/Ubuntu package | Arch package
+requirements=(
+  "command -v docker|docker-ce|docker"
+  "docker compose version|docker-compose-plugin|docker-compose"
+  "docker buildx version|docker-buildx-plugin|docker-buildx"
+  "command -v restic|restic|restic"
+  "command -v smartctl|smartmontools|smartmontools"
+  "command -v hdparm|hdparm|hdparm"
+  "command -v lsof|lsof|lsof"
+  "command -v ip6tables|iptables|iptables-nft"
+  "command -v tailscale|tailscale|tailscale"
+  "command -v avahi-daemon|avahi-daemon|avahi"
+  "grep -q mdns /etc/nsswitch.conf|libnss-mdns|nss-mdns"
+  "python3 -c 'import sys; sys.exit(sys.version_info < (3, 9))'|python3|python"
+)
+
+missing_packages=()
+for requirement in "${requirements[@]}"; do
+  IFS='|' read -r check debian_package arch_package <<< "$requirement"
+  eval "$check" >/dev/null 2>&1 && continue
+
+  if [ "$os_family" = arch ]; then
+    missing_packages+=("$arch_package")
+  else
+    missing_packages+=("$debian_package")
+  fi
+done
+
+problems=()
+if [ ${#missing_packages[@]} -gt 0 ]; then
+  case "$os_family" in
+    arch) problems+=("missing packages: sudo pacman -S --needed ${missing_packages[*]}") ;;
+    debian)
+      problems+=("missing packages: sudo apt-get install ${missing_packages[*]}")
+      [[ " ${missing_packages[*]} " =~ \ (docker-|tailscale) ]] &&
+        problems+=("  (docker-* and tailscale come from their own apt repositories: docs.docker.com/engine/install, tailscale.com/download/linux)")
+      ;;
+    *) problems+=("missing packages (names vary by distribution): ${missing_packages[*]}") ;;
+  esac
+fi
+
+[ "$os_family" = arch ] && ! grep -q mdns /etc/nsswitch.conf &&
+  problems+=("after installing nss-mdns, add 'mdns_minimal [NOTFOUND=return]' before 'resolve' on the hosts line of /etc/nsswitch.conf")
+
+# The timers run health-check and the firewall checks with sudo, unattended.
+sudo -n true 2>/dev/null ||
+  problems+=("$STACK_USER needs passwordless sudo: echo '$STACK_USER ALL=(ALL) NOPASSWD: ALL' | sudo tee /etc/sudoers.d/arr-stack")
+
+id -nG "$STACK_USER" | grep -qw docker ||
+  problems+=("$STACK_USER is not in the docker group: sudo usermod -aG docker $STACK_USER, then log in again")
+
+if [ ${#problems[@]} -gt 0 ]; then
+  printf '  ! %s\n' "${problems[@]}"
+  exit 1
+fi
+
+echo "  = prerequisites present ($os_family)"
+
+render() {
+  sed -e "s|@REPO@|$REPO|g" -e "s|@STACK_USER@|$STACK_USER|g" -e "s|@STACK_GROUP@|$STACK_GROUP|g" \
+      -e "s|@STORAGE_UUID@|${STORAGE_UUID:-}|g" -e "s|@STORAGE_MOUNT@|$STORAGE_MOUNT|g" -e "s|@STORAGE_UNIT@|$STORAGE_UNIT|g" "$1"
+}
+
+for template in "$REPO"/systemd/*; do
+  name=$(basename "$template")
+
+  case "$template" in
+    *.rules) dest=/etc/udev/rules.d ;;
+    *) dest=/etc/systemd/system ;;
+  esac
+
+  # Without a UUID the media disk is always mounted (fstab or a bind mount), so there is nothing to hot-plug.
+  if [ "$name" = 99-arr-storage.rules ] && [ -z "${STORAGE_UUID:-}" ]; then
+    sudo rm -f "$dest/$name"
+    echo "  - skipped $name (no STORAGE_UUID: the media disk is always mounted)"
+    continue
+  fi
+
+  render "$template" | sudo tee "$dest/$name" >/dev/null
+  echo "  installed $dest/$name"
+done
+
+sudo systemctl daemon-reload
+sudo udevadm control --reload
+
+sudo install -D -m 644 -t /etc/ssh/sshd_config.d "$REPO"/host/sshd_config.d/*.conf
+sudo sshd -t
+sudo systemctl reload ssh 2>/dev/null || sudo systemctl reload sshd
+
+if sudo sshd -T | grep -qx 'passwordauthentication no'; then
+  echo "  installed SSH hardening (keys only)"
+else
+  echo "  ! SSH hardening not active: add 'Include /etc/ssh/sshd_config.d/*.conf' at the top of /etc/ssh/sshd_config"
+fi
+
+if ! sudo cmp -s "$REPO/host/docker/daemon.json" /etc/docker/daemon.json; then
+  sudo install -D -m 644 "$REPO/host/docker/daemon.json" /etc/docker/daemon.json
+  echo "  installed Docker log rotation; applies after 'sudo systemctl restart docker' (restarts every container)"
+fi
+
+sudo systemctl disable --now rpcbind.socket rpcbind.service 2>/dev/null || true
+sudo systemctl mask rpcbind.socket rpcbind.service >/dev/null
+echo "  rpcbind off (no NFS here)"

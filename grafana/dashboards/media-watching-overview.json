@@ -1,0 +1,706 @@
+{
+  "id": null,
+  "uid": "media-watching-overview",
+  "title": "Media Server: Watching",
+  "description": "Recorded Jellyfin playback from Jellystat, queried with a column-scoped read-only database role.",
+  "tags": [
+    "arr-stack",
+    "overview"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "1m",
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "1m",
+      "5m",
+      "15m"
+    ],
+    "time_options": [
+      "1h",
+      "6h",
+      "24h",
+      "7d",
+      "30d"
+    ]
+  },
+  "annotations": {
+    "list": []
+  },
+  "templating": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "About this dashboard",
+      "type": "text",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 3
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 1,
+          "noValue": "No data",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "**Recorded Jellyfin viewing activity, not a live Now Playing feed.** Uses existing Jellystat history; no tracking before Jellystat was installed. The selected range filters each record by its ActivityDateInserted timestamp. Full recorded durations are assigned to that timestamp, not split across days; sessions may be partial or repeated. CPU history and watching history are available separately through the links above."
+      },
+      "targets": []
+    },
+    {
+      "id": 2,
+      "title": "Recorded sessions",
+      "type": "stat",
+      "gridPos": {
+        "x": 0,
+        "y": 3,
+        "w": 6,
+        "h": 4
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "No data",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "jellystat-readonly"
+          },
+          "rawSql": "SELECT count(*) AS \"Recorded sessions\" FROM public.jf_playback_activity WHERE $__timeFilter(\"ActivityDateInserted\")",
+          "format": "table",
+          "editorMode": "code",
+          "rawQuery": true
+        }
+      ],
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "jellystat-readonly"
+      }
+    },
+    {
+      "id": 3,
+      "title": "Recorded watch time",
+      "type": "stat",
+      "gridPos": {
+        "x": 6,
+        "y": 3,
+        "w": 6,
+        "h": 4
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 1,
+          "noValue": "No data",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "jellystat-readonly"
+          },
+          "rawSql": "SELECT coalesce(sum(\"PlaybackDuration\"),0) AS \"Recorded watch time\" FROM public.jf_playback_activity WHERE $__timeFilter(\"ActivityDateInserted\")",
+          "format": "table",
+          "editorMode": "code",
+          "rawQuery": true
+        }
+      ],
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "jellystat-readonly"
+      }
+    },
+    {
+      "id": 4,
+      "title": "Active viewers",
+      "type": "stat",
+      "gridPos": {
+        "x": 12,
+        "y": 3,
+        "w": 6,
+        "h": 4
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "No data",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "jellystat-readonly"
+          },
+          "rawSql": "SELECT count(distinct \"UserId\") AS \"Active viewers\" FROM public.jf_playback_activity WHERE $__timeFilter(\"ActivityDateInserted\")",
+          "format": "table",
+          "editorMode": "code",
+          "rawQuery": true
+        }
+      ],
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "jellystat-readonly"
+      }
+    },
+    {
+      "id": 5,
+      "title": "Transcoded sessions",
+      "type": "stat",
+      "gridPos": {
+        "x": 18,
+        "y": 3,
+        "w": 6,
+        "h": 4
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "No data",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "jellystat-readonly"
+          },
+          "rawSql": "SELECT count(*) FILTER (WHERE \"PlayMethod\" = 'Transcode') AS \"Transcoded sessions\" FROM public.jf_playback_activity WHERE $__timeFilter(\"ActivityDateInserted\")",
+          "format": "table",
+          "editorMode": "code",
+          "rawQuery": true
+        }
+      ],
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "jellystat-readonly"
+      }
+    },
+    {
+      "id": 6,
+      "title": "Recorded watch hours by day",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 7,
+        "w": 12,
+        "h": 8
+      },
+      "description": "UTC day buckets, displayed in browser timezone. Full durations assigned to record timestamp. Missing days are not fabricated.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "h",
+          "decimals": 1,
+          "noValue": "No data",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": false,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "jellystat-readonly"
+          },
+          "rawSql": "SELECT date_trunc('day', \"ActivityDateInserted\" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' AS \"time\", sum(\"PlaybackDuration\")/3600.0 AS \"Hours\" FROM public.jf_playback_activity WHERE $__timeFilter(\"ActivityDateInserted\") GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "editorMode": "code",
+          "rawQuery": true
+        }
+      ],
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "jellystat-readonly"
+      }
+    },
+    {
+      "id": 7,
+      "title": "Sessions by day",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 7,
+        "w": 12,
+        "h": 8
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 1,
+          "noValue": "No data",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": false,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "jellystat-readonly"
+          },
+          "rawSql": "SELECT date_trunc('day', \"ActivityDateInserted\" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' AS \"time\", count(*) AS \"Sessions\" FROM public.jf_playback_activity WHERE $__timeFilter(\"ActivityDateInserted\") GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "editorMode": "code",
+          "rawQuery": true
+        }
+      ],
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "jellystat-readonly"
+      }
+    },
+    {
+      "id": 8,
+      "title": "Viewing by user",
+      "type": "table",
+      "gridPos": {
+        "x": 0,
+        "y": 15,
+        "w": 12,
+        "h": 9
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 1,
+          "noValue": "No data",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "jellystat-readonly"
+          },
+          "rawSql": "SELECT coalesce(\"UserName\",'Unknown') AS \"Viewer\", count(*) AS \"Sessions\", round(sum(\"PlaybackDuration\")/3600.0,2) AS \"Hours\", max(\"ActivityDateInserted\") AS \"Latest record\" FROM public.jf_playback_activity WHERE $__timeFilter(\"ActivityDateInserted\") GROUP BY \"UserId\",\"UserName\" ORDER BY \"Hours\" DESC",
+          "format": "table",
+          "editorMode": "code",
+          "rawQuery": true
+        }
+      ],
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "jellystat-readonly"
+      }
+    },
+    {
+      "id": 9,
+      "title": "Most watched titles / series",
+      "type": "table",
+      "gridPos": {
+        "x": 12,
+        "y": 15,
+        "w": 12,
+        "h": 9
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 1,
+          "noValue": "No data",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "jellystat-readonly"
+          },
+          "rawSql": "SELECT coalesce(nullif(\"SeriesName\",''),\"NowPlayingItemName\",'Unknown') AS \"Title\", count(*) AS \"Sessions\", round(sum(\"PlaybackDuration\")/3600.0,2) AS \"Hours\" FROM public.jf_playback_activity WHERE $__timeFilter(\"ActivityDateInserted\") GROUP BY 1 ORDER BY \"Hours\" DESC LIMIT 15",
+          "format": "table",
+          "editorMode": "code",
+          "rawQuery": true
+        }
+      ],
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "jellystat-readonly"
+      }
+    },
+    {
+      "id": 10,
+      "title": "Playback methods",
+      "type": "table",
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 24,
+        "h": 6
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 1,
+          "noValue": "No data",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "jellystat-readonly"
+          },
+          "rawSql": "SELECT coalesce(\"PlayMethod\",'Unknown') AS \"Method\",count(*) AS \"Sessions\", round(sum(\"PlaybackDuration\")/3600.0,2) AS \"Hours\" FROM public.jf_playback_activity WHERE $__timeFilter(\"ActivityDateInserted\") GROUP BY 1 ORDER BY \"Sessions\" DESC",
+          "format": "table",
+          "editorMode": "code",
+          "rawQuery": true
+        }
+      ],
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "jellystat-readonly"
+      }
+    },
+    {
+      "id": 11,
+      "title": "Recent recorded sessions",
+      "type": "table",
+      "gridPos": {
+        "x": 0,
+        "y": 30,
+        "w": 24,
+        "h": 12
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 1,
+          "noValue": "No data",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "jellystat-readonly"
+          },
+          "rawSql": "SELECT \"ActivityDateInserted\" AS \"Recorded at\", \"UserName\" AS \"Viewer\", coalesce(nullif(\"SeriesName\",'') || ': ' ,'') || coalesce(\"NowPlayingItemName\",'Unknown') AS \"Title\", round(\"PlaybackDuration\"/60.0,1) AS \"Minutes\", \"PlayMethod\" AS \"Method\" FROM public.jf_playback_activity WHERE $__timeFilter(\"ActivityDateInserted\") ORDER BY \"ActivityDateInserted\" DESC LIMIT 50",
+          "format": "table",
+          "editorMode": "code",
+          "rawQuery": true
+        }
+      ],
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "jellystat-readonly"
+      }
+    }
+  ],
+  "links": [
+    {
+      "title": "Server Overview",
+      "url": "/d/media-server-overview",
+      "type": "link",
+      "keepTime": true
+    },
+    {
+      "title": "Watching Overview",
+      "url": "/d/media-watching-overview",
+      "type": "link",
+      "keepTime": true
+    },
+    {
+      "title": "Detailed hardware",
+      "url": "/d/rYdddlPWk",
+      "type": "link",
+      "keepTime": true
+    }
+  ]
+}

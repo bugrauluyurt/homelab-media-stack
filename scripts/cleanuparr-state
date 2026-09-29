@@ -1,0 +1,25 @@
+#!/usr/bin/env python3
+"""Print Cleanuparr's safety-relevant state: `live|dryrun downloadcleaner=on|off ignored=a,b`."""
+import json
+import urllib.request
+
+from stack_env import ENV
+
+B = "http://127.0.0.1:11011/api"
+
+pw = ENV["CLEANUPARR_PASSWORD"]
+
+
+def req(p, body=None, tok=None):
+    h = {"Content-Type": "application/json", **({"Authorization": f"Bearer {tok}"} if tok else {})}
+    d = json.dumps(body).encode() if body is not None else None
+    return json.loads(urllib.request.urlopen(urllib.request.Request(B + p, data=d, headers=h), timeout=15).read())
+
+
+tok = req("/auth/login", {"username": "admin", "password": pw})["tokens"]["accessToken"]
+
+g = req("/configuration/general", tok=tok)
+live = "dryrun" if g["dryRun"] else "live"
+dc = "on" if req("/configuration/download_cleaner", tok=tok)["enabled"] else "off"
+
+print(f"{live} downloadcleaner={dc} ignored={','.join(g['ignoredDownloads'])}")

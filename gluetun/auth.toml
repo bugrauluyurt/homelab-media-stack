@@ -1,0 +1,8 @@
+# gluetun's control server requires auth on every route. This opens exactly one,
+# read-only and without credentials: the forwarded port, which Uptime Kuma checks
+# so a lost port raises an alert. Port 8000 isn't published; only containers on
+# the arr network can ask.
+[[roles]]
+name = "port-monitor"
+routes = ["GET /v1/portforward"]
+auth = "none"

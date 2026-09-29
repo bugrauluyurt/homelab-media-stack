@@ -1,0 +1,21 @@
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # The Pi itself: CPU, RAM, disk, network, SoC temperature.
+  - job_name: node
+    static_configs:
+      - targets: ["node-exporter:9100"]
+
+  # One exporter covering Radarr, Sonarr, Prowlarr and Bazarr.
+  # Scraping the arr APIs is slow, so give it room.
+  - job_name: scraparr
+    scrape_interval: 60s
+    scrape_timeout: 45s
+    static_configs:
+      - targets: ["scraparr:7100"]

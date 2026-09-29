@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>homelab-media-stack banner</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500&display=swap">
+<style>
+  :root { --night: #1B1D44; --mist: #E8ECF6; --muted: #A3AACB; --amber: #F0A038; }
+  html, body { margin: 0; width: 1280px; height: 640px; overflow: hidden; background: var(--night); }
+  .banner { position: relative; overflow: hidden; width: 1280px; height: 640px; font-family: "Instrument Sans", "Helvetica Neue", Arial, sans-serif; color: var(--mist); }
+  /* The disc runs off the right edge; its frame stays inside the page, or headless Chrome shifts the capture. */
+  .disc-frame { position: absolute; left: 730px; top: 0; right: 0; bottom: 0; overflow: hidden; }
+  .disc { position: absolute; left: 0; top: -30px; width: 700px; height: 700px; }
+  .copy { position: absolute; left: 88px; top: 50%; transform: translateY(-50%); width: 610px; display: flex; flex-direction: column; gap: 26px; }
+  .name { display: flex; align-items: center; gap: 16px; font: 700 34px/1 "Bricolage Grotesque", sans-serif; letter-spacing: -0.01em; }
+  .name svg { width: 52px; height: 52px; }
+  h1 { margin: 0; font: 700 62px/1.04 "Bricolage Grotesque", sans-serif; letter-spacing: -0.025em; text-wrap: balance; }
+  p { margin: 0; font-size: 23px; line-height: 1.45; color: var(--muted); max-width: 30em; }
+</style>
+</head>
+<body>
+<div class="banner">
+  <div class="disc-frame">
+  <svg class="disc" viewBox="0 0 64 64" aria-hidden="true">
+    <defs><clipPath id="big"><circle cx="29" cy="32" r="25"/></clipPath></defs>
+    <g fill="#262A5E" clip-path="url(#big)">
+      <rect y="7" width="64" height="10.25"/><rect y="20.25" width="64" height="10.25"/><rect y="46.75" width="64" height="10.25"/>
+    </g>
+    <g transform="translate(7 0)"><rect y="33.5" width="64" height="10.25" fill="#F0A038" clip-path="url(#big)"/></g>
+  </svg>
+  </div>
+
+  <div class="copy">
+    <div class="name">
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <defs><clipPath id="small"><circle cx="29" cy="32" r="25"/></clipPath></defs>
+        <g fill="#E8ECF6" clip-path="url(#small)">
+          <rect y="7" width="64" height="10.25"/><rect y="20.25" width="64" height="10.25"/><rect y="46.75" width="64" height="10.25"/>
+        </g>
+        <g transform="translate(7 0)"><rect y="33.5" width="64" height="10.25" fill="#F0A038" clip-path="url(#small)"/></g>
+      </svg>
+      homelab media stack
+    </div>
+    <h1>Movies, TV, music and games on a server you own.</h1>
+    <p>Ask for it in Seerr, fetch it over Usenet or a sealed VPN, watch it in Jellyfin. On a Raspberry Pi 5 or any x86-64 box, with Debian, Ubuntu or Arch.</p>
+  </div>
+</div>
+</body>
+</html>

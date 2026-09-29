@@ -1,0 +1,15 @@
+name: Idea or improvement
+description: Suggest a change to the stack, its scripts or its docs.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem it solves
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you propose

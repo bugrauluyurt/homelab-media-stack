@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Safely stop the media stack and unmount the media drive before cutting its power.
+
+set -euo pipefail
+. "$(dirname "$0")/stack-env.sh"
+
+MOUNT=$STORAGE_MOUNT
+
+echo "==> Stopping media stack..."
+sudo systemctl stop arr-stack.service || true
+
+if ! mountpoint -q "$MOUNT"; then
+  echo "==> $MOUNT already unmounted. Safe to power off."
+  exit 0
+fi
+
+# Resolve the disk while it is still mounted; never spin down the disk / lives on.
+DISK=$(disk_of_mount "$MOUNT")
+ROOT_DISK=$(disk_of_mount /)
+
+echo "==> Flushing writes to disk..."
+sync
+
+echo "==> Unmounting $MOUNT..."
+ATTEMPTS=3
+for attempt in $(seq "$ATTEMPTS"); do
+  if sudo umount "$MOUNT" 2>/dev/null; then
+    break
+  fi
+  echo "    busy, waiting (attempt $attempt/$ATTEMPTS)..."
+  sleep 3
+done
+
+if mountpoint -q "$MOUNT"; then
+  echo "!! Could not unmount. Something is still using it:"
+  if command -v lsof >/dev/null; then
+    sudo lsof +D "$MOUNT" 2>/dev/null | head -20
+  else
+    sudo fuser -vm "$MOUNT" 2>&1 | head -20
+  fi
+  exit 1
+fi
+
+if [ "$DISK" = "$ROOT_DISK" ]; then
+  echo "==> $MOUNT is on the system disk ($DISK); not spinning it down."
+  exit 0
+fi
+
+echo "==> Spinning down $DISK..."
+sudo sync
+sudo hdparm -Y "$DISK" >/dev/null 2>&1 || true
+
+echo "==> Done. Safe to switch the drive off."

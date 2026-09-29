@@ -1,0 +1,19 @@
+# Top-of-page info strip.
+- resources:
+    label: Pi
+    cpu: true
+    memory: true
+    cputemp: true
+    uptime: true
+    tempmin: 20
+    tempmax: 85
+
+- resources:
+    label: Storage
+    disk:
+      - /             # NVMe: OS, configs, Plex metadata
+      - /media-drive  # the media drive, mounted read-only into the container
+
+- search:
+    provider: duckduckgo
+    target: _blank

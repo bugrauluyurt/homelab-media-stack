@@ -1,0 +1,135 @@
+#!/usr/bin/env python3
+"""Push alerts that need someone watching all the time; run every minute by arr-watch.timer.
+
+Alerts once each (reported ones live in STATE/watch-activity.json) on software-transcoded streams, new
+Jellyfin devices, failed Jellyfin logins and Seerr requests approved over STUCK_HOURS ago
+that are out but still have nothing downloaded. The first run only records what exists.
+"""
+import datetime
+import json
+import sys
+
+from stack_env import ENV, STATE, arr_key, http, notify
+
+JELLYFIN = "http://127.0.0.1:8096"
+SEERR = "http://127.0.0.1:5055/api/v1"
+
+JF = {"Authorization": f'MediaBrowser Token="{ENV["JELLYFIN_API_KEY"]}"'}
+SR = {"X-Api-Key": ENV["SEERR_API_KEY"]}
+
+STUCK_HOURS = 48
+# Seerr: request 2 = approved; media 2 = pending, 3 = processing (nothing available yet).
+APPROVED, WAITING = 2, (2, 3)
+
+STATE_FILE = STATE / "watch-activity.json"
+
+
+def get(url, headers):
+    out = http(url, headers=headers, timeout=20, fatal=False)
+
+    if out is None:
+        sys.exit(0)
+
+    return out
+
+
+def transcodes(seen):
+    active = set()
+
+    for s in get(f"{JELLYFIN}/Sessions", JF):
+        item = s.get("NowPlayingItem")
+        if not item or s.get("PlayState", {}).get("PlayMethod") != "Transcode":
+            continue
+
+        # A GPU transcode (compose.gpu.yml) is cheap and expected; only software transcodes stutter.
+        if (s.get("TranscodingInfo") or {}).get("HardwareAccelerationType") not in (None, "none"):
+            continue
+
+        key = f"{s['Id']}:{item['Id']}"
+        active.add(key)
+
+        if key in seen:
+            continue
+
+        title = ": ".join(x for x in (item.get("SeriesName"), item.get("Name")) if x)
+        reasons = ", ".join((s.get("TranscodingInfo") or {}).get("TranscodeReasons") or []) or "unknown"
+
+        notify(f"{s['UserName']} is transcoding", "warning",
+               f"{title}\non {s.get('DeviceName')} ({s.get('Client')})\nReason: {reasons}\n"
+               "It is transcoding in software, which may stutter.")
+
+    return sorted(active)
+
+
+def devices(seen, first_run):
+    ids = []
+
+    for d in get(f"{JELLYFIN}/Devices", JF)["Items"]:
+        ids.append(d["Id"])
+        if d["Id"] not in seen and not first_run:
+            notify("New device on Jellyfin", "iphone",
+                   f"{d.get('LastUserName')} signed in from {d.get('Name')} ({d.get('AppName')}).")
+
+    return sorted(set(ids) | set(seen))
+
+
+def failed_logins(last_id, first_run):
+    entries = get(f"{JELLYFIN}/System/ActivityLog/Entries?limit=100", JF)["Items"]
+    newest = max((e["Id"] for e in entries), default=last_id)
+
+    if not first_run:
+        for e in sorted(entries, key=lambda e: e["Id"]):
+            if e["Id"] > last_id and e["Type"] == "AuthenticationFailed":
+                notify("Failed Jellyfin login", "lock", f"{e['Name']}\n{e.get('ShortOverview') or ''}".strip())
+
+    return max(newest, last_id)
+
+
+def out_but_missing(media):
+    if media["mediaType"] == "movie":
+        movie = get(f"http://127.0.0.1:7878/api/v3/movie?tmdbId={media['tmdbId']}", {"X-Api-Key": arr_key("radarr")})
+        return bool(movie) and movie[0]["isAvailable"] and not movie[0]["hasFile"]
+
+    series = http(f"http://127.0.0.1:8989/api/v3/series/{media['externalServiceId']}",
+                  headers={"X-Api-Key": arr_key("sonarr")}, timeout=20, fatal=False) or {}
+
+    stats = series.get("statistics", {})
+    return stats.get("episodeCount", 0) > 0 and stats.get("episodeFileCount", 0) == 0
+
+
+def stuck(reported):
+    now = datetime.datetime.now(datetime.timezone.utc)
+    current = []
+
+    for r in get(f"{SEERR}/request?take=100&filter=approved", SR)["results"]:
+        media = r["media"]
+        age = now - datetime.datetime.fromisoformat(r["createdAt"].replace("Z", "+00:00"))
+
+        if (r["status"] != APPROVED or media["status"] not in WAITING
+                or age.total_seconds() < STUCK_HOURS * 3600 or not out_but_missing(media)):
+            continue
+
+        current.append(r["id"])
+        if r["id"] in reported:
+            continue
+
+        details = get(f"{SEERR}/{media['mediaType']}/{media['tmdbId']}", SR)
+        name = details.get("name") or details.get("title") or f"TMDB {media['tmdbId']}"
+
+        notify("Request still not downloaded", "hourglass",
+               f"{name}, requested by {r['requestedBy'].get('displayName')} {age.days} days ago, "
+               "has nothing downloaded yet. It may not be on any indexer.")
+
+    return current
+
+
+state = json.loads(STATE_FILE.read_text()) if STATE_FILE.exists() else None
+first_run = state is None
+state = state or {"transcodes": [], "devices": [], "activity": 0, "stuck": []}
+
+state["transcodes"] = transcodes(set(state["transcodes"]))
+state["devices"] = devices(set(state["devices"]), first_run)
+state["activity"] = failed_logins(state["activity"], first_run)
+state["stuck"] = stuck(set(state["stuck"]))
+
+STATE_FILE.write_text(json.dumps(state))

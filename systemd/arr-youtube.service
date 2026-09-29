@@ -1,0 +1,11 @@
+[Unit]
+Description=Sync Glance's YouTube channel lists with your subscriptions
+After=network-online.target
+Wants=network-online.target
+OnFailure=arr-notify-failure@%n.service
+
+[Service]
+Type=oneshot
+User=@STACK_USER@
+Group=@STACK_GROUP@
+ExecStart=@REPO@/scripts/sync-youtube.py

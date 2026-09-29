@@ -1,0 +1,11 @@
+{
+    "radarr": {
+        "save_path": "/data/torrents/movies"
+    },
+    "sonarr": {
+        "save_path": "/data/torrents/tv"
+    },
+    "games": {
+        "save_path": "/data/torrents/games"
+    }
+}

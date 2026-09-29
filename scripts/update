@@ -1,0 +1,173 @@
+#!/usr/bin/env bash
+# Update stack services safely: take a settings snapshot, keep the running
+# images as <repo>:rollback-<stamp>, pull and recreate, then run health-check.
+#
+#   update                        every service check-updates found an update for
+#   update jellyfin sonarr        just these services
+#   update --rollback jellyfin    previous image AND its settings from the pre-update snapshot
+#   update --rollback jellyfin --image-only
+#                                 previous image only, keeping current settings
+#
+# Rollback restores settings by default: updates often migrate an app's
+# database, and the older version can't open a migrated one.
+
+set -uo pipefail
+. "$(dirname "$0")/stack-env.sh"
+cd "$REPO" || exit 1
+
+RESTIC_REPO=$STORAGE_MOUNT/backups/restic
+RESTIC_KEY=$STORAGE_MOUNT/backups/RESTIC_PASSWORD
+ROLLBACK_DIR="$STATE_ROOT/rollback"
+UPDATES="$STATE_ROOT/updates"
+mkdir -p "$ROLLBACK_DIR"
+
+compose_json=$(docker compose config --format json)
+svc_field() {
+  python3 -c '
+import json, sys
+svc = json.loads(sys.argv[1])["services"][sys.argv[2]]
+if sys.argv[3] == "image":
+    print(svc["image"])
+else:
+    root = sys.argv[4].rstrip("/") + "/"
+    print("\n".join(v["source"] for v in svc.get("volumes", []) if v.get("source", "").startswith(root)))
+' "$compose_json" "$@"
+}
+
+services_using() {
+  python3 -c '
+import json, sys
+print(" ".join(n for n, s in json.loads(sys.argv[1])["services"].items() if s.get("image") in sys.argv[2:]))
+' "$compose_json" "$@"
+}
+
+STAGED=/var/tmp/arr-backup/config
+
+rollback() {
+  local svc=$1 mode=${2:-} img old stamp snapshot src rel got tmp failed=0 srcs includes
+  [ -f "$ROLLBACK_DIR/$svc" ] || { echo "no rollback recorded for $svc"; return 1; }
+  read -r img old stamp snapshot < "$ROLLBACK_DIR/$svc"
+
+  if [ "$mode" != "--image-only" ]; then
+    mapfile -t srcs < <(svc_field "$svc" config "$CONFIG_ROOT")
+    [ -n "${srcs[0]:-}" ] && [ -n "$snapshot" ] || { echo "no settings folder or snapshot for $svc; try --image-only"; return 1; }
+
+    tmp=$(mktemp -d)
+    includes=()
+    for src in "${srcs[@]}"; do includes+=(--include "$STAGED/${src#"$CONFIG_ROOT"/}"); done
+
+    sudo restic -r "$RESTIC_REPO" --password-file "$RESTIC_KEY" restore "$snapshot" --target "$tmp" --quiet "${includes[@]}" \
+      || { sudo rm -rf "$tmp"; echo "restore from snapshot $snapshot failed; nothing changed"; return 1; }
+    sudo test -d "$tmp$STAGED" || { sudo rm -rf "$tmp"; echo "snapshot $snapshot has no settings for $svc - nothing changed; try --image-only"; return 1; }
+  fi
+
+  echo "Rolling $svc back to the image from $stamp"
+  docker tag "$old" "$img"
+
+  if [ "$mode" != "--image-only" ]; then
+    docker compose stop "$svc"
+
+    for src in "${srcs[@]}"; do
+      rel=${src#"$CONFIG_ROOT"/}
+      got="$tmp$STAGED/$rel"
+
+      # Backups only stage files, so an empty folder is absent from the snapshot.
+      sudo test -d "$got" || { echo "  $rel: nothing in the snapshot (empty folder)"; continue; }
+
+      # Restored databases are complete copies; stale WAL/SHM files beside them would corrupt them.
+      sudo find "$got" -name '*.db' -printf '%P\n' | while read -r db; do sudo rm -f "$src/$db-wal" "$src/$db-shm"; done
+
+      # Copied over the live folder, not swapped in: backups leave out caches and artwork.
+      if sudo cp -a "$got/." "$src/" && sudo chown -R "$(stat -c %u:%g "$src")" "$src"; then
+        echo "  restored $rel from snapshot $snapshot"
+      else
+        failed=1
+      fi
+    done
+
+    sudo rm -rf "$tmp"
+  fi
+
+  docker compose up -d --force-recreate "$svc"
+  [ "$failed" -eq 0 ] || { echo "SETTINGS NOT FULLY RESTORED for $svc - see above"; return 1; }
+}
+
+if [ "${1:-}" = "--rollback" ]; then
+  [ -n "${2:-}" ] || { echo "usage: update --rollback <service> [--image-only]"; exit 1; }
+  rollback "$2" "${3:-}"
+  exit
+fi
+
+if [ $# -gt 0 ]; then
+  services=("$@")
+else
+  mapfile -t pending_images < <(awk '$1=="update"{print $2}' "$UPDATES" 2>/dev/null)
+  read -r -a services <<< "$(services_using "${pending_images[@]}")"
+fi
+[ ${#services[@]} -gt 0 ] || { echo "Nothing to update (per the last check-updates run)."; exit 0; }
+
+echo "Updating:"
+for svc in "${services[@]}"; do
+  awk -v img="$(svc_field "$svc" image)" -v svc="$svc" \
+    '$1=="update" && $2==img {printf "  %s  %s -> %s\n", svc, $3, $4; found=1} END {if (!found) print "  " svc}' "$UPDATES" 2>/dev/null
+done
+
+echo "[1/4] settings snapshot"
+out=$(sudo "$REPO/scripts/backup-config" pre-update 2>&1) || { echo "$out" | tail -5; echo "backup failed - not updating"; exit 1; }
+snapshot=$(sed -n 's/^snapshot //p' <<< "$out")
+[ -n "$snapshot" ] || { echo "$out"; echo "no snapshot taken (is the drive mounted?) - not updating"; exit 1; }
+echo "  snapshot $snapshot"
+
+echo "[2/4] noting current images"
+declare -A before
+for svc in "${services[@]}"; do
+  before[$svc]=$(docker image inspect -f '{{.Id}}' "$(svc_field "$svc" image)" 2>/dev/null)
+done
+
+echo "[3/4] pull and recreate"
+docker compose pull "${services[@]}" || { echo "pull failed - nothing was restarted"; exit 1; }
+
+# Only a changed image replaces the rollback record, so a second run never rolls back to the new image.
+stamp=$(date +%Y%m%d-%H%M)
+for svc in "${services[@]}"; do
+  img=$(svc_field "$svc" image)
+  old=${before[$svc]}
+  [ -n "$old" ] && [ "$old" != "$(docker image inspect -f '{{.Id}}' "$img" 2>/dev/null)" ] || continue
+
+  # One rollback image per app is enough; older ones only hold disk space.
+  docker images --format '{{.Repository}}:{{.Tag}}' "${img%:*}" | grep ':rollback-' | xargs -r docker rmi >/dev/null 2>&1
+  docker tag "$old" "${img%:*}:rollback-$stamp"
+  echo "$img $old $stamp $snapshot" > "$ROLLBACK_DIR/$svc"
+  echo "  $svc: previous image kept as ${img%:*}:rollback-$stamp"
+done
+
+recreate=("${services[@]}")
+# qBittorrent and slskd share gluetun's network namespace and lose it when gluetun is recreated.
+[[ " ${services[*]} " == *" gluetun "* ]] && recreate+=(qbittorrent) && { ! service_enabled slskd || recreate+=(slskd); }
+docker compose up -d "${recreate[@]}" || {
+  notify "arr-stack: update failed" warning "Recreating ${services[*]} failed. Check with scripts/health-check; roll back with scripts/update --rollback <service>."
+  echo "recreate failed - roll back with: update --rollback <service>"; exit 1; }
+
+if [[ " ${recreate[*]} " == *" gluetun "* ]]; then
+  reattach_vpn_apps
+  wait_gluetun_healthy
+  "$REPO/scripts/sync-port"
+fi
+
+for svc in "${services[@]}"; do
+  sed -i "s|^update $(svc_field "$svc" image)\( .*\)\?\$|current $(svc_field "$svc" image)|" "$UPDATES" 2>/dev/null
+done
+write_update_metrics
+
+echo "[4/4] health check"
+# Freshly recreated apps can take a minute to answer, so retry once quietly before failing.
+"$REPO/scripts/health-check" >/dev/null 2>&1 || {
+  timeout 120 bash -c "until docker compose ps --format '{{.Health}}' ${services[*]} | grep -qv starting; do sleep 5; done"
+  sleep 30
+}
+"$REPO/scripts/health-check" && exit 0
+
+notify "arr-stack: health check failed after update" warning "Updated ${services[*]}, then scripts/health-check failed. Roll back with scripts/update --rollback <service>."
+echo
+echo "Health check failed. To undo:  update --rollback <service>   (restores its settings too; --image-only to keep them)"
+exit 1

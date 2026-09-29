@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Bring the stack up (arr-stack.service's ExecStart). A VPN-only failure must not fail
+# the unit, or systemd's BindsTo drive-lifecycle binding stops working.
+
+set -uo pipefail
+. "$(dirname "$0")/stack-env.sh"
+cd "$REPO" || exit 1
+
+mountpoint -q "$STORAGE_MOUNT" || { echo "FATAL: $STORAGE_MOUNT not mounted; refusing to start."; exit 1; }
+
+# Created here, as the stack user, before Docker would create it as root for node-exporter.
+mkdir -p "$STATE_ROOT/metrics"
+
+# Glance won't start without its YouTube lists; seed any missing ones from the pinned channels.
+"$REPO/scripts/sync-youtube.py" --offline
+
+docker compose up -d --remove-orphans
+rc=$?
+
+# The VPN pair is allowed to be down; the library services are not.
+core="prowlarr radarr sonarr lidarr bazarr seerr plex jellyfin navidrome"
+missing=""
+for s in $core; do
+  service_enabled "$s" || continue
+  docker compose ps --status running --format '{{.Service}}' | grep -qx "$s" || missing="$missing $s"
+done
+
+if [ -n "$missing" ]; then
+  echo "FATAL: core services not running:$missing"
+  exit 1
+fi
+
+# After a boot qBittorrent starts on a stale forwarded port; sync now rather than wait for the timer.
+if docker compose ps --status running --format '{{.Service}}' | grep -qx gluetun; then
+  wait_gluetun_healthy 120
+  if ! vpn_apps_attached; then
+    echo "WARN: qBittorrent or slskd not answering; re-attaching them to gluetun's namespace."
+    reattach_vpn_apps
+  fi
+  "$REPO/scripts/sync-port" || echo "WARN: port sync failed; the timer will retry."
+fi
+
+# Dozzle lists containers once at start; if Docker was too busy to answer, it shows no stats for them.
+if docker compose ps --status running --format '{{.Service}}' | grep -qx dozzle &&
+   docker logs --since "$(docker inspect -f '{{.State.StartedAt}}' dozzle)" dozzle 2>&1 | grep -q "failed to list containers"; then
+  echo "WARN: Dozzle started before Docker could list containers; restarting it."
+  docker compose restart dozzle
+fi
+
+if [ "$rc" -ne 0 ]; then
+  echo "WARN: compose exited $rc but all core services are up (VPN likely still connecting)."
+fi
+exit 0

@@ -1,0 +1,103 @@
+[project]
+site_name = "homelab-media-stack"
+site_description = "A self-hosted media server managed as code: requests, downloads behind a VPN, Jellyfin, music and games."
+site_url = "https://bugrauluyurt.github.io/homelab-media-stack/"
+repo_url = "https://github.com/bugrauluyurt/homelab-media-stack"
+edit_uri = "edit/main/docs/"
+copyright = "MIT licensed"
+docs_dir = "docs"
+
+nav = [
+  { "Home" = "index.md" },
+  { "Getting started" = "getting-started.md" },
+  { "Architecture" = "architecture.md" },
+  { "Security" = "security.md" },
+  { "Flows" = [
+    { "Media requests" = "flows/media-requests.md" },
+    { "Music" = "flows/music.md" },
+    { "Games" = "flows/games.md" },
+    { "VPN and ports" = "flows/vpn-and-ports.md" },
+    { "Storage and boot" = "flows/storage-and-boot.md" },
+    { "Updates" = "flows/updates.md" },
+    { "Backups" = "flows/backups.md" },
+    { "Monitoring" = "flows/monitoring.md" },
+    { "Viewers" = "flows/viewers.md" },
+    { "AI agent" = "flows/ai-agent.md" },
+  ] },
+  { "Using it" = [
+    { "Requesting" = "using/requesting.md" },
+    { "Watching" = "using/watching.md" },
+    { "Music" = "using/music.md" },
+    { "Games" = "using/games.md" },
+    { "Dashboards" = "using/dashboards.md" },
+  ] },
+  { "Operations" = [
+    { "Maintenance" = "operations/maintenance.md" },
+    { "Indexers" = "operations/indexers.md" },
+    { "Terminal" = "operations/terminal.md" },
+    { "Host setup" = "operations/host.md" },
+    { "Releasing" = "operations/releasing.md" },
+  ] },
+  { "Reference" = [
+    { "Scripts" = "reference/scripts.md" },
+    { "Systemd units" = "reference/systemd.md" },
+    { "Configuration" = "reference/configuration.md" },
+  ] },
+  { "Troubleshooting" = "troubleshooting.md" },
+]
+
+[project.theme]
+language = "en"
+logo = "media/logo-auto.svg"
+favicon = "media/logo.svg"
+features = [
+  "content.action.edit",
+  "content.code.copy",
+  "content.tabs.link",
+  "navigation.footer",
+  "navigation.indexes",
+  "navigation.instant",
+  "navigation.path",
+  "navigation.sections",
+  "navigation.top",
+  "navigation.tracking",
+  "search.highlight",
+]
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme)"
+toggle.icon = "lucide/sun-moon"
+toggle.name = "Switch to light mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+scheme = "default"
+primary = "indigo"
+accent = "amber"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+primary = "indigo"
+accent = "amber"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to system preference"
+
+[project.markdown_extensions]
+admonition = {}
+attr_list = {}
+def_list = {}
+footnotes = {}
+md_in_html = {}
+toc.permalink = true
+pymdownx.details = {}
+pymdownx.highlight.anchor_linenums = true
+pymdownx.inlinehilite = {}
+pymdownx.keys = {}
+pymdownx.superfences.custom_fences = [
+  { name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" },
+]
+pymdownx.tabbed.alternate_style = true
+pymdownx.tasklist.custom_checkbox = true

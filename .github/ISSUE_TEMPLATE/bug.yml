@@ -1,0 +1,49 @@
+name: Bug report
+description: Something in the stack doesn't work as documented.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to reproduce it
+      placeholder: The commands you ran, in order.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: architecture
+    attributes:
+      label: Hardware
+      options: [Raspberry Pi 5 (arm64), Other arm64, x86-64 (amd64)]
+    validations:
+      required: true
+
+  - type: input
+    id: distribution
+    attributes:
+      label: Distribution and version
+      placeholder: Debian 13, Ubuntu 24.04, Arch, CachyOS...
+    validations:
+      required: true
+
+  - type: input
+    id: versions
+    attributes:
+      label: Stack release and Docker version
+      placeholder: "v2.0.0, Docker 29.x (docker version --format '{{.Server.Version}}')"
+    validations:
+      required: true
+
+  - type: textarea
+    id: health
+    attributes:
+      label: scripts/health-check output
+      description: Remove host names and anything else private first. It never prints secrets.
+      render: text

@@ -1,0 +1,70 @@
+# yaml-language-server: $schema=https://schemas.recyclarr.dev/v8/config-schema.json
+#
+# TRaSH Guides quality profiles, tuned for direct play on a Pi 5.
+#
+# This machine has no hardware video encoder, so anything a client can't
+# decode forces a transcode it can't do. Both profiles target 1080p.
+#
+# x265 is scored 0 (neutral), not TRaSH's default -10000. Every client in use
+# - iPhone, Apple TV: decode HEVC in hardware, including
+# 10-bit, so x265 direct-plays (Jellyfin only remuxes it). Browsers are the
+# clients that can't, and none are used.
+#
+# Deliberately 0 rather than positive: cutoffFormatScore is 10000 and
+# minUpgradeFormatScore is 1, so any positive score would make every existing
+# x264 file "upgradeable" and re-download the whole library. At 0, TRaSH's
+# source and group tiers still choose - an x265 WEBRip re-encode scores 0
+# against a Tier-01 WEB-DL's 1775, so quality still wins.
+
+radarr:
+  movies:
+    base_url: http://radarr:7878
+    api_key: !env_var RADARR_API_KEY
+
+    quality_definition:
+      type: movie
+
+    quality_profiles:
+      - trash_id: d1d67249d3890e49bc12e275d989a7e9  # HD Bluray + WEB
+        reset_unmatched_scores:
+          enabled: true
+          # Hand-made in scripts/configure-arr.py (TRaSH has no equivalent).
+          # Without this, every nightly sync would reset its -10000 to 0.
+          except:
+            - Audio Description
+
+    custom_format_groups:
+      add:
+        - trash_id: f8bf8eab4617f12dfdbd16303d8da245  # [Optional] Golden Rule HD
+        - trash_id: a3ac6af01d78e4f21fcb75f601ac96df  # [Unwanted] Unwanted Formats
+
+    custom_formats:
+      - trash_ids:
+          - dc98083864ea246d05a42df0d05f81cc  # x265 (HD)
+        assign_scores_to:
+          - name: HD Bluray + WEB
+            score: 0
+
+sonarr:
+  tv:
+    base_url: http://sonarr:8989
+    api_key: !env_var SONARR_API_KEY
+
+    quality_definition:
+      type: series
+
+    quality_profiles:
+      - trash_id: 72dae194fc92bf828f32cde7744e51a1  # WEB-1080p
+        reset_unmatched_scores:
+          enabled: true
+          # Hand-made in scripts/configure-arr.py (TRaSH has no equivalent).
+          # Without this, every nightly sync would reset its -10000 to 0.
+          except:
+            - Audio Description
+
+    custom_formats:
+      - trash_ids:
+          - 47435ece6b99a0b477caf360e79ba0bb  # x265 (HD)
+        assign_scores_to:
+          - name: WEB-1080p
+            score: 0

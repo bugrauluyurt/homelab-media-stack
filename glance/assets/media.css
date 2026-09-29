@@ -1,0 +1,54 @@
+.poster,
+.cover,
+.backdrop,
+.thumb-poster {
+    object-fit: cover;
+    background: var(--color-widget-background-highlight);
+}
+
+.poster,
+.cover {
+    width: 100%;
+    border-radius: var(--border-radius) var(--border-radius) 0 0;
+}
+
+.poster {
+    aspect-ratio: 2 / 3;
+}
+
+.cover {
+    aspect-ratio: 1;
+}
+
+.backdrop {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border-radius: var(--border-radius);
+    margin-bottom: 1rem;
+}
+
+.thumb-poster {
+    width: 4rem;
+    aspect-ratio: 2 / 3;
+    border-radius: calc(var(--border-radius) / 2);
+    flex-shrink: 0;
+}
+
+.media-progress {
+    height: 0.4rem;
+    margin-top: 0.7rem;
+    border-radius: 1rem;
+    overflow: hidden;
+    background: var(--color-widget-background-highlight);
+}
+
+.media-progress > div {
+    height: 100%;
+    background: var(--color-primary);
+}
+
+.vpn-shield {
+    width: 4rem;
+    height: 4rem;
+    flex-shrink: 0;
+}

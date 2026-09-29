@@ -1,0 +1,6 @@
+{
+  "name": "homelab",
+  "description": "Operate the arr media stack on the Pi: health checks, VPN leak checks, drive health, logs, safe updates with rollback, backups and power.",
+  "author": { "name": "Bugra Uluyurt" },
+  "repository": "https://github.com/bugrauluyurt/homelab-media-stack"
+}

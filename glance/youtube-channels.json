@@ -1,0 +1,58 @@
+{
+  "limits": {
+    "Tech": 20,
+    "Gaming": 20,
+    "Markets": 10
+  },
+  "pinned": {
+    "Tech": {
+      "UC9x0AN7BWHpCDHSm9NiJFJQ": "NetworkChuck",
+      "UCBJycsmduvYEL83R_U4JriQ": "Marques Brownlee",
+      "UCVYamHliCI9rw1tHR1xbkfw": "Dave2D",
+      "UCDAck-gFPTrgTx_qp59-bQA": "Mischa van den Burg",
+      "UCg6gPGh8HU2U01vaFCAsvmQ": "Chris Titus Tech",
+      "UCNzszbnvQeFzObW0ghk0Ckw": "Dave's Garage",
+      "UCNxUdsuH8-kEGIwSD0r8RhQ": "Maximilian Schwarzmüller",
+      "UCOk-gHyjcWZNj3Br4oxwh0A": "Techno Tim",
+      "UCZNhwA1B5YqiY1nLzmM0ZRg": "Christian Lempa",
+      "UC4JX40jDee_tINbkjycV4Sg": "Tech With Tim",
+      "UCXuqSBlHAE6Xw-yeJA0Tunw": "Linus Tech Tips",
+      "UCajiMK_CY9icRhLepS8_3ug": "Alex Ziskind",
+      "UCgdTVe88YVSrOZ9qKumhULQ": "Hardware Haven",
+      "UCI8iQa1hv7oV_Z8D35vVuSg": "Hardware Unboxed",
+      "UCdngmbVKX1Tgre699-XLlUA": "TechWorld with Nana",
+      "UCyU5wkjgQYGRB0hIHMwm2Sg": "Syntax",
+      "UCkWQ0gDrqOCarmUKmppD7GQ": "JayzTwoCents",
+      "UCUyeluBRhGPCW4rPe_UvBZQ": "The PrimeTime",
+      "UC_0CVCfC_3iuHqmyClu59Uw": "ETA PRIME",
+      "UCoZQiN0o7f36H7PaW4fVhFw": "Retro Game Corps"
+    },
+    "Gaming": {
+      "UCRl31PWkfF0a3j3hiDRaCGA": "Rhykker",
+      "UCzo4PHA91qM-jWp_bWVOzqQ": "Last Epoch",
+      "UCGIY_O-8vW4rfX98KlMkvRg": "Nintendo of America",
+      "UCEQET18SgPZk3T7ThGZm-Qw": "Gaming Dad Legends",
+      "UCNvzD7Z-g64bPXxGzaQaa4g": "gameranx",
+      "UC9HpbclQHCQCaQRYECETk0A": "Cyber Dopamine",
+      "UCkK4Tzb9ieuAhcyWUZnLBBQ": "Gamer Meld",
+      "UCh66aXZ_hqiT7au6Nwb8p3Q": "KTZ Systems",
+      "UClkUHCETNUph8vM-4gQpwUA": "Fextralife",
+      "UCQeRaTukNYft1_6AZPACnog": "Asmongold TV",
+      "UCyiLs3xJK_hGrKwm0yNX5IQ": "CO-OP Couple",
+      "UCHsSnExLE-YAhIz0-i3aWDw": "Action RPG",
+      "UCxn8csYeZg6awRnZS-aqg0g": "Diablo",
+      "UCKy1dAqELo0zrOtPkf0eTMw": "IGN",
+      "UCbu2SsF-Or3Rsn3NxqODImw": "GameSpot",
+      "UCs20qCPrd1AXRviSTdVCoAg": "Raxxanterax"
+    },
+    "Markets": {
+      "UCOHxDwCcOzBaLkeTazanwcw": "Bravos Research",
+      "UCyqlbzLoYtpqDXwRI9Yh5LA": "BWB - Business With Brian",
+      "UCJtfma0mE_XrBAD9uakcjfA": "Felix Nikolas Prehn",
+      "UC7kCeZ53sli_9XwuQeFxLqw": "Ticker Symbol: YOU",
+      "UCbKdotYtcY9SxoU8CYAXdvg": "Let's Talk Money",
+      "UC-m6zNItyoDk5lSykDlhE4Q": "StockedUp"
+    }
+  },
+  "skip": {}
+}

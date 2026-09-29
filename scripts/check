@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+# Every check CI and releases run: syntax, lint, tests, compose, secrets, diagrams, docs, style.
+# Needs only Docker and Python 3; each tool runs from a pinned container.
+#   scripts/check           everything
+#   scripts/check --fast    skip rendering the diagrams and building the docs site
+
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 1
+
+SHELLCHECK=koalaman/shellcheck:v0.11.0
+RUFF=ghcr.io/astral-sh/ruff:0.16.9
+GITLEAKS=zricethezav/gitleaks:v8.30.1
+MERMAID=minlag/mermaid-cli:12.0.0
+PYTHON=python:3.13-slim
+
+fast=false
+[ "${1:-}" = --fast ] && fast=true
+
+failures=()
+step() {
+  local name=$1
+  shift
+
+  echo "== $name"
+  "$@" || failures+=("$name")
+}
+
+in_docker() { docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/repo -w /repo "$@"; }
+
+tracked_files() { git ls-files -z --cached --others --exclude-standard | xargs -0 -I{} sh -c '[ -f "{}" ] && echo "{}"'; }
+
+mapfile -t python_files < <(tracked_files | while read -r file; do
+  case "$file" in
+    *.py) echo "$file" ;;
+    scripts/* | ai/*) head -1 "$file" | grep -q '^#!.*python' && echo "$file" ;;
+  esac
+done)
+
+mapfile -t shell_files < <(tracked_files | while read -r file; do
+  case "$file" in
+    *.sh | .githooks/*) echo "$file" ;;
+    scripts/*) head -1 "$file" | grep -q '^#!.*bash' && echo "$file" ;;
+  esac
+done)
+
+python_syntax() { python3 -m py_compile "${python_files[@]}"; }
+shell_syntax() { for file in "${shell_files[@]}"; do bash -n "$file" || return 1; done; }
+shellcheck() { in_docker "$SHELLCHECK" -S warning -x -P scripts "${shell_files[@]}"; }
+ruff() { in_docker "$RUFF" check --no-cache --select E4,E7,E9,F "${python_files[@]}"; }
+
+unit_tests() {
+  python3 -m unittest discover -s tests -q &&
+    (cd ai/agent && python3 -m unittest -q test_gateway)
+}
+
+compose_configs() {
+  local profiles
+
+  for profiles in '*' ''; do
+    COMPOSE_PROFILES=$profiles docker compose --env-file .env.example config -q || return 1
+  done
+
+  docker compose --env-file .env.example -f docker-compose.yml -f compose.gpu.yml config -q
+}
+
+secrets() { in_docker "$GITLEAKS" dir /repo --no-banner --redact; }
+
+diagrams() {
+  local file status=0
+
+  while read -r file; do
+    in_docker "$MERMAID" -q -i "/repo/$file" -o "/tmp/$(basename "$file")" >/dev/null 2>&1 || { echo "  diagram fails to render: $file"; status=1; }
+  done < <(git grep -l '^```mermaid' -- '*.md')
+
+  return $status
+}
+
+docs_site() { in_docker -e HOME=/tmp "$PYTHON" sh -c 'pip install -q --user -r docs/requirements.txt 2>/dev/null && ~/.local/bin/zensical build --strict --clean'; }
+
+# Every script and systemd file needs its own heading in the reference pages.
+docs_cover_every_file() {
+  local file missing=()
+
+  for file in $(git ls-files scripts systemd); do
+    grep -qE "^#{2,4} .*\b$(basename "$file" | sed 's/\./\\./g')\b" docs/reference/scripts.md docs/reference/systemd.md || missing+=("$file")
+  done
+
+  [ ${#missing[@]} -eq 0 ] || { printf '  not in docs/reference: %s\n' "${missing[@]}"; return 1; }
+}
+
+# The project's writing style has no em or en dashes; the vendored Grafana dashboard is exempt.
+no_dashes() {
+  ! tracked_files | grep -v '^grafana/dashboards/node-exporter-full.json$' | xargs grep -I -n -P '[\x{2013}\x{2014}]'
+}
+
+step "Python syntax" python_syntax
+step "shell syntax" shell_syntax
+step "shellcheck" shellcheck
+step "ruff" ruff
+step "unit tests" unit_tests
+step "compose configs (every profile, none, GPU overlay)" compose_configs
+step "secrets (gitleaks)" secrets
+step "reference covers every script and unit" docs_cover_every_file
+step "no em or en dashes" no_dashes
+
+if ! $fast; then
+  step "diagrams render" diagrams
+  step "docs site builds (strict)" docs_site
+fi
+
+if [ ${#failures[@]} -gt 0 ]; then
+  printf '\nFAILED: %s\n' "${failures[@]}"
+  exit 1
+fi
+
+echo
+echo "All checks passed."

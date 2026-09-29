@@ -1,0 +1,21 @@
+[Unit]
+Description=Always-on homelab Pi agent (Telegram via native RPC)
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=@REPO@
+ExecStart=/usr/bin/python3 @REPO@/ai/agent/gateway.py --config @HOME@/.config/arr-agent/config.json
+Environment="PATH=@NODE_BIN@:/usr/local/bin:/usr/bin:/bin"
+Environment=PYTHONUNBUFFERED=1
+UMask=0077
+Restart=on-failure
+RestartSec=15
+TimeoutStopSec=45
+KillMode=mixed
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

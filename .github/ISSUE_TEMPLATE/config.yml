@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security problem
+    url: https://github.com/bugrauluyurt/homelab-media-stack/security/advisories/new
+    about: Report vulnerabilities privately, never in a public issue.
+  - name: Troubleshooting guide
+    url: https://github.com/bugrauluyurt/homelab-media-stack/blob/main/docs/troubleshooting.md
+    about: Most problems are already described there, with the fix.

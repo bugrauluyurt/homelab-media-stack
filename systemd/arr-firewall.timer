@@ -1,0 +1,9 @@
+[Unit]
+Description=Re-apply the host firewall (Docker restarts, IPv6 prefix changes)
+
+[Timer]
+OnBootSec=30sec
+OnUnitActiveSec=15min
+
+[Install]
+WantedBy=timers.target

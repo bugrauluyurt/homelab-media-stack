@@ -1,0 +1,9 @@
+[Unit]
+Description=Stack health check every 6 hours
+
+[Timer]
+OnCalendar=00/6:20
+RandomizedDelaySec=10min
+
+[Install]
+WantedBy=timers.target

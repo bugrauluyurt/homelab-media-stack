@@ -1,0 +1,195 @@
+- Watch:
+    - Jellyfin:
+        icon: jellyfin.svg
+        href: http://{{HOMEPAGE_VAR_HOST_NAME}}:8096
+        description: Main media server
+        server: my-docker
+        container: jellyfin
+        # No widget: Jellyfin 12 accepts only `Authorization: MediaBrowser
+        # Token=...` and rejects X-Emby-Token, which is what Homepage's
+        # jellyfin widget sends. Verified against 12.1.0 - every legacy
+        # header returns 401. Watch stats come from Jellystat instead.
+
+    - Seerr:
+        icon: jellyseerr.svg
+        href: http://{{HOMEPAGE_VAR_HOST_NAME}}:5055
+        description: Request a movie or show
+        server: my-docker
+        container: seerr
+        widget:
+          type: jellyseerr
+          url: http://seerr:5055
+          key: {{HOMEPAGE_VAR_SEERR_API_KEY}}
+
+    - Plex:
+        icon: plex.svg
+        href: http://{{HOMEPAGE_VAR_HOST_NAME}}:32400/web
+        description: Unclaimed - optional
+        server: my-docker
+        container: plex
+
+    - JellyDash:
+        icon: jellyfin.svg
+        href: http://{{HOMEPAGE_VAR_HOST_NAME}}:3004
+        description: Now playing, watch history and stats
+        server: my-docker
+        container: jellydash
+
+    - Needle:
+        icon: navidrome.svg
+        href: "{{HOMEPAGE_VAR_NEEDLE_URL}}"
+        description: Music player on Navidrome
+        server: my-docker
+        container: needle
+
+- Manage:
+    - Lidarr:
+        icon: lidarr.svg
+        href: http://{{HOMEPAGE_VAR_HOST_NAME}}:8686
+        description: Music
+        server: my-docker
+        container: lidarr
+        widget:
+          type: lidarr
+          url: http://lidarr:8686
+          key: {{HOMEPAGE_VAR_LIDARR_API_KEY}}
+
+    - Radarr:
+        icon: radarr.svg
+        href: http://{{HOMEPAGE_VAR_HOST_NAME}}:7878
+        description: Movies
+        server: my-docker
+        container: radarr
+        widget:
+          type: radarr
+          url: http://radarr:7878
+          key: {{HOMEPAGE_VAR_RADARR_API_KEY}}
+          enableQueue: true
+
+    - Sonarr:
+        icon: sonarr.svg
+        href: http://{{HOMEPAGE_VAR_HOST_NAME}}:8989
+        description: TV series
+        server: my-docker
+        container: sonarr
+        widget:
+          type: sonarr
+          url: http://sonarr:8989
+          key: {{HOMEPAGE_VAR_SONARR_API_KEY}}
+          enableQueue: true
+
+    - Questarr:
+        icon: https://raw.githubusercontent.com/Doezer/Questarr/main/images/Questarr_Logo-nobg.png
+        href: http://{{HOMEPAGE_VAR_HOST_NAME}}:5000
+        description: Games
+        server: my-docker
+        container: questarr
+
+    - Game downloads:
+        icon: mdi-download-box
+        href: http://{{HOMEPAGE_VAR_HOST_NAME}}:8090
+        description: Download finished games to a PC (read-only)
+        server: my-docker
+        container: sftpgo
+
+    - Prowlarr:
+        icon: prowlarr.svg
+        href: http://{{HOMEPAGE_VAR_HOST_NAME}}:9696
+        description: Indexer search
+        server: my-docker
+        container: prowlarr
+        widget:
+          type: prowlarr
+          url: http://prowlarr:9696
+          key: {{HOMEPAGE_VAR_PROWLARR_API_KEY}}
+
+    - Bazarr:
+        icon: bazarr.svg
+        href: http://{{HOMEPAGE_VAR_HOST_NAME}}:6767
+        description: Subtitles
+        server: my-docker
+        container: bazarr
+        widget:
+          type: bazarr
+          url: http://bazarr:6767
+          key: {{HOMEPAGE_VAR_BAZARR_API_KEY}}
+
+- Infrastructure:
+    # qBittorrent shares gluetun's network namespace, so it is reachable
+    # at the gluetun container name, not its own.
+    - qBittorrent:
+        icon: qbittorrent.svg
+        href: http://{{HOMEPAGE_VAR_HOST_NAME}}:{{HOMEPAGE_VAR_QBIT_PORT}}
+        description: Downloads - inside the VPN
+        server: my-docker
+        container: qbittorrent
+        widget:
+          type: qbittorrent
+          url: http://gluetun:{{HOMEPAGE_VAR_QBIT_PORT}}
+          username: ""
+          password: ""
+          enableLeechProgress: true
+
+    - Uptime Kuma:
+        icon: uptime-kuma.svg
+        href: http://{{HOMEPAGE_VAR_HOST_NAME}}:3003/status/stack
+        description: Uptime of every service; alerts go to ntfy
+        server: my-docker
+        container: uptime-kuma
+        widget:
+          type: uptimekuma
+          url: http://uptime-kuma:3001
+          slug: stack
+
+    - SABnzbd:
+        icon: sabnzbd.svg
+        href: http://{{HOMEPAGE_VAR_HOST_NAME}}:8085
+        description: Usenet downloads (preferred over torrents)
+        server: my-docker
+        container: sabnzbd
+        widget:
+          type: sabnzbd
+          url: http://sabnzbd:8080
+          key: {{HOMEPAGE_VAR_SABNZBD_API_KEY}}
+
+    - Dozzle:
+        icon: dozzle.svg
+        href: http://{{HOMEPAGE_VAR_HOST_NAME}}:8888
+        description: Live logs of every container (read-only)
+        server: my-docker
+        container: dozzle
+
+    - Glance:
+        icon: glance.svg
+        href: http://{{HOMEPAGE_VAR_HOST_NAME}}:3005
+        description: Start page - feeds, videos, markets, media calendar
+        server: my-docker
+        container: glance
+
+    - Scrutiny:
+        icon: scrutiny.svg
+        href: http://{{HOMEPAGE_VAR_HOST_NAME}}:3006
+        description: SMART history of the media drive
+        server: my-docker
+        container: scrutiny
+
+    - ChangeDetection:
+        icon: changedetection.svg
+        href: http://{{HOMEPAGE_VAR_HOST_NAME}}:3007
+        description: Alerts when watched web pages change
+        server: my-docker
+        container: changedetection
+
+    - Grafana:
+        icon: grafana.svg
+        href: http://{{HOMEPAGE_VAR_HOST_NAME}}:3001
+        description: Metrics and graphs
+        server: my-docker
+        container: grafana
+
+    - Jellystat:
+        icon: jellyfin.svg
+        href: http://{{HOMEPAGE_VAR_HOST_NAME}}:3002
+        description: Watch statistics
+        server: my-docker
+        container: jellystat

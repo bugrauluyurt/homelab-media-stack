@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+# Reconcile qBittorrent with the live VPN tunnel: forwarded port, bound interface,
+# login-free networks and WebUI checks. arr-port-sync.timer runs it every 15 minutes.
+# If Proton gives no forwarded port for 15 minutes it restarts gluetun, at most every two hours.
+
+set -uo pipefail
+. "$(dirname "$0")/stack-env.sh"
+cd "$REPO" || exit 1
+
+QB="http://127.0.0.1:$QBIT_PORT"
+MISSING_LIMIT=900
+HEAL_EVERY=7200
+MISSING_SINCE="$STATE_ROOT/port-forward-missing-since"
+LAST_HEAL="$STATE_ROOT/port-forward-last-heal"
+
+qb_set() { docker exec qbittorrent curl -s --max-time 10 -X POST \
+             "$QB/api/v2/app/setPreferences" --data-urlencode "json=$1" >/dev/null 2>&1; }
+
+read_tunnel() { tun_ip=$(tunnel_ip); port=$(forwarded_port); }
+valid_port() { [[ "$port" =~ ^[0-9]+$ ]] && [ "$port" -ge 1024 ]; }
+
+restart_vpn() {
+  date +%s > "$LAST_HEAL"
+  echo "restarting gluetun to get a forwarded port"
+  docker compose restart gluetun >/dev/null 2>&1
+
+  for _ in $(seq 1 36); do
+    sleep 5
+    read_tunnel
+    [ -n "$tun_ip" ] && valid_port && [ "$(docker inspect -f '{{.State.Health.Status}}' gluetun)" = healthy ] && break
+  done
+
+  reattach_vpn_apps >/dev/null 2>&1
+  sleep 8
+}
+
+read_tunnel
+if [ -z "${tun_ip:-}" ]; then
+  echo "VPN tunnel is down; nothing to sync."
+  exit 1
+fi
+
+if ! valid_port; then
+  # Timed by the clock, not by run count: at boot two runs come a minute apart.
+  [ "$(cat "$MISSING_SINCE" 2>/dev/null || echo 0)" -ge "$(date -d "$(uptime -s)" +%s)" ] || date +%s > "$MISSING_SINCE"
+  missing=$(( $(date +%s) - $(cat "$MISSING_SINCE") ))
+  echo "no valid forwarded port from gluetun (got: '${port:-empty}') for $((missing / 60)) min"
+
+  since_heal=$(( $(date +%s) - $(cat "$LAST_HEAL" 2>/dev/null || echo 0) ))
+  [ "$missing" -ge "$MISSING_LIMIT" ] && [ "$since_heal" -ge "$HEAL_EVERY" ] || exit 1
+
+  restart_vpn
+  if ! valid_port; then
+    notify "arr-stack: VPN still has no forwarded port" warning "Proton gave no forwarded port, and restarting the VPN didn't help. Torrents still run through the VPN but get no incoming peers. The next automatic try is in $((HEAL_EVERY / 3600)) hours; see docs/flows/vpn-and-ports.md."
+    exit 1
+  fi
+
+  notify "arr-stack: VPN forwarded port restored" white_check_mark "Proton gave no forwarded port for $((MISSING_LIMIT / 60))+ minutes, so the VPN was restarted automatically. New port: $port. Torrents and Soulseek paused for about a minute."
+fi
+rm -f "$MISSING_SINCE"
+
+prefs=$(qbit_prefs)
+cur_port=$(json_get listen_port <<< "$prefs")
+cur_addr=$(json_get current_interface_address <<< "$prefs")
+
+changed=0
+
+# Bind to tun0: on the bridge IP gluetun routes tracker traffic out eth0, where the firewall drops it.
+if [ "$cur_addr" != "$tun_ip" ]; then
+  qb_set "{\"current_network_interface\":\"tun0\",\"current_interface_address\":\"$tun_ip\"}"
+  echo "bound qBittorrent to tunnel ${cur_addr:-none} -> $tun_ip"
+  changed=1
+fi
+
+if [ "$cur_port" != "$port" ]; then
+  qb_set "{\"listen_port\":$port,\"random_port\":false,\"upnp\":false}"
+  echo "listen_port ${cur_port:-unset} -> $port"
+  changed=1
+fi
+
+# Docker's network and the tailnet skip the login; the home network must always log in.
+no_login=$'100.64.0.0/10\n172.16.0.0/12'
+cur_no_login=$(json_get bypass_auth_subnet_whitelist <<< "$prefs")
+if [ "$cur_no_login" != "$no_login" ]; then
+  qb_set "$(python3 -c 'import json,sys; print(json.dumps({"bypass_auth_subnet_whitelist": sys.argv[1], "bypass_auth_subnet_whitelist_enabled": True}))' "$no_login")"
+  echo "login-free networks -> ${no_login//$'\n'/, }"
+  changed=1
+fi
+
+# CSRF and Host checks stop a web page on a tailnet device from forging requests to the login-free API.
+mapfile -t host_ips < <(ip -4 -o addr show scope global | awk '$2 !~ /^(docker0|br-)/ {print $4}' | cut -d/ -f1 | LC_ALL=C sort)
+web_domains=$(IFS=';'; echo "gluetun;127.0.0.1;$HOST_NAME;$HOST_NAME.local;$HOST_NAME.*.ts.net;${host_ips[*]}")
+web_keys='("web_ui_csrf_protection_enabled", "web_ui_host_header_validation_enabled", "web_ui_domain_list")'
+
+want_web=$(python3 -c "import json, sys; print(json.dumps(dict(zip($web_keys, (True, True, sys.argv[1])))))" "$web_domains")
+cur_web=$(python3 -c "import json, sys; p = json.load(sys.stdin); print(json.dumps({k: p.get(k) for k in $web_keys}))" <<< "$prefs")
+if [ "$cur_web" != "$want_web" ]; then
+  qb_set "$want_web"
+  echo "WebUI CSRF and Host checks on, hosts -> ${web_domains//;/, }"
+  changed=1
+fi
+
+[ "$changed" -eq 0 ] && echo "already in sync (tun $tun_ip, port $port)"
+
+sleep 3
+ok=$(docker exec gluetun sh -c "netstat -tuln 2>/dev/null | grep -c '$tun_ip:$port'")
+if [ "${ok:-0}" -ge 1 ]; then
+  echo "verified: listening on $tun_ip:$port"
+else
+  echo "WARNING: not listening on $tun_ip:$port"
+  exit 1
+fi

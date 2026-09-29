@@ -1,0 +1,23 @@
+[Unit]
+Description=Media stack (arr + Plex + Jellyfin)
+Documentation=https://github.com/bugrauluyurt/homelab-media-stack
+After=docker.service @STORAGE_UNIT@
+Requires=docker.service
+BindsTo=@STORAGE_UNIT@
+OnFailure=arr-notify-failure@%n.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=@REPO@
+ExecStartPre=/usr/bin/mountpoint -q @STORAGE_MOUNT@
+ExecStart=@REPO@/scripts/stack-up
+ExecStop=/usr/bin/docker compose stop
+TimeoutStartSec=600
+# qBittorrent, Jellyfin and Postgres get 30s each to shut down cleanly.
+TimeoutStopSec=180
+User=@STACK_USER@
+Group=@STACK_GROUP@
+
+[Install]
+WantedBy=multi-user.target @STORAGE_UNIT@

@@ -1,0 +1,780 @@
+x-data-mount: &data-mount
+  type: bind
+  source: ${DATA_ROOT}
+  target: /data
+  bind:
+    create_host_path: false
+
+x-media-mount: &media-mount
+  type: bind
+  source: ${DATA_ROOT}/media
+  target: /data/media
+  bind:
+    create_host_path: false
+
+x-common-env: &common-env
+  PUID: ${PUID}
+  PGID: ${PGID}
+  TZ: ${TZ}
+  UMASK: ${UMASK}
+
+x-logging: &logging
+  driver: local
+  options:
+    max-size: 10m
+    max-file: "3"
+
+# For the services that can't take &common (their network is gluetun's or the host's).
+x-restart: &restart
+  restart: unless-stopped
+  logging: *logging
+
+x-common: &common
+  <<: *restart
+  networks: [arr]
+
+x-healthcheck: &hc
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 60s
+
+x-no-new-privileges: &nnp [no-new-privileges:true]
+
+services:
+  gluetun:
+    <<: *common
+    image: qmcgaw/gluetun:latest
+    container_name: gluetun
+    mem_limit: 256m
+    cap_add: [NET_ADMIN]
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=1
+    ports:
+      - "${QBIT_PORT}:${QBIT_PORT}"
+      - "5030:5030"
+    volumes:
+      - ${CONFIG_ROOT}/gluetun:/gluetun
+      - ./gluetun/auth.toml:/gluetun/auth/config.toml:ro
+    environment:
+      # Exact Netherlands endpoint from the private Proton WireGuard config.
+      VPN_SERVICE_PROVIDER: custom
+      VPN_TYPE: wireguard
+      WIREGUARD_PRIVATE_KEY: ${WIREGUARD_PRIVATE_KEY}
+      VPN_PORT_FORWARDING: "on"
+      VPN_PORT_FORWARDING_PROVIDER: protonvpn
+      FIREWALL_OUTBOUND_SUBNETS: ${LAN_CIDR},100.64.0.0/10
+      # The malicious-domain blocklist also blocks public trackers, which then fail with NXDOMAIN.
+      BLOCK_MALICIOUS: "off"
+      # No IPv6 in the tunnel: AAAA answers have no route out, so trackers fail with "Operation not permitted".
+      DOT_IPV6: "off"
+      TZ: ${TZ}
+      VPN_PORT_FORWARDING_UP_COMMAND: >-
+        /bin/sh -c 'wget -qO- --post-data="json={\"listen_port\":{{PORT}},\"random_port\":false,\"upnp\":false}"
+        http://127.0.0.1:${QBIT_PORT}/api/v2/app/setPreferences'
+    healthcheck:
+      test: ["CMD", "/gluetun-entrypoint", "healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    mem_limit: 3g
+    <<: *restart
+    network_mode: "service:gluetun"
+    depends_on:
+      gluetun:
+        condition: service_healthy
+        restart: true
+    # Time to save resume data for every torrent before it is killed.
+    stop_grace_period: 30s
+    healthcheck:
+      <<: *hc
+      test: ["CMD", "curl", "-sf", "-o", "/dev/null", "http://127.0.0.1:${QBIT_PORT}/api/v2/app/version"]
+    environment:
+      <<: *common-env
+      WEBUI_PORT: ${QBIT_PORT}
+      TORRENTING_PORT: 6881
+    volumes:
+      - ${CONFIG_ROOT}/qbittorrent:/config
+      - *data-mount
+
+  # qBittorrent holds Proton's only forwarded port, so slskd reaches only peers that accept incoming connections.
+  slskd:
+    image: slskd/slskd:latest
+    container_name: slskd
+    profiles: [music]
+    mem_limit: 512m
+    <<: *restart
+    network_mode: "service:gluetun"
+    depends_on:
+      gluetun:
+        condition: service_healthy
+        restart: true
+    user: "${PUID}:${PGID}"
+    security_opt: *nnp
+    environment:
+      SLSKD_SLSK_USERNAME: ${SOULSEEK_USER}
+      SLSKD_SLSK_PASSWORD: ${SOULSEEK_PASS}
+      SLSKD_USERNAME: admin
+      SLSKD_PASSWORD: ${SLSKD_PASSWORD}
+      SLSKD_API_KEY: ${SLSKD_API_KEY}
+      SLSKD_DOWNLOADS_DIR: /data/soulseek/downloads
+      SLSKD_INCOMPLETE_DIR: /data/soulseek/incomplete
+      SLSKD_SHARED_DIR: /data/media/music
+      SLSKD_UMASK: ${UMASK}
+      TZ: ${TZ}
+    volumes:
+      - ${CONFIG_ROOT}/slskd:/app
+      - *data-mount
+
+  # Deliberately outside the VPN: Usenet is SSL and download-only (nothing is shared).
+  sabnzbd:
+    <<: *common
+    image: lscr.io/linuxserver/sabnzbd:latest
+    container_name: sabnzbd
+    mem_limit: 512m
+    ports: ["8085:8080"]
+    environment: *common-env
+    healthcheck:
+      <<: *hc
+      test: ["CMD", "curl", "-sf", "-o", "/dev/null", "http://127.0.0.1:8080/api?mode=version"]
+    volumes:
+      - ${CONFIG_ROOT}/sabnzbd:/config
+      - *data-mount
+
+  # Fixed IP: Questarr trusts Prowlarr's download links only when their host matches its indexer URL,
+  # and Prowlarr writes the IP it was called on into those links.
+  prowlarr:
+    <<: *restart
+    networks:
+      arr:
+        ipv4_address: ${PROWLARR_IP}
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    mem_limit: 768m
+    ports: ["9696:9696"]
+    environment: *common-env
+    healthcheck:
+      <<: *hc
+      test: ["CMD", "curl", "-sf", "-o", "/dev/null", "http://127.0.0.1:9696/ping"]
+    volumes:
+      - ${CONFIG_ROOT}/prowlarr:/config
+
+  radarr:
+    <<: *common
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    mem_limit: 1g
+    ports: ["7878:7878"]
+    environment: *common-env
+    healthcheck:
+      <<: *hc
+      test: ["CMD", "curl", "-sf", "-o", "/dev/null", "http://127.0.0.1:7878/ping"]
+    volumes:
+      - ${CONFIG_ROOT}/radarr:/config
+      - *data-mount
+
+  sonarr:
+    <<: *common
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    mem_limit: 1g
+    ports: ["8989:8989"]
+    environment: *common-env
+    healthcheck:
+      <<: *hc
+      test: ["CMD", "curl", "-sf", "-o", "/dev/null", "http://127.0.0.1:8989/ping"]
+    volumes:
+      - ${CONFIG_ROOT}/sonarr:/config
+      - *data-mount
+
+  questarr:
+    <<: *common
+    image: ghcr.io/doezer/questarr:latest
+    container_name: questarr
+    profiles: [games]
+    mem_limit: 512m
+    ports: ["5000:5000"]
+    environment:
+      <<: *common-env
+      ALLOWED_ORIGINS: ${QUESTARR_ALLOWED_ORIGINS}
+    volumes:
+      - ${CONFIG_ROOT}/questarr:/app/data
+      - *data-mount
+    security_opt: *nnp
+    healthcheck:
+      <<: *hc
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:5000/api/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+
+  # IPv4 only: over IPv6 Docker's proxy would make every client look like the Docker gateway,
+  # which the admin allow-list trusts.
+  sftpgo:
+    <<: *common
+    image: drakkan/sftpgo:v2-alpine
+    container_name: sftpgo
+    profiles: [games]
+    user: "${PUID}:${PGID}"
+    security_opt: *nnp
+    mem_limit: 256m
+    ports: ["0.0.0.0:8090:8080", "0.0.0.0:2022:2022"]
+    environment:
+      SFTPGO_SFTPD__BINDINGS__0__PORT: "2022"
+      SFTPGO_HTTPD__BINDINGS__0__ENABLE_WEB_ADMIN: "false"
+      SFTPGO_HTTPD__BINDINGS__0__RENDER_OPENAPI: "false"
+      SFTPGO_HTTPD__BINDINGS__0__BRANDING__WEB_CLIENT__NAME: Game downloads
+      SFTPGO_HTTPD__BINDINGS__0__BRANDING__WEB_CLIENT__SHORT_NAME: Games
+      SFTPGO_HTTPD__HIDE_SUPPORT_LINK: "true"
+      SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN: "true"
+      SFTPGO_DEFAULT_ADMIN_USERNAME: ${SFTPGO_ADMIN_USER}
+      SFTPGO_DEFAULT_ADMIN_PASSWORD: ${SFTPGO_ADMIN_PASSWORD}
+    volumes:
+      - ${CONFIG_ROOT}/sftpgo:/var/lib/sftpgo
+      - {type: bind, source: "${DATA_ROOT}/torrents/games", target: /srv/games/Torrent, read_only: true, bind: {create_host_path: false}}
+      - {type: bind, source: "${DATA_ROOT}/usenet/complete/games", target: /srv/games/Usenet, read_only: true, bind: {create_host_path: false}}
+    healthcheck:
+      <<: *hc
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+
+  # Lidarr's plugins branch, for Tubifarry (Soulseek indexer + download client).
+  lidarr:
+    <<: *common
+    image: ghcr.io/hotio/lidarr:pr-plugins
+    container_name: lidarr
+    profiles: [music]
+    mem_limit: 1g
+    ports: ["8686:8686"]
+    environment: *common-env
+    healthcheck:
+      <<: *hc
+      test: ["CMD", "curl", "-sf", "-o", "/dev/null", "http://127.0.0.1:8686/ping"]
+    volumes:
+      - ${CONFIG_ROOT}/lidarr:/config
+      - *data-mount
+
+  bazarr:
+    <<: *common
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
+    mem_limit: 768m
+    ports: ["6767:6767"]
+    environment: *common-env
+    healthcheck:
+      <<: *hc
+      test: ["CMD", "curl", "-sf", "-o", "/dev/null", "http://127.0.0.1:6767/api/system/ping"]
+    volumes:
+      - ${CONFIG_ROOT}/bazarr:/config
+      - *data-mount
+
+  seerr:
+    <<: *common
+    image: ghcr.io/seerr-team/seerr:latest
+    container_name: seerr
+    mem_limit: 768m
+    ports: ["5055:5055"]
+    security_opt: *nnp
+    healthcheck:
+      <<: *hc
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:5055/api/v1/status"]
+    environment:
+      LOG_LEVEL: info
+      TZ: ${TZ}
+    volumes:
+      - ${CONFIG_ROOT}/seerr:/app/config
+
+  recyclarr:
+    <<: *common
+    image: ghcr.io/recyclarr/recyclarr:8
+    container_name: recyclarr
+    mem_limit: 256m
+    user: ${PUID}:${PGID}
+    security_opt: *nnp
+    environment:
+      TZ: ${TZ}
+      RADARR_API_KEY: ${RADARR_API_KEY}
+      SONARR_API_KEY: ${SONARR_API_KEY}
+    volumes:
+      - ${CONFIG_ROOT}/recyclarr:/config
+      - ./recyclarr/recyclarr.yml:/config/recyclarr.yml:ro
+
+  # Not FlareSolverr: TRaSH reports it broken against current Cloudflare, and Byparr is its maintained replacement.
+  byparr:
+    <<: *common
+    image: ghcr.io/thephaseless/byparr:latest
+    container_name: byparr
+    # shm_size counts against this limit, and the browser was OOM-killed at 1.5g.
+    mem_limit: 2g
+    cpus: ${MEDIA_CPUS:-3}
+    security_opt: *nnp
+    # The image's check reports unhealthy for up to 15 minutes after every boot. Probe often only while
+    # starting: each /health launches a real browser (~20s, ~400MB).
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8191/health"]
+      start_period: 3m
+      start_interval: 15s
+      interval: 15m
+      timeout: 45s
+      retries: 3
+    environment:
+      TZ: ${TZ}
+      LOG_LEVEL: info
+    shm_size: 1gb
+
+  plex:
+    image: lscr.io/linuxserver/plex:latest
+    container_name: plex
+    profiles: [plex]
+    # The 2g transcode tmpfs counts against this limit.
+    mem_limit: 3g
+    cpus: ${MEDIA_CPUS:-3}
+    <<: *restart
+    network_mode: host
+    healthcheck:
+      <<: *hc
+      test: ["CMD", "curl", "-sf", "-o", "/dev/null", "http://127.0.0.1:32400/identity"]
+    environment:
+      <<: *common-env
+      VERSION: docker
+      PLEX_CLAIM: ${PLEX_CLAIM}
+    # Rare transcodes keep their scratch files in RAM rather than grinding the NVMe.
+    tmpfs:
+      - /transcode:size=2g
+    volumes:
+      - ${CONFIG_ROOT}/plex:/config
+      - *media-mount
+
+  jellyfin:
+    <<: *common
+    image: lscr.io/linuxserver/jellyfin:latest
+    container_name: jellyfin
+    mem_limit: 2g
+    cpus: ${MEDIA_CPUS:-3}
+    stop_grace_period: 30s
+    ports:
+      - "8096:8096"
+    environment: *common-env
+    healthcheck:
+      <<: *hc
+      test: ["CMD", "curl", "-sf", "-o", "/dev/null", "http://127.0.0.1:8096/health"]
+    volumes:
+      - ${CONFIG_ROOT}/jellyfin:/config
+      - ./jellyfin/custom-cont-init.d:/custom-cont-init.d:ro
+      - *media-mount
+
+  navidrome:
+    <<: *common
+    image: deluan/navidrome:latest
+    container_name: navidrome
+    profiles: [music]
+    mem_limit: 512m
+    ports: ["4533:4533"]
+    user: "${PUID}:${PGID}"
+    security_opt: *nnp
+    healthcheck:
+      <<: *hc
+      test: ["CMD", "curl", "-sf", "-o", "/dev/null", "http://127.0.0.1:4533/ping"]
+    environment:
+      ND_MUSICFOLDER: /music
+      ND_SCANSCHEDULE: 15m
+      ND_LOGLEVEL: info
+      ND_ENABLESHARING: "true"
+      TZ: ${TZ}
+    volumes:
+      - ${CONFIG_ROOT}/navidrome:/data
+      - ${DATA_ROOT}/media/music:/music:ro
+      - ${DATA_ROOT}/media/singles:/singles:ro
+
+  # Needle writes single songs only to media/singles, apart from Lidarr's music (docs/flows/music.md).
+  needle:
+    <<: *common
+    image: ${NEEDLE_IMAGE:-ghcr.io/bugrauluyurt/needle:1}
+    container_name: needle
+    profiles: [music]
+    mem_limit: 256m
+    ports: ["127.0.0.1:4535:4535"]
+    user: "${PUID}:${PGID}"
+    security_opt: *nnp
+    depends_on: [navidrome]
+    healthcheck:
+      <<: *hc
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4535/api/health"]
+    environment:
+      TZ: ${TZ}
+      NAVIDROME_URL: http://navidrome:4533
+      LIDARR_URL: http://lidarr:8686
+      LIDARR_API_KEY: ${LIDARR_API_KEY}
+      SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID:-}
+      SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET:-}
+      PUBLIC_URL: ${NEEDLE_PUBLIC_URL:-}
+      SLSKD_URL: http://gluetun:5030
+      SLSKD_API_KEY: ${SLSKD_API_KEY}
+    volumes:
+      - ${CONFIG_ROOT}/needle:/data
+      - ${DATA_ROOT}/soulseek/downloads:/soulseek
+      - ${DATA_ROOT}/media/singles:/singles
+
+  homepage:
+    <<: *common
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage
+    profiles: [dashboards]
+    ports: ["3000:3000"]
+    mem_limit: 512m
+    security_opt: *nnp
+    environment:
+      <<: *common-env
+      # homepage:3000 is how other containers (Uptime Kuma) reach it.
+      HOMEPAGE_ALLOWED_HOSTS: ${HOMEPAGE_ALLOWED_HOSTS},homepage:3000
+      HOMEPAGE_VAR_HOST_NAME: ${HOST_NAME}
+      HOMEPAGE_VAR_QBIT_PORT: ${QBIT_PORT}
+      HOMEPAGE_VAR_NEEDLE_URL: ${NEEDLE_PUBLIC_URL}
+      HOMEPAGE_VAR_RADARR_API_KEY: ${RADARR_API_KEY}
+      HOMEPAGE_VAR_LIDARR_API_KEY: ${LIDARR_API_KEY}
+      HOMEPAGE_VAR_SABNZBD_API_KEY: ${SABNZBD_API_KEY}
+      HOMEPAGE_VAR_SONARR_API_KEY: ${SONARR_API_KEY}
+      HOMEPAGE_VAR_PROWLARR_API_KEY: ${PROWLARR_API_KEY}
+      HOMEPAGE_VAR_BAZARR_API_KEY: ${BAZARR_API_KEY}
+      HOMEPAGE_VAR_SEERR_API_KEY: ${SEERR_API_KEY}
+      HOMEPAGE_VAR_JELLYFIN_API_KEY: ${JELLYFIN_API_KEY}
+    volumes:
+      - ./homepage:/app/config
+      # Read-only: the disk widget only reports the drive's usage.
+      - type: bind
+        source: ${DATA_ROOT}
+        target: /media-drive
+        read_only: true
+        bind:
+          create_host_path: false
+
+  # Container states come through socket-proxy, never the raw socket.
+  # The image has no tzdata, so the host's zoneinfo is lent for TZ.
+  glance:
+    <<: *common
+    image: glanceapp/glance:latest
+    container_name: glance
+    profiles: [dashboards]
+    ports: ["3005:8080"]
+    mem_limit: 128m
+    user: "${PUID}:${PGID}"
+    security_opt: *nnp
+    depends_on: [socket-proxy]
+    environment:
+      TZ: ${TZ}
+      HOST_NAME: ${HOST_NAME}
+      QBIT_PORT: ${QBIT_PORT}
+      RADARR_API_KEY: ${RADARR_API_KEY}
+      SONARR_API_KEY: ${SONARR_API_KEY}
+      LIDARR_API_KEY: ${LIDARR_API_KEY}
+      PROWLARR_API_KEY: ${PROWLARR_API_KEY}
+      BAZARR_API_KEY: ${BAZARR_API_KEY}
+      SABNZBD_API_KEY: ${SABNZBD_API_KEY}
+      SEERR_API_KEY: ${SEERR_API_KEY}
+      JELLYFIN_API_KEY: ${JELLYFIN_API_KEY}
+      JELLYSTAT_API_KEY: ${JELLYSTAT_API_KEY}
+      CHANGEDETECTION_API_KEY: ${CHANGEDETECTION_API_KEY}
+      NEEDLE_PUBLIC_URL: ${NEEDLE_PUBLIC_URL}
+      STORAGE_MOUNT: ${STORAGE_MOUNT:-/mnt/storage}
+      WEATHER_LOCATION: ${WEATHER_LOCATION:-}
+    volumes:
+      - ./glance:/app/config:ro
+      # YouTube channel lists written by scripts/sync-youtube.py.
+      - ${CONFIG_ROOT}/glance:/app/data:ro
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
+      - type: bind
+        source: ${DATA_ROOT}
+        target: /media-drive
+        read_only: true
+        bind:
+          create_host_path: false
+    healthcheck:
+      <<: *hc
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/api/healthz"]
+
+  # SYS_RAWIO lets smartctl reach the drive behind its USB-SATA bridge (sat type in scrutiny/collector.yaml).
+  scrutiny:
+    <<: *common
+    image: ghcr.io/analogj/scrutiny:master-omnibus
+    container_name: scrutiny
+    profiles: [monitoring]
+    ports: ["3006:8080"]
+    mem_limit: 512m
+    cap_add: [SYS_RAWIO]
+    devices: ["${STORAGE_DEVICE:-/dev/sda}:/dev/sda"]
+    environment:
+      TZ: ${TZ}
+      COLLECTOR_CRON_SCHEDULE: "0 */6 * * *"
+    volumes:
+      - ${CONFIG_ROOT}/scrutiny/config:/opt/scrutiny/config
+      - ${CONFIG_ROOT}/scrutiny/influxdb:/opt/scrutiny/influxdb
+      - ./scrutiny/collector.yaml:/opt/scrutiny/config/collector.yaml:ro
+      - /run/udev:/run/udev:ro
+    healthcheck:
+      <<: *hc
+      test: ["CMD", "curl", "-sf", "-o", "/dev/null", "http://127.0.0.1:8080/api/health"]
+
+  # Plain HTTP fetches only; deliberately no browser container.
+  changedetection:
+    <<: *common
+    image: ghcr.io/dgtlmoon/changedetection.io:latest
+    container_name: changedetection
+    profiles: [dashboards]
+    ports: ["3007:5000"]
+    mem_limit: 384m
+    user: "${PUID}:${PGID}"
+    security_opt: *nnp
+    environment:
+      TZ: ${TZ}
+      BASE_URL: http://${HOST_NAME}:3007
+    volumes:
+      - ${CONFIG_ROOT}/changedetection:/datastore
+    healthcheck:
+      <<: *hc
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/')"]
+
+  # Deliberately no /data: it acts only through the qBittorrent and arr APIs, and the
+  # orphan/no-hardlink cleanup that would need the mount stays off.
+  cleanuparr:
+    <<: *common
+    image: ghcr.io/cleanuparr/cleanuparr:latest
+    container_name: cleanuparr
+    ports: ["11011:11011"]
+    mem_limit: 512m
+    security_opt: *nnp
+    environment:
+      <<: *common-env
+      PORT: 11011
+    volumes:
+      - ${CONFIG_ROOT}/cleanuparr:/config
+    healthcheck:
+      <<: *hc
+      test: ["CMD", "curl", "-f", "http://localhost:11011/health"]
+
+  # Mounting the real socket, even :ro, gives full control of Docker (root on the Pi), so clients use this.
+  # It answers read-only endpoints only (POST=0) and publishes no port.
+  socket-proxy:
+    <<: *common
+    image: lscr.io/linuxserver/socket-proxy:latest
+    container_name: socket-proxy
+    mem_limit: 64m
+    read_only: true
+    tmpfs:
+      - /run
+    environment:
+      CONTAINERS: 1
+      # Read-only system info, needed by Dozzle.
+      INFO: 1
+      # Reading container logs is gated separately from CONTAINERS; Dozzle needs it.
+      ALLOW_LOGS: 1
+      POST: 0
+      LOG_LEVEL: warning
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  prometheus:
+    <<: *common
+    image: prom/prometheus:latest
+    container_name: prometheus
+    profiles: [monitoring]
+    ports: ["9090:9090"]
+    mem_limit: 768m
+    user: "${PUID}:${PGID}"
+    security_opt: *nnp
+    healthcheck:
+      <<: *hc
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9090/-/healthy"]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      # Bounded retention; this is a Pi, not a monitoring cluster.
+      - --storage.tsdb.retention.time=30d
+      - --storage.tsdb.retention.size=4GB
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ${CONFIG_ROOT}/prometheus:/prometheus
+
+  node-exporter:
+    <<: *common
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    profiles: [monitoring]
+    mem_limit: 128m
+    security_opt: *nnp
+    pid: host
+    command:
+      - --path.rootfs=/host
+      - --collector.thermal_zone
+      # Backup and pending-update metrics, written by backup-config and check-updates.
+      - --collector.textfile.directory=/textfile
+    volumes:
+      - /:/host:ro,rslave
+      # Mounted on its own: node-exporter runs as nobody, which can't pass through the home directory.
+      - ${CONFIG_ROOT}/../state/metrics:/textfile:ro
+
+  scraparr:
+    <<: *common
+    image: ghcr.io/thecfu/scraparr:latest
+    container_name: scraparr
+    profiles: [monitoring]
+    mem_limit: 256m
+    security_opt: *nnp
+    environment:
+      TZ: ${TZ}
+      SONARR_API_KEY: ${SONARR_API_KEY}
+      RADARR_API_KEY: ${RADARR_API_KEY}
+      PROWLARR_API_KEY: ${PROWLARR_API_KEY}
+      BAZARR_API_KEY: ${BAZARR_API_KEY}
+    volumes:
+      # Rendered config lives outside the repo because it contains API keys.
+      - ${CONFIG_ROOT}/scraparr:/app/src/scraparr/config
+
+  grafana:
+    <<: *common
+    image: grafana/grafana:latest
+    container_name: grafana
+    profiles: [monitoring]
+    ports: ["3001:3000"]
+    mem_limit: 1g
+    user: "${PUID}:${PGID}"
+    security_opt: *nnp
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      <<: *hc
+      test: ["CMD", "curl", "-sf", "-o", "/dev/null", "http://127.0.0.1:3000/api/health"]
+    environment:
+      TZ: ${TZ}
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_SERVER_ROOT_URL: http://${HOST_NAME}:3001
+    volumes:
+      - ${CONFIG_ROOT}/grafana:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+
+  dozzle:
+    <<: *common
+    image: amir20/dozzle:latest
+    container_name: dozzle
+    profiles: [monitoring]
+    mem_limit: 128m
+    ports: ["8888:8080"]
+    security_opt: *nnp
+    environment:
+      DOCKER_HOST: tcp://socket-proxy:2375
+      DOZZLE_AUTH_PROVIDER: simple
+      # Pinned off even though they default off: the first-run wizard could otherwise switch them on.
+      DOZZLE_ENABLE_ACTIONS: "false"
+      DOZZLE_ENABLE_SHELL: "false"
+      DOZZLE_AUTO_UPDATE: "off"
+      DOZZLE_NO_ANALYTICS: "true"
+    volumes:
+      - ${CONFIG_ROOT}/dozzle:/data
+    depends_on: [socket-proxy]
+    healthcheck:
+      <<: *hc
+      test: ["CMD", "/dozzle", "healthcheck"]
+
+  jellydash:
+    <<: *common
+    image: ghcr.io/themartz90/jellydash:latest
+    container_name: jellydash
+    profiles: [stats]
+    mem_limit: 384m
+    ports: ["3004:80"]
+    security_opt: *nnp
+    depends_on:
+      jellyfin:
+        condition: service_healthy
+    environment:
+      APP_TIMEZONE: ${TZ}
+      DB_DRIVER: sqlite3
+      # Without a full path the database lands inside the container, wiped on every update.
+      DB_NAME: /var/www/html/var/data/jellydash.sqlite
+      JELLYFIN_URL: http://jellyfin:8096
+      JELLYFIN_API_TOKEN: ${JELLYDASH_JELLYFIN_API_KEY}
+      JELLYSEER_URL: http://seerr:5055
+      JELLYSEER_API_TOKEN: ${SEERR_API_KEY}
+      POLLER_ENABLED: "true"
+      NTFY_URL: ${NTFY_SERVER:-https://ntfy.sh}
+      NTFY_TOPIC: ${NTFY_TOPIC}
+      AUTH_ENABLED: "true"
+      # Created by configure-jellydash.py, which can set a password under the app's 8-character minimum.
+      AUTH_ADMIN_USER: ${JELLYDASH_USER}
+    volumes:
+      - ${CONFIG_ROOT}/jellydash/data:/var/www/html/var/data
+      - ${CONFIG_ROOT}/jellydash/uploads:/var/www/html/public/uploads
+      - ${CONFIG_ROOT}/jellydash/sessions:/var/www/html/var/sessions
+
+  uptime-kuma:
+    <<: *common
+    image: louislam/uptime-kuma:2
+    container_name: uptime-kuma
+    profiles: [monitoring]
+    mem_limit: 384m
+    ports: ["3003:3001"]
+    security_opt: *nnp
+    environment:
+      TZ: ${TZ}
+      # Skips v2's first-run database picker; SQLite lives in /app/data.
+      UPTIME_KUMA_DB_TYPE: sqlite
+    # Plex runs on the host network; this is how Kuma reaches it.
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    volumes:
+      - ${CONFIG_ROOT}/uptime-kuma:/app/data
+
+  jellystat-db:
+    <<: *common
+    image: postgres:16-alpine
+    container_name: jellystat-db
+    profiles: [stats]
+    mem_limit: 384m
+    stop_grace_period: 30s
+    environment: &jellystat-db-env
+      POSTGRES_DB: jfstat
+      POSTGRES_USER: ${JELLYSTAT_DB_USER}
+      POSTGRES_PASSWORD: ${JELLYSTAT_DB_PASSWORD}
+    volumes:
+      - ${CONFIG_ROOT}/jellystat-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${JELLYSTAT_DB_USER} -d jfstat"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  jellystat:
+    <<: *common
+    image: cyfershepard/jellystat:latest
+    container_name: jellystat
+    profiles: [stats]
+    ports: ["3002:3000"]
+    mem_limit: 512m
+    security_opt: *nnp
+    depends_on:
+      jellystat-db:
+        condition: service_healthy
+      jellyfin:
+        condition: service_healthy
+    environment:
+      <<: *jellystat-db-env
+      TZ: ${TZ}
+      POSTGRES_IP: jellystat-db
+      POSTGRES_PORT: 5432
+      JWT_SECRET: ${JELLYSTAT_JWT_SECRET}
+    volumes:
+      - ${CONFIG_ROOT}/jellystat/backup:/app/backend/backup-data
+
+networks:
+  arr:
+    name: arr
+    ipam:
+      config:
+        - subnet: 172.18.0.0/16

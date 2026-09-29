@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# Block commits that contain credentials or scripts that don't parse; scripts/check runs gitleaks for the rest.
+# Enable with: git config core.hooksPath .githooks
+
+set -uo pipefail
+
+# pattern | what it catches
+SECRET_PATTERNS=(
+  '(PrivateKey|WIREGUARD_PRIVATE_KEY)[[:space:]]*=[[:space:]]*[A-Za-z0-9+/]{42,}=|a WireGuard private key'
+  'PLEX_CLAIM[[:space:]]*=[[:space:]]*claim-.+|a Plex claim token'
+  '(api_?key|x-api-key)"?[[:space:]]*[:=][[:space:]]*"?[a-f0-9]{32}|an API key'
+  '<ApiKey>[a-f0-9]{32}</ApiKey>|an arr API key'
+  '-----BEGIN [A-Z ]*PRIVATE KEY-----|a private key'
+  'gh[pousr]_[A-Za-z0-9]{36}|a GitHub token'
+  '[0-9]{8,10}:AA[A-Za-z0-9_-]{33}|a Telegram bot token'
+  '1//0[A-Za-z0-9_-]{40,}|a Google refresh token'
+)
+
+fail=0
+mapfile -d '' staged < <(git diff --cached --name-only -z --diff-filter=ACMR)
+[ ${#staged[@]} -eq 0 ] && exit 0
+
+for file in "${staged[@]}"; do
+  if [ "$(basename "$file")" = .env ] || [[ $file == *.key || $file == *.pem ]]; then
+    echo "BLOCKED: $file looks like a secrets file and must not be committed."
+    fail=1
+    continue
+  fi
+
+  content=$(git show ":$file" 2>/dev/null) || continue
+
+  for secret in "${SECRET_PATTERNS[@]}"; do
+    if grep -qiE -- "${secret%|*}" <<< "$content"; then
+      echo "BLOCKED: $file contains what looks like ${secret##*|}."
+      fail=1
+    fi
+  done
+done
+
+if [ "$fail" -ne 0 ]; then
+  echo
+  echo "Commit aborted. Put secrets in .env (gitignored), not in tracked files."
+  exit 1
+fi
+
+# pyflakes catches undefined names that only fail at run time; optional.
+if command -v pyflakes >/dev/null; then flakes=(pyflakes)
+elif uvx --offline -q pyflakes --version >/dev/null 2>&1; then flakes=(uvx --offline -q pyflakes)
+else flakes=(true); fi
+
+for file in "${staged[@]}"; do
+  case "$(head -1 "$file" 2>/dev/null)" in
+    *bash*) bash -n "$file" || fail=1 ;;
+    *python*)
+      python3 -c 'import ast, sys; ast.parse(open(sys.argv[1]).read(), sys.argv[1])' "$file" || fail=1
+      "${flakes[@]}" "$file" || fail=1 ;;
+  esac
+done
+
+[ "$fail" -eq 0 ] || { echo; echo "Commit aborted: fix the script errors above."; exit 1; }
+exit 0

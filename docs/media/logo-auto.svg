@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="homelab-media-stack">
+  <style>
+    .band { fill: #232653; }
+    @media (prefers-color-scheme: dark) { .band { fill: #E8ECF6; } }
+  </style>
+  <defs>
+    <clipPath id="disc"><circle cx="29" cy="32" r="25"/></clipPath>
+  </defs>
+  <g class="band" clip-path="url(#disc)">
+    <rect y="7" width="64" height="10.25"/>
+    <rect y="20.25" width="64" height="10.25"/>
+    <rect y="46.75" width="64" height="10.25"/>
+  </g>
+  <g transform="translate(7 0)">
+    <rect y="33.5" width="64" height="10.25" fill="#F0A038" clip-path="url(#disc)"/>
+  </g>
+</svg>

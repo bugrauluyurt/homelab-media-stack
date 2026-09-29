@@ -1,0 +1,46 @@
+# ---- Secrets: never commit ----
+.env
+*.env
+!.env.example
+*.key
+*.pem
+*.conf
+!host/sshd_config.d/*.conf
+*.crt
+wg*.conf
+secrets/
+
+# ---- Runtime data (lives outside the repo, but belt-and-braces) ----
+config/
+data/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.log
+logs/
+Backups/
+
+# ---- OS / editor noise ----
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# scraparr config is rendered with live API keys
+scraparr/config.yaml
+
+# ---- Python bytecode ----
+__pycache__/
+
+# ---- Local agent and tool state ----
+.remember/
+.claude/settings.local.json
+AGENTS.local.md
+
+# ---- Docs site build output ----
+site/

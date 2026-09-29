@@ -1,0 +1,70 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  version:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      skip: ${{ steps.version.outputs.skip }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - id: version
+        run: |
+          version=$(jq -r .version ai/homelab-plugin/plugin.json)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+          # Release only a version the release PR wrote into CHANGELOG.md and nobody has tagged yet.
+          if git ls-remote --exit-code --tags origin "refs/tags/v$version" > /dev/null \
+            || ! python3 scripts/changelog.py notes "$version" > /dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  checks:
+    needs: version
+    if: needs.version.outputs.skip == 'false'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    needs: [version, checks]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Draft first, then publish: immutable releases lock the tag and sign it on publish.
+      - name: Publish the release
+        run: |
+          notes=$(python3 scripts/changelog.py notes "$VERSION")
+
+          if gh release view "v$VERSION" > /dev/null 2>&1; then
+            gh release edit "v$VERSION" --target "$GITHUB_SHA" --title "homelab-media-stack $VERSION" --notes "$notes"
+          else
+            gh release create "v$VERSION" --draft --target "$GITHUB_SHA" --title "homelab-media-stack $VERSION" --notes "$notes"
+          fi
+
+          gh release edit "v$VERSION" --draft=false --latest

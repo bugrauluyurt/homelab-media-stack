@@ -1,0 +1,16 @@
+{
+  "name": "homelab-media-stack",
+  "owner": {
+    "name": "Bugra Uluyurt"
+  },
+  "metadata": {
+    "description": "Operational skills for the homelab media stack on the Pi."
+  },
+  "plugins": [
+    {
+      "name": "homelab",
+      "source": "./ai/homelab-plugin",
+      "description": "Skills to check, update, back up and troubleshoot this media stack."
+    }
+  ]
+}

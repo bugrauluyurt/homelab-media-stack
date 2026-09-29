@@ -1,0 +1,10 @@
+[Unit]
+Description=Weekly sync of Glance's YouTube channel lists
+
+[Timer]
+OnCalendar=Sun *-*-* 05:00:00
+RandomizedDelaySec=30min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
