@@ -238,9 +238,10 @@ that the admin login is refused when tried from the server's tailnet address.
   (Scraparr's config) are written there, `chmod 600`.
 - **The VPN key** is only in `.env`. `wg0.conf` holds the rest of the WireGuard
   configuration, mode `600`, and deliberately no `PrivateKey`.
-- **The pre-commit hook** (`git config core.hooksPath .githooks`) blocks `.env`, `*.key` and
-  `*.pem` files and contents that look like a WireGuard private key, a Plex claim token, an
-  API key, a PEM private key, a GitHub token, a Telegram bot token or a Google refresh token.
+- **The pre-commit hook** (`git config core.hooksPath .githooks`) blocks `.env` and its copies
+  (`.env.bak`, `.env.local`; `.env.example` is allowed), `*.local.*`, `*.key` and `*.pem` files,
+  and contents that look like a WireGuard private key, a Plex claim token, an API key, a PEM
+  private key, a GitHub token, a Telegram bot token or a Google refresh token.
   It also refuses scripts that do not parse. The repository's own checks run gitleaks as well.
 - **Backups include `.env`**, encrypted by restic with `RESTIC_PASSWORD`. The backup
   repository is on the media disk with a mirror on the system disk, and a root-only copy of
