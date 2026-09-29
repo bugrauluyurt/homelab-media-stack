@@ -9,7 +9,7 @@ Read-only. The media drive is mounted at `STORAGE_MOUNT` (`.env`, default `/mnt/
 A drive in a USB enclosure needs `-d sat`; internal SATA and NVMe drives don't.
 
 ```bash
-STACK=${ARR_STACK_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}; [ -x "$STACK/scripts/health-check" ] || STACK=~/arr-stack
+STACK=${MEDIA_STACK_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}; [ -x "$STACK/scripts/health-check" ] || STACK=~/homelab-media-stack
 MOUNT=$(sed -n 's/^STORAGE_MOUNT=//p' "$STACK/.env"); MOUNT=${MOUNT:-/mnt/storage}
 SOURCE=$(findmnt -no SOURCE "$MOUNT" | sed 's/\[.*//')
 PARENT=$(lsblk -no PKNAME "$SOURCE" | head -1)

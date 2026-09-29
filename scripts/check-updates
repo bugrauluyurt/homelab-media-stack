@@ -92,7 +92,7 @@ for line in sys.stdin:
     flag = "  MAJOR" if major(old) and major(now) and major(old) != major(now) else ""
     print(f"{names}: {old} -> {now}{flag}")
 ' "$(docker compose config --format json)" "$new")
-  notify "arr-stack: $(printf '%s\n' $new | wc -l) update(s) available" package "$body
+  notify "media stack: $(printf '%s\n' $new | wc -l) update(s) available" package "$body
 Apply with: update"
 fi
 

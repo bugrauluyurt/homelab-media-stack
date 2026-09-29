@@ -4,7 +4,7 @@
   "title": "Media Server: Watching",
   "description": "Recorded Jellyfin playback from Jellystat, queried with a column-scoped read-only database role.",
   "tags": [
-    "arr-stack",
+    "homelab-media-stack",
     "overview"
   ],
   "timezone": "browser",

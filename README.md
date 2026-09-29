@@ -129,7 +129,7 @@ Every service, its port and who can reach it are in the
 1. **Install the prerequisites:** Docker with Compose, Tailscale, restic and a few tools, and
    give your account passwordless sudo and the docker group.
    ([Prerequisites](docs/getting-started.md#install-the-prerequisites))
-2. **Clone and configure:** clone this repository to `~/arr-stack`, copy `.env.example` to
+2. **Clone and configure:** clone this repository to `~/homelab-media-stack`, copy `.env.example` to
    `.env`, fill it in and pick your modules.
    ([Configure .env](docs/getting-started.md#fill-in-env))
 3. **Prepare storage and the VPN:** mount the media disk at `STORAGE_MOUNT`, create the data
@@ -160,8 +160,8 @@ logins are in `.env` as well.
 | Know when something is down | Uptime Kuma, `http://<tailscale-ip>:3003/status/stack` |
 | Read a container's logs | Dozzle, `http://<tailscale-ip>:8888` |
 | Watch a web page for changes | ChangeDetection.io, `http://<tailscale-ip>:3007` |
-| Check that everything is healthy | `~/arr-stack/scripts/health-check` |
-| Power the media drive off safely | `~/arr-stack/scripts/storage-off` |
+| Check that everything is healthy | `~/homelab-media-stack/scripts/health-check` |
+| Power the media drive off safely | `~/homelab-media-stack/scripts/storage-off` |
 | Give family or a friend access | [Viewers](docs/flows/viewers.md) |
 
 From the home network without Tailscale, only Jellyfin (`http://<lan-ip>:8096`), Seerr
@@ -230,10 +230,9 @@ and starts throwaway containers, so keep it for validation you have approved.
 |---|---|---|
 | Claude Code | `/plugin marketplace add bugrauluyurt/homelab-media-stack` (or a local path), then `/plugin install homelab@homelab-media-stack` | `/plugin marketplace update homelab-media-stack` |
 | Codex | `codex plugin marketplace add bugrauluyurt/homelab-media-stack`, then install it from `/plugins` | `codex plugin marketplace upgrade` |
-| pi | `pi install ~/arr-stack/ai/homelab-plugin` | Follows the folder: `git pull`, then `/reload` |
 
 Ask in plain words ("is everything healthy?") or call a skill by name:
-`/homelab:stack-health` in Claude Code, `$stack-health` in Codex, `/skill:stack-health` in pi.
+`/homelab:stack-health` in Claude Code, `$stack-health` in Codex.
 For an agent you can message from your phone without a terminal open, see
 [AI agent](docs/flows/ai-agent.md).
 

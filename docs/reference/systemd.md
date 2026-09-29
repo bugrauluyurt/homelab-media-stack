@@ -10,7 +10,7 @@ The files in `systemd/` are templates. [`install-host`](scripts.md#install-host)
 
 | Placeholder | Filled with | Example |
 |---|---|---|
-| `@REPO@` | the repository's absolute path (the folder above `scripts/`) | `/home/<user>/arr-stack` |
+| `@REPO@` | the repository's absolute path (the folder above `scripts/`) | `/home/<user>/homelab-media-stack` |
 | `@STACK_USER@` | `STACK_USER` | `<user>` |
 | `@STACK_GROUP@` | the stack user's primary group, `id -gn "$STACK_USER"` | `<user>` |
 | `@STORAGE_UUID@` | `STORAGE_UUID` | the drive's filesystem UUID |

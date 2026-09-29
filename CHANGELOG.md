@@ -8,6 +8,13 @@ the release pull request publishes it ([how releases work](docs/operations/relea
 
 ## Unreleased
 
+### Changed
+- The documented checkout is `~/homelab-media-stack`: the terminal aliases and the skills look there
+  unless `MEDIA_STACK_DIR` says otherwise (it replaces `ARR_STACK_DIR`), and the example
+  `CONFIG_ROOT` is `~/homelab-media-stack-data/config`. An install in another folder keeps working;
+  set `MEDIA_STACK_DIR` for the aliases.
+- Push notifications start with "media stack:" instead of "arr-stack:".
+
 ## 2.0.0 - 2026-09-29
 
 ### Added

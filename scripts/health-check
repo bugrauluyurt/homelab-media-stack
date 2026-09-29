@@ -227,7 +227,7 @@ fi
 echo "  $pass passed, $fail failed"
 
 if [ "$fail" -gt 0 ] && [ "${1:-}" = "--notify" ]; then
-  notify "arr-stack: $fail health check(s) failing" warning "$(printf '%s\n' "${failed[@]}")
+  notify "media stack: $fail health check(s) failing" warning "$(printf '%s\n' "${failed[@]}")
 
 Run scripts/health-check for details."
 fi

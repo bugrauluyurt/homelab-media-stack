@@ -130,9 +130,9 @@ computes the wanted rules, compares a hash stamped into `ARR-IN`, and rebuilds o
 differ (`+ iptables: rules rebuilt`, otherwise `= iptables: rules current`).
 
 ```bash
-sudo ~/arr-stack/scripts/firewall status       # show the rules
-sudo ~/arr-stack/scripts/firewall off          # remove them (the timer restores them within 15 minutes)
-~/arr-stack/scripts/firewall home-ports        # the ports open to the home network
+sudo ~/homelab-media-stack/scripts/firewall status       # show the rules
+sudo ~/homelab-media-stack/scripts/firewall off          # remove them (the timer restores them within 15 minutes)
+~/homelab-media-stack/scripts/firewall home-ports        # the ports open to the home network
 ```
 
 **Guards.** The script refuses to apply, and says why, when:
