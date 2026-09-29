@@ -9,6 +9,7 @@ page says what does, what is left to you, and how to check on it. `health` (the
 | Chore | Runs by itself | Left to you |
 |---|---|---|
 | [Image updates](#updates) | A check every morning at 06:00, pushed to your phone | Apply them with `update` when it suits you |
+| [Stack upgrades](#upgrading-the-stack) | Nothing | Pull a new release of this repository when you want its changes |
 | [Stalled and fake downloads](#cleanuparr) | Cleanuparr, every 5 minutes | Nothing, unless you change its rules |
 | [Disk space](#disk-space) | `health-check` fails above 90% full | Delete what you no longer want |
 | [Drive health](#drive-health) | SMART checks every 6 hours, with a push on failure | Replace a failing drive in time |
@@ -38,6 +39,25 @@ only the updated services and runs the health check afterwards. It is never auto
 these apps depend on each other: a single Jellyfin release once broke the logins of Seerr,
 Sonarr, Radarr and Homepage at once. The whole story, including rollback, is in
 [Updates](../flows/updates.md).
+
+## Upgrading the stack
+
+`update` changes app images; the stack itself (the compose file, scripts and units) changes
+only when you pull a new version of this repository. Read the release notes on the
+[releases page](https://github.com/bugrauluyurt/homelab-media-stack/releases) first: a major
+version lists what to change in `.env` or on the server, and new keys are in `.env.example`.
+
+```bash
+cd ~/homelab-media-stack
+sudo scripts/backup-config pre-update   # settings snapshot, kept like update's
+git pull --ff-only                      # main; or git checkout vX.Y.Z for a tagged release
+scripts/install-host                    # re-renders changed units and timers
+scripts/stack-up                        # recreates only the services whose definition changed
+health
+```
+
+A release that needs a configure script run again says so in its notes; all of them are safe to
+re-run.
 
 ## Cleanuparr
 
