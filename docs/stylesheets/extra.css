@@ -1,0 +1,111 @@
+@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&display=swap");
+
+/* Brand tokens: indigo ink, lamp amber, mist; the same as the logo and the banner. */
+:root {
+  --hms-ink: #232653;
+  --hms-amber: #F0A038;
+  --hms-amber-text: #9A5A06;
+  --hms-muted: #5B6385;
+  --hms-guide: #D9DEEC;
+  --hms-display: "Bricolage Grotesque", var(--md-text-font-family);
+
+  --md-primary-fg-color: var(--hms-ink);
+  --md-accent-fg-color: var(--hms-amber-text);
+  --md-typeset-a-color: #3B3F8F;
+}
+
+[data-md-color-scheme="slate"] {
+  --hms-ink: #E8ECF6;
+  --hms-amber-text: #F0A038;
+  --hms-muted: #A3AACB;
+  --hms-guide: #2A2E55;
+
+  --md-accent-fg-color: var(--hms-amber-text);
+  --md-typeset-a-color: #AEB5F0;
+}
+
+/* Headings carry the display face. */
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3,
+.md-header__title {
+  font-family: var(--hms-display);
+  letter-spacing: -0.015em;
+}
+
+.md-typeset h1 {
+  font-weight: 700;
+}
+
+.md-typeset h2,
+.md-typeset h3 {
+  font-weight: 600;
+}
+
+/* Right-hand table of contents: groups read as groups, entries sit on a guide line under them. */
+.md-nav--secondary .md-nav__title {
+  font-family: var(--hms-display);
+  font-size: 0.72rem;
+  color: var(--hms-muted);
+  border-bottom: 1px solid var(--hms-guide);
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.md-nav--secondary > .md-nav__list > .md-nav__item {
+  margin-top: 0.35rem;
+}
+
+.md-nav--secondary > .md-nav__list > .md-nav__item > .md-nav__link {
+  font-family: var(--hms-display);
+  font-weight: 600;
+  color: var(--hms-ink);
+}
+
+.md-nav--secondary .md-nav__item .md-nav {
+  margin: 0.1rem 0 0.5rem 0.8rem;
+  border-left: 1px solid var(--hms-guide);
+}
+
+.md-nav--secondary .md-nav__item .md-nav .md-nav__link {
+  font-size: 0.66rem;
+  color: var(--hms-muted);
+  margin-left: -1px;
+  border-left: 2px solid transparent;
+  border-radius: 0;
+  padding: 0.12rem 0.6rem;
+}
+
+.md-nav--secondary .md-nav__link--active,
+.md-nav--secondary .md-nav__item .md-nav .md-nav__link--active {
+  color: var(--hms-amber-text);
+}
+
+.md-nav--secondary .md-nav__item .md-nav .md-nav__link--active {
+  border-left-color: var(--hms-amber);
+}
+
+/* Left navigation: each section opens with a divider and a display-face title. */
+.md-nav--primary .md-nav__item--section {
+  margin-top: 0.9rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--hms-guide);
+}
+
+.md-nav--primary .md-nav__item--section > .md-nav__link {
+  font-family: var(--hms-display);
+  font-weight: 700;
+  color: var(--hms-ink);
+}
+
+.md-nav--primary .md-nav__item--section .md-nav .md-nav__link {
+  color: var(--hms-muted);
+}
+
+.md-nav--primary .md-nav__link--active,
+.md-nav--primary .md-nav__item--section .md-nav .md-nav__link--active {
+  color: var(--hms-ink);
+  font-weight: 600;
+  background-color: color-mix(in srgb, var(--hms-amber) 18%, transparent);
+  box-shadow: inset 3px 0 0 var(--hms-amber);
+}
