@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "homelab",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Operate the arr media stack on the Pi: health checks, VPN leak checks, drive health, logs, safe updates with rollback, backups and power.",
   "author": { "name": "Bugra Uluyurt" },
   "repository": "https://github.com/bugrauluyurt/homelab-media-stack"

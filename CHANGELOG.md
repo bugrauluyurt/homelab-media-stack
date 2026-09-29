@@ -8,6 +8,8 @@ the release pull request publishes it ([how releases work](docs/operations/relea
 
 ## Unreleased
 
+## 2.2.0 - 2026-09-29
+
 ### Added
 - `ARR_SUBNET` sets the `arr` Docker network's subnet, and `install-host` reports when it overlaps
   another Docker network on the machine (Docker hands the default `172.18.0.0/16` to the first
