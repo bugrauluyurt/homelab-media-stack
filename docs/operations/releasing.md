@@ -50,7 +50,7 @@ flowchart TD
     rpr --> nxt{"changelog.py next: anything under Unreleased?"}
     nxt -->|no| close["Close the release PR, if one is open"]
     nxt -->|yes| cut["changelog.py cut on branch release/next: CHANGELOG.md and plugin.json"]
-    cut --> pr["Pull request 'Release vX.Y.Z' opened or updated"]
+    cut --> pr["Pull request 'chore(release): vX.Y.Z' opened or updated"]
     pr -->|"you approve and merge it"| push
     push --> rel["release workflow"]
     rel --> tag{"Tag vX.Y.Z already exists?"}
@@ -66,7 +66,7 @@ On every push to `main`, two workflows run:
    version. If `## Unreleased` is empty, it closes any open release pull request and stops.
    Otherwise it cuts the release on the branch `release/next` (the changelog section and the
    `version` in `ai/homelab-plugin/plugin.json`), force-pushes that branch, and opens or updates
-   the pull request **Release vX.Y.Z**, with the notes as its description. GitHub holds CI on a
+   the pull request **chore(release): vX.Y.Z**, with the notes as its description. GitHub holds CI on a
    pull request the workflow's own token opened until a maintainer approves the run.
 2. **release** (`.github/workflows/release.yml`) reads the version from `plugin.json`. If the
    tag `vX.Y.Z` already exists, there is nothing new and it stops; that is the case for every
@@ -84,7 +84,7 @@ release is still a draft.
 ## How to release
 
 1. Merge changes to `main`, each with its changelog line under `## Unreleased`.
-2. Open the pull request **Release vX.Y.Z**. Check the version and read the notes: they are what
+2. Open the pull request **chore(release): vX.Y.Z**. Check the version and read the notes: they are what
    people will see.
 3. Start its CI: the pull request says a workflow is awaiting approval; choose **Approve
    workflows to run**, or from a terminal:

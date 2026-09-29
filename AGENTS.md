@@ -68,4 +68,5 @@ Operating skills live in `ai/homelab-plugin/skills/` (linked into `.claude/skill
   decide the next version; merging the bot's release PR publishes it (`docs/operations/releasing.md`).
 - Edit skills only under `ai/homelab-plugin/skills/`. They reach Codex with the next release, which
   sets `version` in `ai/homelab-plugin/plugin.json`.
-- Commits: an imperative summary line and a body explaining why.
+- Commits and pull request titles follow Conventional Commits (`type(scope): summary`, at most
+  72 characters, lowercase, imperative); the body says why. `CONTRIBUTING.md` has the types.
