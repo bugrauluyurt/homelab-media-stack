@@ -24,8 +24,8 @@ username is their name up to any "@", so `you@example.com` signs in as `you`.
 
 What you get:
 
-- **Home:** mixes made from your library, recently added music, and a card to pick up where
-  another device stopped.
+- **Home:** mixes made from your library, recently added music, a card to pick up where
+  another device stopped, and your ListenBrainz playlists once you connect them (below).
 - **Search** of your library, matching text anywhere in a title, artist or album. It also offers
   music you don't have, which you can ask for (below).
 - **Your library:** All, Songs, Albums, Artists and Playlists, with its own search.
@@ -85,6 +85,39 @@ hundreds of artists with every album monitored and pulled in music nobody asked 
 `configure-arr.py` keeps it that way. For a search by hand, slskd has its own web page
 (`http://<tailscale-ip>:5030`, user `admin`, password `SLSKD_PASSWORD`).
 
+## Discovery with ListenBrainz
+
+[ListenBrainz](https://listenbrainz.org) is a free, open service that learns what you like from
+what you play and makes playlists for you every week: **Weekly Exploration** with songs you
+haven't heard, **Weekly Jams** and **Daily Jams** with songs you like and more like them. Each
+person connects their own account; the owner sets nothing up.
+
+To connect:
+
+1. Create an account at <https://listenbrainz.org> and copy your **user token** from
+   <https://listenbrainz.org/settings/>.
+2. In Needle, open **Settings → ListenBrainz** and paste the token.
+3. Optionally type your Navidrome password (the one you sign in to Needle with). Needle uses it
+   once to switch on scrobbling in Navidrome, so everything you play is sent to ListenBrainz, and
+   never stores it. Leave it empty to do that yourself: in Navidrome
+   (`http://<tailscale-ip>:4533`, owner only) open **Settings → Personal → ListenBrainz** and paste
+   the same token.
+4. Choose **Connect ListenBrainz**. Settings then shows *Connected as* your ListenBrainz name, and
+   whether Navidrome sends your listens.
+
+ListenBrainz needs about a week of listening before the first playlists appear. They show up on
+Home under **Made for you by ListenBrainz**, with how many songs you already have and how many
+you could get. On a playlist:
+
+- **Play** and **Shuffle** play the songs in your library.
+- **Get N missing** fetches the rest from Soulseek into the **Singles** library, like **Get song**
+  (only for people who may request music). Each song also has its own **Get song**.
+- **Save as playlist** keeps the songs you have as a Navidrome playlist, named after the playlist
+  and its date.
+
+**Disconnect** in Settings removes your token from Needle. Navidrome keeps sending your listens
+until you remove the token there too.
+
 ## Spotify (optional)
 
 With Spotify connected, your Spotify liked songs, playlists and saved albums show up in Your
@@ -140,6 +173,6 @@ Needle passes the music through.
 
 ## What is kept safe
 
-Your likes, playlists, play history, requests and Spotify sign-in are in the nightly settings
-backup; the music files are not, since they can be fetched again
+Your likes, playlists, play history, requests, Spotify sign-in and ListenBrainz token are in the
+nightly settings backup; the music files are not, since they can be fetched again
 ([what's backed up](../flows/music.md#whats-backed-up)).
