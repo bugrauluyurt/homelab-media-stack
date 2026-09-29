@@ -124,14 +124,18 @@ done
 
 # A Jellyfin update can disable plugins built for an older version without anything else failing.
 jellyfin_plugins_ok() {
-  curl -sf --max-time 10 -H "Authorization: MediaBrowser Token=\"$JELLYFIN_API_KEY\"" http://127.0.0.1:8096/Plugins \
-    | python3 -c 'import json, sys; bad = [p["Name"] + ":" + p["Status"] for p in json.load(sys.stdin) if p["Status"] != "Active"]; print(", ".join(bad)); sys.exit(1 if bad else 0)'
+  local plugins_json
+  plugins_json=$(curl -sf --max-time 10 -H "Authorization: MediaBrowser Token=\"$JELLYFIN_API_KEY\"" http://127.0.0.1:8096/Plugins) || return 1
+
+  python3 -c 'import json, sys; bad = [p["Name"] + ":" + p["Status"] for p in json.load(sys.stdin) if p["Status"] != "Active"]; print(", ".join(bad)); sys.exit(1 if bad else 0)' <<< "$plugins_json"
 }
 chk "jellyfin plugins all active"       "jellyfin_plugins_ok"
 
 arr_health_ok() {
-  curl -sf --max-time 10 -H "X-Api-Key: $3" "http://127.0.0.1:$2/api/$4/health" \
-    | python3 -c 'import json, sys; sys.exit(any(h["type"] == "error" for h in json.load(sys.stdin)))'
+  local health_json
+  health_json=$(curl -sf --max-time 10 -H "X-Api-Key: $3" "http://127.0.0.1:$2/api/$4/health") || return 1
+
+  python3 -c 'import json, sys; sys.exit(any(h["type"] == "error" for h in json.load(sys.stdin)))' <<< "$health_json"
 }
 for s in "radarr 7878 RADARR_API_KEY v3" "sonarr 8989 SONARR_API_KEY v3" "lidarr 8686 LIDARR_API_KEY v1" "prowlarr 9696 PROWLARR_API_KEY v1"; do
   set -- $s

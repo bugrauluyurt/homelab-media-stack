@@ -25,7 +25,9 @@ there are the review checklist.
    `scripts/health-check` in the pull request. Say which platform you tested on
    (Raspberry Pi 5 or x86-64; Debian, Ubuntu or Arch).
 
-Commit messages are an imperative summary line and a body that explains why.
+Commit messages are an imperative summary line and a body that explains why. A pull request
+merges into `main` once it is up to date with `main`, its `checks` run passes and a maintainer
+approves it; maintainers merge their own through the admin bypass.
 
 By contributing you agree that your work is released under the [MIT license](LICENSE) and that
 you follow the [code of conduct](CODE_OF_CONDUCT.md).

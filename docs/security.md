@@ -268,10 +268,13 @@ that the admin login is refused when tried from the server's tailnet address.
   gh attestation verify oci://ghcr.io/bugrauluyurt/needle:<version> --owner bugrauluyurt
   ```
 
-- **This repository's releases** are immutable and signed by GitHub:
+- **This repository's releases** are immutable and signed by GitHub, and from v2.3.0 each
+  carries its source archive with signed build provenance:
 
   ```bash
   gh release verify <tag> -R bugrauluyurt/homelab-media-stack
+  gh attestation verify homelab-media-stack-<version>.tar.gz \
+    --bundle homelab-media-stack-<version>.tar.gz.intoto.jsonl -R bugrauluyurt/homelab-media-stack
   ```
 
 ## Reporting a vulnerability

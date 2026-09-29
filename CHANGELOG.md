@@ -8,6 +8,10 @@ the release pull request publishes it ([how releases work](docs/operations/relea
 
 ## Unreleased
 
+### Added
+- Each release carries its source archive, `homelab-media-stack-X.Y.Z.tar.gz`, with signed build
+  provenance (`.intoto.jsonl`) that `gh attestation verify` checks; SECURITY.md shows how.
+
 ## 2.2.0 - 2026-09-29
 
 ### Added
