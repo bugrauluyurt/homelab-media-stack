@@ -7,6 +7,45 @@ a minor version adds features, and a patch fixes bugs. A change records its entr
 next version, and merging the release pull request writes the entries here and publishes it
 ([how releases work](docs/operations/releasing.md)).
 
+## 2.4.0 - 2026-09-29
+
+### Added
+- A copy of `glance/youtube-channels.json` in `$CONFIG_ROOT/glance/` replaces the repository's
+  sample, so your pinned YouTube channels stay out of git.
+- Music docs explain ListenBrainz discovery in Needle: each listener connects their ListenBrainz
+  token in Needle's Settings, Navidrome sends the listens, and missing songs from the weekly
+  playlists come through slskd into `media/singles`. Lidarr and Tubifarry are unchanged.
+- The troubleshooting notes cover game searches that always take 30 seconds: one slow indexer
+  holds Questarr to its timeout, and switching it off in Prowlarr fixes it.
+- The troubleshooting notes cover a VPN that drops soon after torrents start and recovers about
+  an hour later: what was observed, the suspected cause, and why DHT stays enabled.
+
+### Changed
+- Changelog entries are files in `changelog.d/` instead of lines under `## Unreleased`, so pull
+  requests no longer conflict with each other or with a release. `changelog.d/README.md` shows the
+  format.
+- Glance's subreddits, stock list and pinned YouTube channels are now generic samples; edit them
+  in `glance/glance.yml` and `glance/youtube-channels.json`.
+
+### Fixed
+- `scripts/check` passes on a Raspberry Pi 5. ruff's arm64 build crashes on its 16 KiB-page
+  kernel, so the check skips ruff there and says so; CI still runs it.
+- Glance's YouTube rows show videos again. YouTube's RSS feed answers 404 for hours at a time, so
+  `sync-youtube.py` now fetches the latest uploads hourly, through the Data API once you are signed
+  in, and keeps a channel's last videos when it can't be read. `arr-youtube.timer` runs hourly
+  instead of weekly; rerun `install-host` to pick up the new schedule.
+- The plugin description, script messages and comments say "the server" instead of "the Pi",
+  since the stack runs on any supported machine.
+- Grafana's network panels show the server's real traffic. node-exporter now runs on the host
+  network; in a container network it counted only its own container. `configure-uptime-kuma.py`
+  updates the URL of a monitor whose service moved, so re-run it after updating.
+
+### Security
+- `.gitignore` and the pre-commit hook also keep `.env.*` copies (`.env.bak`, `.env.local`) and
+  `*.local.*` files out of commits, not only `.env` itself.
+- `render-scraparr-config` and `backup-config` create the scraparr config and the restic key file
+  private from the start, instead of making them private right after writing.
+
 ## 2.3.0 - 2026-09-29
 
 ### Added
