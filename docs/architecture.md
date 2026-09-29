@@ -111,15 +111,17 @@ flowchart TB
   Prowlarr's download links only when their host matches the indexer URL it was given, and
   Prowlarr writes the address it was called on into those links. Questarr connects by IP, so
   that IP must never change.
-- **Plex on the host network** (`network_mode: host`), so its port 32400 is the host's own.
-  Uptime Kuma reaches it at `host.docker.internal`.
+- **Plex and node-exporter on the host network** (`network_mode: host`). Plex's port 32400 is
+  the host's own, and node-exporter needs the host's network to count the server's traffic
+  rather than its own container's. Uptime Kuma and Prometheus reach them at
+  `host.docker.internal`; the firewall keeps port 9100 off the home network.
 - **Needle** publishes `127.0.0.1:4535` only. Tailscale Serve takes port 4535 on the tailnet
   addresses and serves it over HTTPS with a Tailscale certificate, so HTTPS is the only way
   in. Offline downloads, the iPhone home-screen app and Spotify need that HTTPS address.
 - **socket-proxy** is the only container with the Docker socket. Homepage, Glance and Dozzle
   read container state through it ([why](#socket-proxy-instead-of-the-docker-socket)).
-- **Docker only.** Byparr (`byparr:8191`), Scraparr (`scraparr:7100`), node-exporter
-  (`node-exporter:9100`), jellystat-db, socket-proxy (`socket-proxy:2375`) and gluetun's
+- **Docker only.** Byparr (`byparr:8191`), Scraparr (`scraparr:7100`), jellystat-db,
+  socket-proxy (`socket-proxy:2375`) and gluetun's
   control server (port 8000) publish nothing. The control server opens exactly one route
   without credentials, `GET /v1/portforward`, so Uptime Kuma can alert on a lost forwarded
   port.
@@ -264,7 +266,7 @@ Logins in capitals are keys in `.env`.
 | ChangeDetection.io | dashboards | 3007 | you | None | Watches web pages for changes |
 | Prometheus | monitoring | 9090 | you | None | Metrics, 30 days, at most 4 GB |
 | Grafana | monitoring | 3001 | you | `GRAFANA_USER` / `GRAFANA_PASSWORD` | Graphs and history |
-| node-exporter | monitoring | 9100 | Docker only | None | Host metrics |
+| node-exporter | monitoring | 9100 | you | None | Host metrics, on the host network |
 | Scraparr | monitoring | 7100 | Docker only | None | Metrics from the arr apps |
 | Uptime Kuma | monitoring | 3003 | you | `UPTIME_KUMA_USER` / `UPTIME_KUMA_PASSWORD` | Checks every service each minute, alerts to ntfy |
 | Scrutiny | monitoring | 3006 | you | None | SMART history of the media disk |
