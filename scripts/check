@@ -46,7 +46,18 @@ done)
 python_syntax() { python3 -m py_compile "${python_files[@]}"; }
 shell_syntax() { for file in "${shell_files[@]}"; do bash -n "$file" || return 1; done; }
 shellcheck() { in_docker "$SHELLCHECK" -S warning -x -P scripts "${shell_files[@]}"; }
-ruff() { in_docker "$RUFF" check --no-cache --select E4,E7,E9,F "${python_files[@]}"; }
+# ruff's arm64 build allocates for 4 KiB pages and crashes on 16 KiB-page kernels such as the Raspberry Pi 5's.
+ruff() {
+  local page_size
+  page_size=$(getconf PAGESIZE)
+
+  if [ "$page_size" != 4096 ]; then
+    echo "  ~ skipped: ruff can't start on this kernel's $page_size-byte pages; CI runs it"
+    return 0
+  fi
+
+  in_docker "$RUFF" check --no-cache --select E4,E7,E9,F "${python_files[@]}"
+}
 
 unit_tests() {
   python3 -m unittest discover -s tests -q &&

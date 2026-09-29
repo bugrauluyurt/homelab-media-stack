@@ -665,6 +665,7 @@ Every check CI and releases run, each tool from a pinned container, so it needs 
 - **Runs:** the CI workflow on pull requests and pushes to `main`, and before releases; by hand before you push.
 - **Root:** no.
 - **Changes:** nothing in the repository.
+- **Why:** on a kernel with 16 KiB memory pages, such as the Raspberry Pi 5's, ruff's arm64 build crashes on start, so `check` skips ruff there and says so; CI still runs it on every pull request.
 
 ## State files
 
