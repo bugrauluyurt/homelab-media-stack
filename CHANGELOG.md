@@ -8,6 +8,10 @@ the release pull request publishes it ([how releases work](docs/operations/relea
 
 ## Unreleased
 
+### Added
+- A copy of `glance/youtube-channels.json` in `$CONFIG_ROOT/glance/` replaces the repository's
+  sample, so your pinned YouTube channels stay out of git.
+
 ### Changed
 - Glance's subreddits, stock list and pinned YouTube channels are now generic samples; edit them
   in `glance/glance.yml` and `glance/youtube-channels.json`.
