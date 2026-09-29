@@ -8,6 +8,8 @@ the release pull request publishes it ([how releases work](docs/operations/relea
 
 ## Unreleased
 
+## 2.0.0 - 2026-09-29
+
 ### Added
 - Runs on x86-64 as well as on a Raspberry Pi 5, and on Arch (and CachyOS) as well as Debian and
   Ubuntu. `install-host` checks every prerequisite first and prints the exact `apt-get` or
