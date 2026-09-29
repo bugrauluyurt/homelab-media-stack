@@ -8,6 +8,20 @@ the release pull request publishes it ([how releases work](docs/operations/relea
 
 ## Unreleased
 
+### Added
+- `ARR_SUBNET` sets the `arr` Docker network's subnet, and `install-host` reports when it overlaps
+  another Docker network on the machine (Docker hands the default `172.18.0.0/16` to the first
+  other compose project) or doesn't hold `PROWLARR_IP`.
+
+### Fixed
+- A fresh install works with Jellyfin 12: `configure-jellyfin.py` reads the startup user before
+  naming it, which Jellyfin 12 needs.
+- On a fresh install, services that run as your user (Prometheus, Navidrome, Needle, Seerr,
+  Questarr, SFTPGo, ChangeDetection) could not write their settings, because Docker created their
+  folders as root. `stack-up` now creates every bind-mount folder as the stack user first.
+- A stalled download of the Jellyfin Spotlight theme no longer keeps Jellyfin from starting; the
+  download times out and Jellyfin starts with the files it has.
+
 ## 2.1.0 - 2026-09-29
 
 ### Changed

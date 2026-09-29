@@ -122,7 +122,7 @@ Installs the host side of the stack: renders every template in `systemd/` with v
 
 - **File:** [`scripts/install-host`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/install-host)
 - **Runs:** by hand, first; again after changing `STACK_USER`, `STORAGE_MOUNT`, `STORAGE_UUID` or any file in `systemd/`.
-- **Checks:** Docker with the compose and buildx plugins, restic, smartctl, hdparm, lsof, ip6tables, Tailscale, avahi-daemon, mDNS in `/etc/nsswitch.conf`, Python 3.9 or newer, passwordless sudo, and the stack user in the docker group.
+- **Checks:** Docker with the compose and buildx plugins, restic, smartctl, hdparm, lsof, ip6tables, Tailscale, avahi-daemon, mDNS in `/etc/nsswitch.conf`, Python 3.9 or newer, passwordless sudo, the stack user in the docker group, and that `ARR_SUBNET` overlaps no other Docker network and holds `PROWLARR_IP`.
 - **Root:** sudo; it needs passwordless sudo (it checks `sudo -n true`).
 - **Changes:** writes the units, timers and udev rule, then `systemctl daemon-reload` and `udevadm control --reload`; installs `/etc/ssh/sshd_config.d/10-arr-hardening.conf` (keys only, no root login), checks it with `sshd -t` and reloads ssh, warning when the `Include` line is missing from `sshd_config`; installs `/etc/docker/daemon.json` only when it differs, leaving the Docker restart to you because it restarts every container; disables and masks `rpcbind.socket` and `rpcbind.service`. Without `STORAGE_UUID` it skips the udev rule and removes an installed copy. It never enables or starts a unit.
 - **Idempotent:** yes.
@@ -360,7 +360,7 @@ These run unattended. The [systemd reference](systemd.md) has each unit's exact 
 Brings the stack up; it is `arr-stack.service`'s `ExecStart`. In order:
 
 1. Refuses to start (exit 1) unless `STORAGE_MOUNT` is a mount point.
-2. Creates `$STATE/metrics` as the stack user, before Docker would create it as root for node-exporter.
+2. Creates every missing bind-mount folder under the app-data root (`CONFIG_ROOT`'s parent, which holds `config/` and `state/`) as the stack user. Docker would create them as root, and the services that run as `PUID` could then not write their own settings on a fresh install.
 3. Seeds any missing Glance YouTube list with [`sync-youtube.py --offline`](#sync-youtubepy); Glance won't start without them.
 4. Runs `docker compose up -d --remove-orphans`.
 5. Fails (exit 1) when a library service is not running: prowlarr, radarr, sonarr, lidarr, bazarr, seerr, plex, jellyfin, navidrome, each only when its module is on.

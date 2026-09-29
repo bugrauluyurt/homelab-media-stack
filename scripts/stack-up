@@ -8,8 +8,15 @@ cd "$REPO" || exit 1
 
 mountpoint -q "$STORAGE_MOUNT" || { echo "FATAL: $STORAGE_MOUNT not mounted; refusing to start."; exit 1; }
 
-# Created here, as the stack user, before Docker would create it as root for node-exporter.
-mkdir -p "$STATE_ROOT/metrics"
+# Docker creates a missing bind-mount folder as root, which services running as PUID can't write,
+# so every folder under the app-data root is created here first, as the stack user.
+docker compose config --format json | python3 -c '
+import json, os, sys
+data_root = os.path.dirname(os.environ["CONFIG_ROOT"].rstrip("/")) + "/"
+for service in json.load(sys.stdin)["services"].values():
+    for volume in service.get("volumes", []):
+        if volume.get("type") == "bind" and volume["source"].startswith(data_root):
+            print(volume["source"])' | xargs -r mkdir -p
 
 # Glance won't start without its YouTube lists; seed any missing ones from the pinned channels.
 "$REPO/scripts/sync-youtube.py" --offline

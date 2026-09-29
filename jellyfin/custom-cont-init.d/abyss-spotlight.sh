@@ -37,7 +37,8 @@ trap 'rm -rf "$STAGE_DIR"' EXIT
 
 for file in "${SPOTLIGHT_FILES[@]}"; do
     dest="${STAGE_DIR}/$(basename "$file")"
-    if curl -fsSL "${RAW}/${file}" -o "$dest"; then
+    # A stalled download must not hold up Jellyfin's start; on failure it starts with the previous files.
+    if curl -fsSL --connect-timeout 10 --max-time 30 --retry 2 "${RAW}/${file}" -o "$dest"; then
         log "Downloaded: $(basename "$file")"
     else
         log "ERROR: Failed to download $(basename "$file") - check internet connection"
