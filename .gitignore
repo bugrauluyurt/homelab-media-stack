@@ -1,7 +1,10 @@
 # ---- Secrets: never commit ----
 .env
+.env.*
 *.env
 !.env.example
+*.bak
+*.orig
 *.key
 *.pem
 *.conf
@@ -40,7 +43,7 @@ __pycache__/
 # ---- Local agent and tool state ----
 .remember/
 .claude/settings.local.json
-AGENTS.local.md
+*.local.*
 
 # ---- Docs site build output ----
 site/

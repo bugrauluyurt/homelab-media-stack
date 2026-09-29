@@ -59,7 +59,7 @@ services:
       - ${CONFIG_ROOT}/gluetun:/gluetun
       - ./gluetun/auth.toml:/gluetun/auth/config.toml:ro
     environment:
-      # Exact Netherlands endpoint from the private Proton WireGuard config.
+      # Exact endpoint from the private Proton WireGuard config.
       VPN_SERVICE_PROVIDER: custom
       VPN_TYPE: wireguard
       WIREGUARD_PRIVATE_KEY: ${WIREGUARD_PRIVATE_KEY}

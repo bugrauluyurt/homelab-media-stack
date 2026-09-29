@@ -331,7 +331,7 @@ pages:
                 collapse-after: 6
                 cache: 2h
                 feeds:
-                  - url: "https://www.reddit.com/r/technology+programming+ExperiencedDevs+cscareerquestions+golang+rust+selfhosted+homelab+gaming+pcgaming+Games+patientgamers+SteamDeck+GameDeals/.rss"
+                  - url: "https://www.reddit.com/r/selfhosted+homelab+technology+programming+gaming+pcgaming/.rss"
                     hide-description: true
               - {<<: *detailed, title: Ars Technica, cache: 1h, feeds: [{url: "https://feeds.arstechnica.com/arstechnica/index"}]}
 
@@ -344,14 +344,11 @@ pages:
 
           - type: markets
             markets: &stocks
-              - {symbol: NVDA, name: NVIDIA}
-              - {symbol: AMD, name: AMD}
-              - {symbol: MU, name: Micron}
-              - {symbol: MSFT, name: Microsoft}
-              - {symbol: GOOG, name: Alphabet}
               - {symbol: AAPL, name: Apple}
-              - {symbol: META, name: Meta}
-              - {symbol: FXAIX, name: Fidelity 500 Index}
+              - {symbol: MSFT, name: Microsoft}
+              - {symbol: NVDA, name: NVIDIA}
+              - {symbol: GOOG, name: Alphabet}
+              - {symbol: AMZN, name: Amazon}
 
           - type: group
             widgets:

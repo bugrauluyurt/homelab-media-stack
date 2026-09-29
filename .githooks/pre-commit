@@ -21,7 +21,8 @@ mapfile -d '' staged < <(git diff --cached --name-only -z --diff-filter=ACMR)
 [ ${#staged[@]} -eq 0 ] && exit 0
 
 for file in "${staged[@]}"; do
-  if [ "$(basename "$file")" = .env ] || [[ $file == *.key || $file == *.pem ]]; then
+  name=$(basename "$file")
+  if [[ $name == .env || ( $name == .env.* && $name != .env.example ) || $name == *.local.* || $file == *.key || $file == *.pem ]]; then
     echo "BLOCKED: $file looks like a secrets file and must not be committed."
     fail=1
     continue

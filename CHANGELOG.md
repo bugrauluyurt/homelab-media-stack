@@ -8,6 +8,16 @@ the release pull request publishes it ([how releases work](docs/operations/relea
 
 ## Unreleased
 
+### Changed
+- Glance's subreddits, stock list and pinned YouTube channels are now generic samples; edit them
+  in `glance/glance.yml` and `glance/youtube-channels.json`.
+
+### Security
+- `.gitignore` and the pre-commit hook also keep `.env.*` copies (`.env.bak`, `.env.local`) and
+  `*.local.*` files out of commits, not only `.env` itself.
+- `render-scraparr-config` and `backup-config` create the scraparr config and the restic key file
+  private from the start, instead of making them private right after writing.
+
 ## 2.3.0 - 2026-09-29
 
 ### Added

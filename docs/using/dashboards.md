@@ -88,6 +88,8 @@ How it works, and what to know when you change it:
 - **Reddit** refuses its JSON API from the server's address and rate-limits RSS to about one
   request at a time, so every subreddit shares one combined feed (`r/a+b+c/.rss`), refreshed
   every two hours. Add a subreddit by extending the `+` list, never with a second Reddit feed.
+- **Samples to edit:** the subreddits, the stock list (`&stocks` in `glance/glance.yml`) and the
+  pinned YouTube channels ship as generic examples; replace them with your own.
 - **Pending updates and the last backup** reach Glance through Prometheus: `check-updates`,
   `update` and `backup-config` write them as metrics, which node-exporter exports, so Grafana has
   their history too.

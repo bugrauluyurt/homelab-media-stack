@@ -11,10 +11,13 @@ cd "$REPO"
 out="${CONFIG_ROOT}/scraparr"
 mkdir -p "$out"
 
-sed -e "s|__SONARR_API_KEY__|${SONARR_API_KEY}|" \
-    -e "s|__RADARR_API_KEY__|${RADARR_API_KEY}|" \
-    -e "s|__PROWLARR_API_KEY__|${PROWLARR_API_KEY}|" \
-    -e "s|__BAZARR_API_KEY__|${BAZARR_API_KEY}|" \
-    scraparr/config.yaml.template > "$out/config.yaml"
+(
+  umask 077
+  sed -e "s|__SONARR_API_KEY__|${SONARR_API_KEY}|" \
+      -e "s|__RADARR_API_KEY__|${RADARR_API_KEY}|" \
+      -e "s|__PROWLARR_API_KEY__|${PROWLARR_API_KEY}|" \
+      -e "s|__BAZARR_API_KEY__|${BAZARR_API_KEY}|" \
+      scraparr/config.yaml.template > "$out/config.yaml"
+)
 chmod 600 "$out/config.yaml"
 echo "rendered $out/config.yaml"
