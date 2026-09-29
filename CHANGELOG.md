@@ -12,6 +12,12 @@ the release pull request publishes it ([how releases work](docs/operations/relea
 - Glance's subreddits, stock list and pinned YouTube channels are now generic samples; edit them
   in `glance/glance.yml` and `glance/youtube-channels.json`.
 
+### Fixed
+- Glance's YouTube rows show videos again. YouTube's RSS feed answers 404 for hours at a time, so
+  `sync-youtube.py` now fetches the latest uploads hourly, through the Data API once you are signed
+  in, and keeps a channel's last videos when it can't be read. `arr-youtube.timer` runs hourly
+  instead of weekly; rerun `install-host` to pick up the new schedule.
+
 ### Security
 - `.gitignore` and the pre-commit hook also keep `.env.*` copies (`.env.bak`, `.env.local`) and
   `*.local.*` files out of commits, not only `.env` itself.

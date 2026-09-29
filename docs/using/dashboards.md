@@ -101,14 +101,19 @@ To open Glance's Lab page in every new Chrome tab, with the cursor in its search
 
 ### YouTube rows follow your subscriptions
 
-The Tech, Gaming and Markets video rows are lists of channels that `sync-youtube.py` writes to
-`$CONFIG_ROOT/glance/youtube-*.yml` every Sunday (`arr-youtube.timer`); `glance.yml` includes
-them. The sync reads your subscriptions, most relevant first, keeps the **pinned** channels in
+The Tech, Gaming and Markets video rows show the latest uploads of a list of channels per tab.
+Every hour (`arr-youtube.timer`) `sync-youtube.py` writes the lists to
+`$CONFIG_ROOT/glance/youtube-*.yml` and each tab's newest 25 videos to
+`$CONFIG_ROOT/glance/youtube/<tab>.json`, which Glance reads from `/assets/youtube/` and draws like
+its own videos widget. The sync reads your subscriptions, most relevant first, keeps the **pinned** channels in
 `glance/youtube-channels.json` that you still follow, and fills the remaining slots (the limits are
 in the same file) with channels whose YouTube topic tags say gaming, technology or business.
 Unsubscribe and a channel disappears; subscribe and it shows up if it fits a row. Put a channel
 under `skip` to keep it out, or pin it to force its row. Until you sign in, the pinned lists are
-used as they are.
+used as they are, and their videos come from YouTube's RSS feed, which often answers 404 for hours
+([Glance #910](https://github.com/glanceapp/glance/issues/910)). Signed in, the videos come from
+the YouTube Data API instead, about 1,500 of its 10,000 daily quota units. Either way, a channel
+that can't be read keeps its last videos.
 
 One-time setup:
 
@@ -122,9 +127,9 @@ One-time setup:
 4. Run `scripts/sync-youtube.py --login`, open the address it prints on any device and enter the
    code. Google warns that the app is unverified: **Advanced → continue**. Access is read-only,
    and the script stores the refresh token in `.env` itself.
-5. Run `scripts/sync-youtube.py` to sync at once; the timer does it weekly after that.
+5. Run `scripts/sync-youtube.py` to sync at once; the timer does it hourly after that.
 
-Once you are signed in, `health-check` fails if the lists haven't synced in 14 days.
+`health-check` fails if the rows haven't synced in a day.
 
 ## Grafana
 

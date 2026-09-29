@@ -482,8 +482,8 @@ services:
       WEATHER_LOCATION: ${WEATHER_LOCATION:-}
     volumes:
       - ./glance:/app/config:ro
-      # YouTube channel lists written by scripts/sync-youtube.py.
-      - ${CONFIG_ROOT}/glance:/app/data:ro
+      # Latest YouTube uploads written by scripts/sync-youtube.py, served at /assets/youtube/.
+      - ${CONFIG_ROOT}/glance/youtube:/app/config/assets/youtube:ro
       - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - type: bind
         source: ${DATA_ROOT}

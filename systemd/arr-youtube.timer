@@ -1,9 +1,9 @@
 [Unit]
-Description=Weekly sync of Glance's YouTube channel lists
+Description=Hourly sync of Glance's YouTube rows
 
 [Timer]
-OnCalendar=Sun *-*-* 05:00:00
-RandomizedDelaySec=30min
+OnCalendar=hourly
+RandomizedDelaySec=10min
 Persistent=true
 
 [Install]

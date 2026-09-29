@@ -84,7 +84,7 @@ With the drive off, steps 3 and 5 do nothing: `arr-stack.service` waits for the 
 | [`arr-port-sync.timer`](#arr-port-synctimer) | every 15 minutes, first 90 s after boot | none | no | `sync-port` |
 | [`arr-health.timer`](#arr-healthtimer) | 00:20, 06:20, 12:20, 18:20 | up to 10 min | no | `health-check --notify` |
 | [`arr-backup.timer`](#arr-backuptimer) | daily 04:30 | up to 15 min | yes | `backup-config` |
-| [`arr-youtube.timer`](#arr-youtubetimer) | Sundays 05:00 | up to 30 min | yes | `sync-youtube.py` |
+| [`arr-youtube.timer`](#arr-youtubetimer) | hourly | up to 10 min | yes | `sync-youtube.py` |
 | [`arr-updates.timer`](#arr-updatestimer) | daily 06:00 | up to 30 min | yes | `check-updates` |
 
 `systemctl list-timers 'arr-*'` shows the next and last run of each.
@@ -248,7 +248,7 @@ Runs [`check-updates`](scripts.md#check-updates), which reports new image builds
 
 ### arr-youtube.service
 
-Runs [`sync-youtube.py`](scripts.md#sync-youtubepy), which syncs Glance's YouTube channel lists with your subscriptions. With the dashboards module off, the script exits at once.
+Runs [`sync-youtube.py`](scripts.md#sync-youtubepy), which syncs Glance's YouTube channel lists with your subscriptions and writes their latest uploads. With the dashboards module off, the script exits at once.
 
 - **File:** [`systemd/arr-youtube.service`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/systemd/arr-youtube.service)
 - **Runs:** `@REPO@/scripts/sync-youtube.py`, `Type=oneshot`.
@@ -260,7 +260,7 @@ Runs [`sync-youtube.py`](scripts.md#sync-youtubepy), which syncs Glance's YouTub
 ### arr-youtube.timer
 
 - **File:** [`systemd/arr-youtube.timer`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/systemd/arr-youtube.timer)
-- **When:** `OnCalendar=Sun *-*-* 05:00:00`, `RandomizedDelaySec=30min`, `Persistent=true`.
+- **When:** `OnCalendar=hourly`, `RandomizedDelaySec=10min`, `Persistent=true`.
 - **Started by:** `WantedBy=timers.target`.
 
 ## Failure alerts

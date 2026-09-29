@@ -115,7 +115,7 @@ In the tables below, **Required** is *yes* when the core stack or a core script 
 |---|---|---|---|---|
 | <a id="youtube_client_id"></a>`YOUTUBE_CLIENT_ID` | no | empty | A Google OAuth client of type "TVs and Limited Input devices" with the YouTube Data API enabled, for Glance's video rows. | [`sync-youtube.py`](scripts.md#sync-youtubepy) |
 | <a id="youtube_client_secret"></a>`YOUTUBE_CLIENT_SECRET` | no | empty | Its secret. | `sync-youtube.py` |
-| <a id="youtube_refresh_token"></a>`YOUTUBE_REFRESH_TOKEN` | filled by a script | empty | Stored by `sync-youtube.py --login`. Without it the pinned channel lists stay. | `sync-youtube.py`, `health-check` |
+| <a id="youtube_refresh_token"></a>`YOUTUBE_REFRESH_TOKEN` | filled by a script | empty | Stored by `sync-youtube.py --login`. Without it the pinned channel lists stay and videos come from YouTube's unreliable RSS feed. | `sync-youtube.py`, `health-check` |
 
 ### Needle and Spotify
 

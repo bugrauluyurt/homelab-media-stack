@@ -129,8 +129,8 @@ flowchart TD
 1. **Refuses to start without the drive** (`mountpoint -q "$STORAGE_MOUNT"`).
 2. **Creates `$STATE_ROOT/metrics`** as the stack user, before Docker would create it as root for
    node-exporter.
-3. **Seeds Glance's YouTube lists** (`sync-youtube.py --offline`), since Glance won't start without
-   them.
+3. **Seeds Glance's YouTube lists** (`sync-youtube.py --offline`), and an empty video row per tab
+   until the first hourly sync.
 4. **Starts every container** in the active profiles (`docker compose up -d --remove-orphans`).
 5. **Checks the core library services** are running: Prowlarr, Radarr, Sonarr, Lidarr, Bazarr,
    Seerr, Plex, Jellyfin and Navidrome, each only if its module is on. A missing one fails the unit.
@@ -169,7 +169,7 @@ Nothing needs starting by hand:
 | [`arr-health.timer`](../reference/systemd.md#arr-healthtimer) | `OnCalendar=00/6:20` (00:20, 06:20, 12:20, 18:20), up to 10 min later | `health-check --notify` | yes |
 | [`arr-backup.timer`](../reference/systemd.md#arr-backuptimer) | `OnCalendar=*-*-* 04:30:00`, up to 15 min later | `backup-config` | yes |
 | [`arr-updates.timer`](../reference/systemd.md#arr-updatestimer) | `OnCalendar=*-*-* 06:00:00`, up to 30 min later | `check-updates` | no |
-| [`arr-youtube.timer`](../reference/systemd.md#arr-youtubetimer) | `OnCalendar=Sun *-*-* 05:00:00`, up to 30 min later | `sync-youtube.py` | no |
+| [`arr-youtube.timer`](../reference/systemd.md#arr-youtubetimer) | `OnCalendar=hourly`, up to 10 min later | `sync-youtube.py` | no |
 
 - "Up to N min later" is `RandomizedDelaySec`. The throttle and watch timers use `AccuracySec=10s`
   so they really run every minute.

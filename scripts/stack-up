@@ -18,7 +18,7 @@ for service in json.load(sys.stdin)["services"].values():
         if volume.get("type") == "bind" and volume["source"].startswith(data_root):
             print(volume["source"])' | xargs -r mkdir -p
 
-# Glance won't start without its YouTube lists; seed any missing ones from the pinned channels.
+# Seed any missing YouTube list from the pinned channels, and an empty video row until the first sync.
 "$REPO/scripts/sync-youtube.py" --offline
 
 docker compose up -d --remove-orphans

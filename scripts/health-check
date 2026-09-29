@@ -151,8 +151,7 @@ chk "socket proxy refuses writes"      "test \"\$(docker run --rm --network arr 
 chk "socket proxy allows log reads (Dozzle)" "test \"\$(docker run --rm --network arr $CURL_IMAGE -s -o /dev/null -w '%{http_code}' --max-time 10 'http://socket-proxy:2375/containers/jellyfin/logs?stdout=1&tail=1')\" = 200"
 chk_if homepage "homepage holds no raw socket"     "! docker exec homepage test -e /var/run/docker.sock"
 chk_if glance "glance sees container status"     "curl -s --max-time 30 http://127.0.0.1:3005/api/pages/lab/content/ | grep -q docker-container-status-icon"
-# Only once signed in (sync-youtube.py --login); until then the pinned lists are used.
-chk_if glance "youtube channel lists synced in 14 days" "[ -z \"\${YOUTUBE_REFRESH_TOKEN:-}\" ] || [ -n \"\$(find '$STATE_ROOT/metrics/youtube.prom' -mtime -14 2>/dev/null)\" ]"
+chk_if glance "youtube rows synced in the last day" "[ -n \"\$(find '$STATE_ROOT/metrics/youtube.prom' -mtime -1 2>/dev/null)\" ]"
 chk_if glance "glance holds no raw socket"       "! docker exec glance test -e /var/run/docker.sock"
 for s in "homepage 3000" "glance 3005/api/healthz" "grafana 3001/api/health" "jellystat 3002" "prometheus 9090/-/ready"; do
   set -- $s
