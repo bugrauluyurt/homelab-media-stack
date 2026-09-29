@@ -92,7 +92,7 @@ chk "ssh: every key pinned to its sources"   "test -s '$KEYS' && ! grep -vE '^(#
 chk "rpcbind off"                            "! systemctl is-active -q rpcbind.socket rpcbind.service"
 chk_if sftpgo "games page: no login, no files"        "test \"\$(curl -s -o /dev/null -w '%{http_code}' --max-time 8 'http://127.0.0.1:8090/api/v2/user/dirs?path=/')\" = 401"
 chk_if sftpgo "games SFTP answering (read-only accounts)" "timeout 8 bash -c 'exec 3<>/dev/tcp/127.0.0.1/2022; head -c 16 <&3' | grep -q SFTPGo"
-chk_if sftpgo "games page: admin refused off the Pi"   "test \"\$(curl -s -o /dev/null -w '%{http_code}' --max-time 8 -u \"\$SFTPGO_ADMIN_USER:\$SFTPGO_ADMIN_PASSWORD\" http://$TAILSCALE_IP:8090/api/v2/token)\" = 401"
+chk_if sftpgo "games page: admin refused off the server"   "test \"\$(curl -s -o /dev/null -w '%{http_code}' --max-time 8 -u \"\$SFTPGO_ADMIN_USER:\$SFTPGO_ADMIN_PASSWORD\" http://$TAILSCALE_IP:8090/api/v2/token)\" = 401"
 
 # Any whitelisted range overlapping the LAN (e.g. 192.168.0.0/16) counts, not just LAN_CIDR itself.
 lan_must_log_in() {

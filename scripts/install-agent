@@ -16,7 +16,7 @@ def main():
     args = parser.parse_args()
 
     if os.geteuid() == 0:
-        parser.error("Run as the Pi account, not root")
+        parser.error("Run as your own account, not root")
 
     repo = Path(__file__).resolve().parent.parent
     home = Path.home()

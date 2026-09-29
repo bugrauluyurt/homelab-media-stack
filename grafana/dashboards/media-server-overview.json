@@ -70,7 +70,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "**Quick view of the Raspberry Pi.** Choose Last 24 hours / Last 7 days using the time picker. Graphs are host-wide, not per-container. Prometheus retains up to 30 days / 4 GiB; gaps mean missing samples. The green scrape status means metrics are reachable, not that every media service is healthy."
+        "content": "**Quick view of the server.** Choose Last 24 hours / Last 7 days using the time picker. Graphs are host-wide, not per-container. Prometheus retains up to 30 days / 4 GiB; gaps mean missing samples. The green scrape status means metrics are reachable, not that every media service is healthy."
       },
       "targets": []
     },
