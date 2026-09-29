@@ -44,8 +44,8 @@ PATHS = {"questarr": "/api/health", "navidrome": "/ping", "slskd": "/health",
 # Not published on the host, but Kuma reaches them over the Docker network.
 EXTRA_HTTP = {"plex": "http://host.docker.internal:32400/identity",
               "byparr": "http://byparr:8191/", "scraparr": "http://scraparr:7100/",
-              "node-exporter": "http://node-exporter:9100/",
-              "media drive mounted": "http://node-exporter:9100/metrics"}
+              "node-exporter": "http://host.docker.internal:9100/",
+              "media drive mounted": "http://host.docker.internal:9100/metrics"}
 KEYWORDS = {"media drive mounted": f'mountpoint="{STORAGE}"'}
 
 # Proton can stop handing out a forwarded port while the tunnel stays up; torrents
@@ -203,6 +203,14 @@ for m in stale:
     print(f"  - monitor {m['name']} (service gone)")
 
 existing = {m["name"]: m["id"] for m in monitors if m not in stale}
+
+# Monitors are matched by name, so one whose service moved (to the host network, say) needs its URL edited.
+for m in monitors:
+    url = wanted.get(m["name"], {}).get("url")
+    if m not in stale and url not in (None, m.get("url")):
+        emit("editMonitor", {**m, "url": url})
+        print(f"  + monitor {m['name']} now checks {url}")
+
 added = [name for name in sorted(wanted) if name not in existing]
 for name in added:
     existing[name] = emit("add", wanted[name])["monitorID"]

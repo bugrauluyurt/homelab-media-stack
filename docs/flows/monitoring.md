@@ -58,8 +58,9 @@ flowchart LR
    which is why it is written outside the repository.
 3. **Prometheus** scrapes node-exporter every 30 seconds and scraparr every 60 seconds (with a
    45 second timeout, because the arr APIs are slow). It keeps **30 days**, capped at **4 GB**, so
-   it cannot grow without bound. node-exporter and scraparr publish no port; Prometheus reaches
-   them on the Docker network. Check collection at `http://<tailscale-ip>:9090/targets`: every row
+   it cannot grow without bound. Scraparr publishes no port; Prometheus reaches it on the Docker
+   network, and node-exporter, which runs on the host network so it sees the server's own
+   traffic, at `host.docker.internal:9100`. Check collection at `http://<tailscale-ip>:9090/targets`: every row
    should be `UP`.
 4. **Grafana** gets its Prometheus datasource and six dashboards from `grafana/` in the repository,
    in the **Media Stack** folder. It re-reads `grafana/dashboards/` every 60 seconds, so a new
@@ -104,9 +105,9 @@ checks in a row (one failure plus two retries, 60 seconds apart) it sends **DOWN
   (`/ping` for Navidrome, `/api/health` for Needle, `/healthz` for SFTPGo, and so on). Kuma's own
   port and SFTP (2022) are skipped. gluetun's published ports become **qbittorrent** and **slskd**,
   since both answer through the VPN container.
-- **Services without a published port**, over the Docker network: Byparr, scraparr, node-exporter,
-  and Plex through `host.docker.internal` (it runs on the host network). Each only when its module
-  is on.
+- **Services without a published port**: Byparr and scraparr over the Docker network, Plex and
+  node-exporter through `host.docker.internal` (both run on the host network). Each only when its
+  module is on.
 - **media drive mounted:** node-exporter's metrics must mention the `STORAGE_MOUNT` mount point.
 - **vpn forwarded port:** gluetun's `/v1/portforward` must report a port above 0. Proton sometimes
   stops handing one out while the tunnel stays up; torrents keep working but get no incoming peers

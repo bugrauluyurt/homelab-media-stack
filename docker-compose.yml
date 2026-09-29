@@ -593,17 +593,22 @@ services:
       # Bounded retention; this is a Pi, not a monitoring cluster.
       - --storage.tsdb.retention.time=30d
       - --storage.tsdb.retention.size=4GB
+    # node-exporter runs on the host network; this is how Prometheus reaches it.
+    extra_hosts: ["host.docker.internal:host-gateway"]
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ${CONFIG_ROOT}/prometheus:/prometheus
 
+  # On the host network: in a container network it counts only its own container's traffic.
+  # The firewall keeps port 9100 off the home network, like every port outside HOME_APPS.
   node-exporter:
-    <<: *common
+    <<: *restart
     image: prom/node-exporter:latest
     container_name: node-exporter
     profiles: [monitoring]
     mem_limit: 128m
     security_opt: *nnp
+    network_mode: host
     pid: host
     command:
       - --path.rootfs=/host
