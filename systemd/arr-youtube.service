@@ -1,5 +1,5 @@
 [Unit]
-Description=Sync Glance's YouTube channel lists with your subscriptions
+Description=Sync Glance's YouTube rows with your subscriptions and their latest uploads
 After=network-online.target
 Wants=network-online.target
 OnFailure=arr-notify-failure@%n.service

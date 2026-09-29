@@ -273,6 +273,14 @@ cache at once.
 - The stack refuses to start without the mount (`arr-stack.service` checks `mountpoint`), so
   media never lands on the system disk.
 
+## Glance's video rows are empty or stale
+- **Cause:** Glance reads `/assets/youtube/<tab>.json`, which `arr-youtube.timer` rewrites hourly.
+  Check `systemctl status arr-youtube.service` and run `scripts/sync-youtube.py`: `!` lines name
+  channels that failed and kept their last videos.
+- Not signed in (`YOUTUBE_REFRESH_TOKEN` empty), the videos come from YouTube's RSS feed, which
+  answers 404 for hours at a time; sign in with `sync-youtube.py --login` to use the Data API.
+- `quotaExceeded` from the API resets at midnight Pacific time; the rows keep their last videos.
+
 ## Things never to do
 - `docker compose down`, or recreating the `arr` network, while the user is
   watching or downloading. Both restart everything.

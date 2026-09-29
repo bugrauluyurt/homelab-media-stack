@@ -209,7 +209,7 @@ and the `journalctl` command for the rest.
 | `arr-updates.service` | The daily update check ([Updates](updates.md)) |
 | `arr-firewall.service` | The host firewall ([Security](../security.md)) |
 | `arr-stack.service` | Starting the stack ([Storage and boot](storage-and-boot.md)) |
-| `arr-youtube.service` | The weekly sync of Glance's YouTube lists |
+| `arr-youtube.service` | The hourly sync of Glance's YouTube rows |
 
 ## Every alert into ntfy
 

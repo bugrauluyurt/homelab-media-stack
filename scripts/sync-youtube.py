@@ -1,19 +1,24 @@
 #!/usr/bin/env python3
-"""Keep Glance's YouTube channel lists in step with your subscriptions.
+"""Keep Glance's YouTube rows in step with your subscriptions.
 
 Sorts your subscriptions (YouTube Data API, read-only) into the tabs of
 glance/youtube-channels.json and writes each tab to $CONFIG_ROOT/glance/youtube-<tab>.yml.
+Then writes each tab's latest uploads to $CONFIG_ROOT/glance/youtube/<tab>.json, which
+Glance renders; a channel that fails keeps its previous videos.
 
-  sync-youtube.py            sync (the weekly arr-youtube timer)
+  sync-youtube.py            sync lists and videos (the hourly arr-youtube timer)
   sync-youtube.py --login    one-time sign-in; stores YOUTUBE_REFRESH_TOKEN in .env
-  sync-youtube.py --offline  write missing lists from the pinned channels only (stack-up)
+  sync-youtube.py --offline  write missing lists from the pinned channels and empty rows (stack-up)
 """
 import json
+import re
 import sys
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
 
 from stack_env import CONFIG, ENV, REPO, STATE, require_service, set_env
 
@@ -25,7 +30,12 @@ TOKEN_URL = "https://oauth2.googleapis.com/token"
 
 CHANNELS = json.loads((REPO / "glance" / "youtube-channels.json").read_text())
 OUT = CONFIG / "glance"
+FEEDS = OUT / "youtube"
 METRIC = STATE / "metrics" / "youtube.prom"
+
+VIDEOS_PER_CHANNEL = 5
+VIDEOS_PER_ROW = 25
+ATOM = {"atom": "http://www.w3.org/2005/Atom", "yt": "http://www.youtube.com/xml/schemas/2015"}
 
 TOPICS = {"Gaming": ("game",), "Tech": ("technology",), "Markets": ("business", "finance", "economics")}
 
@@ -152,19 +162,100 @@ def write(lists, only_missing=False):
         print(f"  + {tab}: {len(chans)} channels written")
 
 
-if "--login" in sys.argv:
-    login()
-elif "--offline" in sys.argv:
-    write({tab: list(chans.items()) for tab, chans in CHANNELS["pinned"].items()}, only_missing=True)
-elif not ENV.get("YOUTUBE_REFRESH_TOKEN"):
-    print("  ~ not signed in to YouTube; the pinned lists stay (run scripts/sync-youtube.py --login)")
-else:
-    token = access_token()
-    subs = subscriptions(token)
-    write(build(subs, topics(token, [cid for cid, _ in subs])))
+def listed_channels(tab):
+    path = OUT / f"youtube-{tab.lower()}.yml"
+    return re.findall(r"^- (UC[\w-]{22}) # (.*)$", path.read_text(), re.M) if path.exists() else []
 
-    METRIC.parent.mkdir(exist_ok=True)
-    METRIC.write_text(f"arr_youtube_sync_timestamp_seconds {int(time.time())}\n")
-    METRIC.chmod(0o644)
 
-    print(f"  synced from {len(subs)} subscriptions")
+def video(video_id, title, channel_id, channel, published):
+    published_utc = datetime.fromisoformat(published).astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return {"id": video_id, "title": title, "channel_id": channel_id, "channel": channel, "published": published_utc}
+
+
+# YouTube's RSS feed often answers 404 for hours, so a signed-in sync reads uploads through the API instead.
+def api_uploads(token, channel_id, channel):
+    items = api("playlistItems", token, part="snippet,contentDetails", playlistId="UULF" + channel_id[2:],
+                maxResults=VIDEOS_PER_CHANNEL)["items"]
+
+    return [video(item["contentDetails"]["videoId"], item["snippet"]["title"], channel_id, channel,
+                  item["contentDetails"]["videoPublishedAt"])
+            for item in items if "videoPublishedAt" in item["contentDetails"]]
+
+
+def rss_uploads(channel_id, channel):
+    url = f"https://www.youtube.com/feeds/videos.xml?playlist_id=UULF{channel_id[2:]}"
+    with urllib.request.urlopen(url, timeout=30) as r:
+        entries = ET.parse(r).getroot().findall("atom:entry", ATOM)[:VIDEOS_PER_CHANNEL]
+
+    return [video(entry.findtext("yt:videoId", namespaces=ATOM), entry.findtext("atom:title", namespaces=ATOM),
+                  channel_id, channel, entry.findtext("atom:published", namespaces=ATOM))
+            for entry in entries]
+
+
+def write_feeds(token):
+    FEEDS.mkdir(parents=True, exist_ok=True)
+
+    for tab in CHANNELS["limits"]:
+        path = FEEDS / f"{tab.lower()}.json"
+        previous_videos = json.loads(path.read_text())["videos"] if path.exists() else []
+        videos, failed_channels = [], []
+
+        for channel_id, channel in listed_channels(tab):
+            try:
+                videos += api_uploads(token, channel_id, channel) if token else rss_uploads(channel_id, channel)
+            except (OSError, ET.ParseError, KeyError, TypeError, ValueError):
+                failed_channels.append(channel)
+                videos += [previous for previous in previous_videos if previous["channel_id"] == channel_id]
+
+        row_videos = sorted(videos, key=lambda row_video: row_video["published"], reverse=True)[:VIDEOS_PER_ROW]
+        text = json.dumps({"videos": row_videos}, ensure_ascii=False, indent=1) + "\n"
+
+        if failed_channels:
+            print(f"  ! {tab}: kept the last videos of unreachable channels: {', '.join(failed_channels)}")
+
+        if path.exists() and path.read_text() == text:
+            print(f"  = {tab}: {len(row_videos)} videos")
+            continue
+
+        # Renamed into place so Glance never reads half a file.
+        partial = path.with_suffix(".tmp")
+        partial.write_text(text)
+        partial.replace(path)
+        print(f"  + {tab}: {len(row_videos)} videos written")
+
+
+def seed_feeds():
+    FEEDS.mkdir(parents=True, exist_ok=True)
+
+    for tab in CHANNELS["limits"]:
+        path = FEEDS / f"{tab.lower()}.json"
+        if not path.exists():
+            path.write_text('{"videos": []}\n')
+
+
+def main():
+    if "--login" in sys.argv:
+        login()
+    elif "--offline" in sys.argv:
+        write({tab: list(chans.items()) for tab, chans in CHANNELS["pinned"].items()}, only_missing=True)
+        seed_feeds()
+    else:
+        token = None
+        if ENV.get("YOUTUBE_REFRESH_TOKEN"):
+            token = access_token()
+            subs = subscriptions(token)
+            write(build(subs, topics(token, [cid for cid, _ in subs])))
+            print(f"  synced from {len(subs)} subscriptions")
+        else:
+            print("  ~ not signed in to YouTube; the pinned lists stay and videos come from its RSS feed "
+                  "(run scripts/sync-youtube.py --login)")
+
+        write_feeds(token)
+
+        METRIC.parent.mkdir(exist_ok=True)
+        METRIC.write_text(f"arr_youtube_sync_timestamp_seconds {int(time.time())}\n")
+        METRIC.chmod(0o644)
+
+
+if __name__ == "__main__":
+    main()

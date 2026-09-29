@@ -42,7 +42,7 @@ Every file in [`scripts/`](https://github.com/bugrauluyurt/homelab-media-stack/t
 | [`health-check`](#health-check) | `arr-health.timer`, `update`, by hand | sudo | test file on the drive, throwaway containers, ntfy |
 | [`watch-activity`](#watch-activity) | `arr-watch.timer` | sudo if needed | state file, ntfy |
 | [`throttle-downloads`](#throttle-downloads) | `arr-throttle.timer` | no | qBittorrent speed limits |
-| [`sync-youtube.py`](#sync-youtubepy) | `arr-youtube.timer`, `stack-up` | no | Glance channel lists, metric; `.env` with `--login` |
+| [`sync-youtube.py`](#sync-youtubepy) | `arr-youtube.timer`, `stack-up` | no | Glance channel lists and video rows, metric; `.env` with `--login` |
 | [`notify-failure`](#notify-failure) | `arr-notify-failure@.service` | yes | ntfy only |
 | [`update`](#update) | by hand | sudo | pulls images, recreates containers, restores settings |
 | [`storage-off`](#storage-off) | by hand | sudo | stops the stack, unmounts and spins down the drive |
@@ -361,7 +361,7 @@ Brings the stack up; it is `arr-stack.service`'s `ExecStart`. In order:
 
 1. Refuses to start (exit 1) unless `STORAGE_MOUNT` is a mount point.
 2. Creates every missing bind-mount folder under the app-data root (`CONFIG_ROOT`'s parent, which holds `config/` and `state/`) as the stack user. Docker would create them as root, and the services that run as `PUID` could then not write their own settings on a fresh install.
-3. Seeds any missing Glance YouTube list with [`sync-youtube.py --offline`](#sync-youtubepy); Glance won't start without them.
+3. Seeds any missing Glance YouTube list, and an empty video row until the first sync, with [`sync-youtube.py --offline`](#sync-youtubepy).
 4. Runs `docker compose up -d --remove-orphans`.
 5. Fails (exit 1) when a library service is not running: prowlarr, radarr, sonarr, lidarr, bazarr, seerr, plex, jellyfin, navidrome, each only when its module is on.
 6. When gluetun runs: waits up to 120 seconds for it to be healthy, recreates qBittorrent and slskd when they don't answer, then runs [`sync-port`](#sync-port).
@@ -492,14 +492,14 @@ Keeps qBittorrent's speed limits: an alternative download limit of 20 MB/s and a
 
 ### sync-youtube.py
 
-Keeps Glance's YouTube channel lists in step with your subscriptions, read through the YouTube Data API (read-only). For each tab in `glance/youtube-channels.json`, pinned channels you still follow come first and the remaining slots go to channels whose YouTube topics match the tab (Gaming, Tech, Markets). Each list is written to `$CONFIG_ROOT/glance/youtube-<tab>.yml`, which `glance.yml` includes, only when it changed; a tab with no channels keeps its previous list. A sync also writes the metric `arr_youtube_sync_timestamp_seconds`.
+Keeps Glance's YouTube channel lists in step with your subscriptions, read through the YouTube Data API (read-only). For each tab in `glance/youtube-channels.json`, pinned channels you still follow come first and the remaining slots go to channels whose YouTube topics match the tab (Gaming, Tech, Markets). Each list is written to `$CONFIG_ROOT/glance/youtube-<tab>.yml` only when it changed; a tab with no channels keeps its previous list. Then the newest 25 uploads of each tab's channels (Shorts left out) go to `$CONFIG_ROOT/glance/youtube/<tab>.json`, renamed into place, which Glance serves at `/assets/youtube/` and draws with a `custom-api` widget. Signed in, the uploads come from the Data API (`playlistItems`, one quota unit per channel); otherwise from YouTube's RSS feed. A channel that fails keeps its previous videos and is named in a `!` line. Every sync writes the metric `arr_youtube_sync_timestamp_seconds`.
 
 - **File:** [`scripts/sync-youtube.py`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/sync-youtube.py)
-- **Runs:** [`arr-youtube.timer`](systemd.md#arr-youtubetimer) on Sundays at 05:00; [`stack-up`](#stack-up) with `--offline`; by hand once with `--login`.
-- **Flags:** none syncs (without `YOUTUBE_REFRESH_TOKEN` it keeps the pinned lists and says so); `--login` signs in once with Google's device flow and stores `YOUTUBE_REFRESH_TOKEN` in `.env`; `--offline` writes only missing lists, from the pinned channels.
+- **Runs:** [`arr-youtube.timer`](systemd.md#arr-youtubetimer) hourly; [`stack-up`](#stack-up) with `--offline`; by hand once with `--login`.
+- **Flags:** none syncs (without `YOUTUBE_REFRESH_TOKEN` it keeps the pinned lists, reads videos from the RSS feed and says so); `--login` signs in once with Google's device flow and stores `YOUTUBE_REFRESH_TOKEN` in `.env`; `--offline` writes only missing lists, from the pinned channels, and an empty video row for each missing tab.
 - **Root:** no.
-- **Changes:** the list files, the metric; `.env` with `--login`.
-- **Module:** `dashboards` (`glance`). Once you are signed in, `health-check` expects a sync within the last 14 days.
+- **Changes:** the list files, the video rows, the metric; `.env` with `--login`.
+- **Module:** `dashboards` (`glance`). `health-check` expects a sync within the last day.
 - **Idempotent:** yes.
 
 ### notify-failure

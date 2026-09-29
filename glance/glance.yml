@@ -314,10 +314,34 @@ pages:
                 limit: 20
                 collapse-after: 5
 
-          - type: videos
-            limit: 25
-            channels:
-              $include: /app/data/youtube-tech.yml
+          # Latest uploads written hourly by scripts/sync-youtube.py (YouTube's RSS feed is unreliable),
+          # in the markup of Glance's own videos widget.
+          - &youtube
+            type: custom-api
+            title: Videos
+            url: http://127.0.0.1:8080/assets/youtube/tech.json
+            cache: 15m
+            frameless: true
+            options: {grid: false}
+            template: |
+              {{ $grid := .Options.BoolOr "grid" false }}
+              {{ if $grid }}<div class="cards-grid collapsible-container" data-collapse-after-rows="3">
+              {{ else }}<div class="carousel-container"><div class="cards-horizontal carousel-items-container">{{ end }}
+              {{ range .JSON.Array "videos" }}
+                <div class="card widget-content-frame thumbnail-parent">
+                  <img class="video-thumbnail thumbnail" loading="lazy" src="https://i.ytimg.com/vi/{{ .String "id" }}/mqdefault.jpg" alt="">
+                  <div class="margin-top-10 margin-bottom-widget flex flex-column grow padding-inline-widget">
+                    <a class="text-truncate-2-lines margin-bottom-auto color-primary-if-not-visited" href="https://www.youtube.com/watch?v={{ .String "id" }}" target="_blank" rel="noreferrer">{{ .String "title" }}</a>
+                    <ul class="list-horizontal-text flex-nowrap margin-top-7">
+                      <li class="shrink-0" {{ .String "published" | parseRelativeTime "rfc3339" }}></li>
+                      <li class="min-width-0"><a class="block text-truncate" href="https://www.youtube.com/channel/{{ .String "channel_id" }}" target="_blank" rel="noreferrer">{{ .String "channel" }}</a></li>
+                    </ul>
+                  </div>
+                </div>
+              {{ else }}
+                <p class="padding-widget">No videos yet; the hourly YouTube sync fills this row.</p>
+              {{ end }}
+              </div>{{ if not $grid }}</div>{{ end }}
 
           # Reddit refuses its JSON API from this IP and rate-limits RSS to about
           # one request at a time, so every subreddit shares one feed (r/a+b/.rss).
@@ -888,11 +912,9 @@ pages:
               - {url: "https://www.eurogamer.net/feed", title: Eurogamer}
               - {url: "https://www.gamingonlinux.com/article_rss.php", title: GamingOnLinux}
 
-          - type: videos
-            style: grid-cards
-            collapse-after-rows: 3
-            channels:
-              $include: /app/data/youtube-gaming.yml
+          - <<: *youtube
+            url: http://127.0.0.1:8080/assets/youtube/gaming.json
+            options: {grid: true}
 
       - size: small
         widgets:
@@ -1024,11 +1046,9 @@ pages:
 
       - size: full
         widgets:
-          - type: videos
-            style: grid-cards
-            collapse-after-rows: 3
-            channels:
-              $include: /app/data/youtube-markets.yml
+          - <<: *youtube
+            url: http://127.0.0.1:8080/assets/youtube/markets.json
+            options: {grid: true}
 
       - size: small
         widgets:
