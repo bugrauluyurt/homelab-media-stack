@@ -45,5 +45,5 @@ echo "  qBittorrent listen_port: ${listen:-unknown}"
 if [ -n "${port:-}" ] && [ "${port:-x}" = "${listen:-y}" ]; then
   echo "  PASS - forwarded port is wired into qBittorrent."
 else
-  echo "  MISMATCH - run scripts/sync-port to push the forwarded port in."
+  echo "  MISMATCH - run scripts/vpn-port-sync to push the forwarded port in."
 fi

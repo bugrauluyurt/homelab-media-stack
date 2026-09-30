@@ -1,25 +1,25 @@
 # Host setup
 
 This page is for the owner: every change made to the server itself rather than to the containers,
-why it is there, and how to put it back after reinstalling the operating system. `install-host`
+why it is there, and how to put it back after reinstalling the operating system. `host-install`
 applies most of them; the rest are a few manual steps, listed here with the command for each.
 
 ## What goes where
 
-| Change | Why | Applied by | Checked by `health-check` |
+| Change | Why | Applied by | Checked by `stack-health` |
 |---|---|---|---|
-| [systemd units and the udev rule](#systemd-units-and-the-udev-rule) | Start the stack with the drive, run the timers | `install-host` (enable by hand) | Yes |
-| [SSH: keys only, no root](#ssh-keys-only-no-root-login) | No password guessing | `install-host` | Yes |
+| [systemd units and the udev rule](#systemd-units-and-the-udev-rule) | Start the stack with the drive, run the timers | `host-install` (enable by hand) | Yes |
+| [SSH: keys only, no root](#ssh-keys-only-no-root-login) | No password guessing | `host-install` | Yes |
 | [SSH keys pinned with `from=`](#ssh-keys-pinned-to-where-they-are-used) | A leaked key is useless elsewhere | By hand | Yes |
-| [Docker log rotation](#docker-log-rotation) | Logs can't fill the system disk | `install-host` (restart Docker by hand) | No |
-| [rpcbind off](#rpcbind-off) | No NFS here, one service fewer | `install-host` | Yes |
+| [Docker log rotation](#docker-log-rotation) | Logs can't fill the system disk | `host-install` (restart Docker by hand) | No |
+| [rpcbind off](#rpcbind-off) | No NFS here, one service fewer | `host-install` | Yes |
 | [mDNS on real interfaces only](#mdns-only-on-real-network-interfaces) | `<host>.local` never resolves to a Docker address | By hand | Yes |
 | [Memory cgroup](#memory-cgroup-raspberry-pi-os) | Container memory limits work | By hand, Raspberry Pi OS only | Yes |
 | [Media drive in fstab, immutable mount point](#the-media-drive) | The drive mounts in one place; nothing writes to the system disk in its place | By hand | Yes (mounted) |
-| [Firewall](#firewall) | The home network reaches only what it should | `install-host` installs its units | Yes |
+| [Firewall](#firewall) | The home network reaches only what it should | `host-install` installs its units | Yes |
 | [HTTPS for Needle](#https-for-needle-tailscale-serve) | Needle's only address, with a certificate | By hand (`tailscale serve`) | Needle answers |
 | [Tailscale access policy](#tailscale-access-policy) | Who reaches which port | Tailscale's admin console | No |
-| [Passwordless sudo, docker group](#prerequisites) | Timers run unattended | By hand; `install-host` checks | No |
+| [Passwordless sudo, docker group](#prerequisites) | Timers run unattended | By hand; `host-install` checks | No |
 | [Chrome new-tab extension](#chrome-new-tab-extension) | Glance on every new tab | On your computer | No |
 
 The nightly backup keeps a copy of the hand-edited files (`/etc/fstab`,
@@ -29,7 +29,7 @@ The nightly backup keeps a copy of the hand-edited files (`/etc/fstab`,
 
 ## After a reinstall
 
-1. Install the prerequisites and run `install-host` ([below](#what-install-host-does)).
+1. Install the prerequisites and run `host-install` ([below](#what-install-host-does)).
 2. Enable the units, as in [Getting started](../getting-started.md#enable-the-timers).
 3. Restart Docker once for log rotation: `sudo systemctl restart docker`.
 4. Put back the manual changes: `authorized_keys` with its `from=` pins, the avahi interfaces, the
@@ -38,10 +38,10 @@ The nightly backup keeps a copy of the hand-edited files (`/etc/fstab`,
    `tailscale serve` command for Needle.
 6. Run `health` and fix anything it reports.
 
-## What install-host does
+## What host-install does
 
 ```bash
-scripts/install-host
+scripts/host-install
 ```
 
 It is safe to re-run. In order, it:
@@ -64,8 +64,8 @@ It enables nothing: each unit needs `sudo systemctl enable --now <unit>` once.
 
 ## Prerequisites
 
-The timers run `health-check` and the firewall with `sudo`, unattended, so the stack's user needs
-passwordless sudo and the docker group. `install-host` checks both and prints the fix:
+The timers run `stack-health` and the firewall with `sudo`, unattended, so the stack's user needs
+passwordless sudo and the docker group. `host-install` checks both and prints the fix:
 
 ```bash
 echo '<user> ALL=(ALL) NOPASSWD: ALL' | sudo tee /etc/sudoers.d/homelab-media-stack
@@ -76,7 +76,7 @@ That makes any SSH key for this account effectively root, which is why every key
 [pinned](#ssh-keys-pinned-to-where-they-are-used).
 
 On Arch, after installing `nss-mdns`, add `mdns_minimal [NOTFOUND=return]` before `resolve` on
-the `hosts` line of `/etc/nsswitch.conf`; `install-host` reminds you.
+the `hosts` line of `/etc/nsswitch.conf`; `host-install` reminds you.
 
 ## systemd units and the udev rule
 
@@ -95,7 +95,7 @@ systemctl list-timers 'arr-*'      # what runs when
 `host/sshd_config.d/10-arr-hardening.conf` sets `PasswordAuthentication no`,
 `KbdInteractiveAuthentication no` and `PermitRootLogin no`. Its name sorts before
 `50-cloud-init.conf`, which some images ship to turn passwords back on: sshd keeps the first value
-it reads. If `install-host` warns that the hardening isn't active, your `sshd_config` lacks the
+it reads. If `host-install` warns that the hardening isn't active, your `sshd_config` lacks the
 `Include /etc/ssh/sshd_config.d/*.conf` line at the top.
 
 ```bash
@@ -117,7 +117,7 @@ from="<agent's tailnet IPv4>,<its IPv6>",no-agent-forwarding,no-X11-forwarding s
 
 The first form accepts your key from any tailnet device (Tailscale's policy already limits port
 22 to your own devices); the second limits another machine's key, such as an AI agent's, to that
-machine alone. `health-check` fails if any key has no `from=`.
+machine alone. `stack-health` fails if any key has no `from=`.
 
 ## Docker log rotation
 
@@ -136,8 +136,8 @@ afterwards.
 
 ## rpcbind off
 
-`rpcbind` serves NFS, which the stack doesn't use, so `install-host` disables and masks it:
-one listening service fewer. `health-check` checks it stays off.
+`rpcbind` serves NFS, which the stack doesn't use, so `host-install` disables and masks it:
+one listening service fewer. `stack-health` checks it stays off.
 
 ## mDNS only on real network interfaces
 
@@ -157,7 +157,7 @@ sudo systemctl restart avahi-daemon
 getent hosts <host>.local        # must show the home-network address, never 172.x
 ```
 
-`health-check` checks that `<host>.local` resolves inside `LAN_CIDR`.
+`stack-health` checks that `<host>.local` resolves inside `LAN_CIDR`.
 
 ## Memory cgroup (Raspberry Pi OS)
 
@@ -170,7 +170,7 @@ cgroup_memory=1 cgroup_enable=memory
 
 Check with `cat /sys/fs/cgroup/cgroup.controllers`: it must list `memory`. Containers created
 before the reboot keep running without a limit, because compose sees their configuration
-unchanged; recreate them with `docker compose up -d --force-recreate`. `health-check` checks both
+unchanged; recreate them with `docker compose up -d --force-recreate`. `stack-health` checks both
 the kernel and that every container has a limit. Other systems usually have the controller on
 already; the same check tells you.
 
@@ -183,7 +183,7 @@ A drive switched on by hand is pinned by filesystem UUID in `/etc/fstab`, a hand
 UUID=<STORAGE_UUID>  /mnt/storage  ext4  defaults,noatime,nofail,x-systemd.device-timeout=60  0  2
 ```
 
-`nofail` lets the server boot with the drive off, and the udev rule that `install-host` installs
+`nofail` lets the server boot with the drive off, and the udev rule that `host-install` installs
 mounts it when it is switched on. On a single-disk machine, bind-mount a folder at the mount point
 instead (`/srv/media /mnt/storage none bind 0 0`) and leave `STORAGE_UUID` empty.
 
@@ -200,13 +200,13 @@ mount, and the compose bind mounts refuse to create a missing media folder. Use 
 
 ## Firewall
 
-`scripts/firewall`, run by `arr-firewall.service` at boot and by `arr-firewall.timer` every 15
+`scripts/host-firewall`, run by `arr-firewall.service` at boot and by `arr-firewall.timer` every 15
 minutes, lets the home network reach only Jellyfin, Seerr and the games page, over IPv4 and IPv6,
-including Docker's published ports. `install-host` installs the units; you enable them. The rules
+including Docker's published ports. `host-install` installs the units; you enable them. The rules
 and the reasoning are in [Security](../security.md).
 
 ```bash
-sudo scripts/firewall status
+sudo scripts/host-firewall status
 ```
 
 ## HTTPS for Needle (Tailscale Serve)

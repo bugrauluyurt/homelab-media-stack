@@ -29,7 +29,7 @@ Operating skills live in `ai/homelab-plugin/skills/` (linked into `.claude/skill
 - `.env` holds every secret and this machine's values (gitignored); `.env.example` documents each key.
 - `scripts/`: idempotent `configure-*.py` API setup, the operational scripts, and their shared
   helpers `stack_env.py` (Python) and `stack-env.sh` (bash). New helpers go into those two files.
-- `host/systemd/`: unit and udev templates with `@PLACEHOLDERS@`, rendered by `scripts/install-host`.
+- `host/systemd/`: unit and udev templates with `@PLACEHOLDERS@`, rendered by `scripts/host-install`.
 - `docs/`: how everything works. Start at `docs/architecture.md`; each script and unit has an entry in
   `docs/reference/scripts.md` and `docs/reference/systemd.md`, each `.env` key in `docs/reference/configuration.md`.
 - App data lives in `$CONFIG_ROOT`; media in `$DATA_ROOT`, inside the `$STORAGE_MOUNT` mount.
@@ -38,14 +38,14 @@ Operating skills live in `ai/homelab-plugin/skills/` (linked into `.claude/skill
 - **Ask the user first** before restarting services, changing the VPN, editing `.env`,
   restoring data, applying updates or powering the stack or drive. Check that nothing is
   playing in Jellyfin before restarting it. Two automatic exceptions are approved:
-  `sync-port` restarts gluetun after 15 minutes without a forwarded port, and
-  `throttle-downloads` caps downloads at 20 MB/s while someone watches or the load is high
+  `vpn-port-sync` restarts gluetun after 15 minutes without a forwarded port, and
+  `downloads-throttle` caps downloads at 20 MB/s while someone watches or the load is high
   and keeps the permanent 10 Mbps upload cap. Downloads are otherwise unlimited by choice.
 - **P2P stays in the VPN:** qBittorrent and slskd share gluetun's network, and the exit
   stays inside `VPN_COUNTRIES`. SABnzbd (Usenet) is the only downloader outside it.
 - **The home network is untrusted** (guests share it): it reaches only the firewall's
   `HOME_APPS`. New access goes through Tailscale; SSH stays keys-only on the tailnet, and
-  every `authorized_keys` entry carries a `from="..."` restriction (`health-check` fails otherwise).
+  every `authorized_keys` entry carries a `from="..."` restriction (`stack-health` fails otherwise).
 - **SFTPGo stays read-only:** accounts get `list` and `download` only and are managed through
   `scripts/games_accounts.py`; game folders mount `read_only`; the admin API answers only the
   host and Docker; its ports stay IPv4-only; FTP and WebDAV stay off.
@@ -60,7 +60,7 @@ Operating skills live in `ai/homelab-plugin/skills/` (linked into `.claude/skill
 - Code style: blank lines between logical steps; a comment only for a non-obvious reason, in
   one line; names that say what they hold; `${VAR:-x}` and `ENV.get()` defaults; no em or en dashes.
 - **Tests are required before handing off changes or opening/updating a PR.** Run the relevant
-  focused tests, then the full `scripts/check` against the final source, including new files;
+  focused tests, then the full `scripts/repo-check` against the final source, including new files;
   CI runs the same checks. Rerun affected tests and the full check after subsequent edits.
 - Add regression coverage for bug fixes. Tests must control clock, boot time, network and other
   external inputs they rely on; do not assume the runner has the same uptime or state as this server.
@@ -68,13 +68,13 @@ Operating skills live in `ai/homelab-plugin/skills/` (linked into `.claude/skill
   than skipping tests or weakening assertions. If validation is blocked, disclose the exact
   blocker and unverified scope; do not claim the checks passed.
 - Keep secrets out of validation artifacts. If private deployment files prevent a clean source
-  scan, run `scripts/check` in a fresh source-only checkout/export containing every intended
+  scan, run `scripts/repo-check` in a fresh source-only checkout/export containing every intended
   change and new file, and report that scope explicitly; do not disable the secret scan.
-- For changes affecting the running stack, also run `scripts/health-check` on the server after
+- For changes affecting the running stack, also run `scripts/stack-health` on the server after
   authorized deployment. It writes a test file on the drive and starts throwaway containers, so
   keep it for validating deployed changes rather than read-only investigations. Testing does
   not grant permission to restart services, change VPN settings or perform other protected actions.
-- A new script or unit gets an entry in the reference pages; `scripts/check` fails without one.
+- A new script or unit gets an entry in the reference pages; `scripts/repo-check` fails without one.
 - Every user-visible change adds its entry as `changelog.d/<name>.<heading>.md`, never an edit to
   `CHANGELOG.md` (headings: breaking or removed, added, changed or deprecated, fixed or security;
   `changelog.d/README.md` has the format). The headings decide the next version; merging the bot's

@@ -8,4 +8,4 @@ OnFailure=arr-notify-failure@%n.service
 Type=oneshot
 User=@STACK_USER@
 Group=@STACK_GROUP@
-ExecStart=@REPO@/scripts/check-updates
+ExecStart=@REPO@/scripts/stack-update-check

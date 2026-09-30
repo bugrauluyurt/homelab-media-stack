@@ -5,7 +5,7 @@ Uploads always stay capped at 10 Mbps. Downloads get the alternative speed limit
 plays in Jellyfin or Plex or the 5-minute load is LOAD_ON or more, until nobody watches and
 the load is under LOAD_OFF. A limit switched on by hand is left alone.
 
-  throttle-downloads --upload-cap   print the upload cap (health-check reads it)
+  downloads-throttle --upload-cap   print the upload cap (stack-health reads it)
 """
 import json
 import os
@@ -26,7 +26,7 @@ UPLOAD_CAP = UPLOAD_MBIT_S * 125_000 // 1024 * 1024
 # Twice the cores switches the cap on, back under the core count switches it off.
 LOAD_ON, LOAD_OFF = 2 * (os.cpu_count() or 4), os.cpu_count() or 4
 
-# health-check asks for the configured upload cap instead of keeping its own copy.
+# stack-health asks for the configured upload cap instead of keeping its own copy.
 if sys.argv[1:] == ["--upload-cap"]:
     print(UPLOAD_MBIT_S, UPLOAD_CAP)
     sys.exit()

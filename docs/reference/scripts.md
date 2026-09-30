@@ -2,9 +2,9 @@
 
 Every file in [`scripts/`](https://github.com/bugrauluyurt/homelab-media-stack/tree/main/scripts): what it does, what runs it, whether it needs root, what it changes and whether a second run is safe. It is for anyone operating or changing the stack; the flow pages tell the story around these scripts, and the [systemd reference](systemd.md) covers the units that run them.
 
-**Anchors.** Each entry's heading is the file name, so its anchor is the file name in lower case with the dots removed: `sync-port` is `#sync-port`, `configure-arr.py` is `#configure-arrpy`, `stack_env.py` is `#stack_envpy`.
+**Anchors.** Each entry's heading is the file name, so its anchor is the file name in lower case with the dots removed: `vpn-port-sync` is `#vpn-port-sync`, `configure-arr.py` is `#configure-arrpy`, `stack_env.py` is `#stack_envpy`.
 
-**Conventions.** Run the scripts as the stack user (`STACK_USER`) from the repository, for example `./scripts/health-check`. That user has passwordless sudo and is in the docker group ([`install-host`](#install-host) checks both). In the tables and entries:
+**Conventions.** Run the scripts as the stack user (`STACK_USER`) from the repository, for example `./scripts/stack-health`. That user has passwordless sudo and is in the docker group ([`host-install`](#host-install) checks both). In the tables and entries:
 
 - **Root**: *no* runs as the stack user without sudo; *sudo* runs as the stack user and calls `sudo` itself for some steps; *sudo if needed* calls `sudo grep` only to read an app's API key from its `config.xml` when that key is missing from `.env`; *yes* must run as root.
 - **Module**: the compose profile a script belongs to. When that module is off in `COMPOSE_PROFILES`, the script prints `~ <service> is off (COMPOSE_PROFILES in .env); skipped` and exits 0. See [compose profiles](configuration.md#compose-profiles).
@@ -14,13 +14,13 @@ Every file in [`scripts/`](https://github.com/bugrauluyurt/homelab-media-stack/t
 
 | Script | Run by | Root | Changes state |
 |---|---|---|---|
-| [`install-host`](#install-host) | by hand, first | sudo | systemd units, udev rule, SSH and Docker config, rpcbind |
+| [`host-install`](#host-install) | by hand, first | sudo | systemd units, udev rule, SSH and Docker config, rpcbind |
 | [`configure-jellyfin.py`](#configure-jellyfinpy) | by hand | no | Jellyfin API |
 | [`configure-sabnzbd.py`](#configure-sabnzbdpy) | by hand | sudo | `.env`, `sabnzbd.ini` (restarts SABnzbd), SABnzbd API |
 | [`configure-arr.py`](#configure-arrpy) | by hand | sudo if needed | Radarr, Sonarr, Lidarr and Prowlarr APIs |
 | [`configure-bazarr.py`](#configure-bazarrpy) | by hand | sudo if needed | Bazarr API |
 | [`configure-lidarr.py`](#configure-lidarrpy) | by hand | sudo if needed | Lidarr API (restarts Lidarr), qBittorrent category, Navidrome admin |
-| [`add-indexers.py`](#add-indexerspy) | by hand | sudo if needed | Prowlarr API |
+| [`configure-indexers.py`](#configure-indexerspy) | by hand | sudo if needed | Prowlarr API |
 | [`configure-plex.py`](#configure-plexpy) | by hand | sudo | Plex `Preferences.xml` (restarts Plex) |
 | [`configure-seerr.py`](#configure-seerrpy) | by hand | sudo if needed | Seerr API |
 | [`configure-jellyfin-plugins.py`](#configure-jellyfin-pluginspy) | by hand | no | Jellyfin API (restarts Jellyfin) |
@@ -33,30 +33,30 @@ Every file in [`scripts/`](https://github.com/bugrauluyurt/homelab-media-stack/t
 | [`configure-grafana-watch.py`](#configure-grafana-watchpy) | by hand | no | Postgres role in `jellystat-db`, Grafana API |
 | [`configure-navidrome.py`](#configure-navidromepy) | by hand | no | `media/singles` folder, Navidrome API |
 | [`configure-uptime-kuma.py`](#configure-uptime-kumapy) | by hand | no | Python venv, Uptime Kuma settings and database |
-| [`render-scraparr-config`](#render-scraparr-config) | by hand | no | Scraparr's config file |
+| [`configure-scraparr`](#configure-scraparr) | by hand | no | Scraparr's config file |
 | [`stack-up`](#stack-up) | `arr-stack.service` | no | starts containers; may recreate qBittorrent and slskd, restart Dozzle |
-| [`sync-port`](#sync-port) | `arr-port-sync.timer`, `stack-up`, `update` | no | qBittorrent settings; may restart gluetun |
-| [`firewall`](#firewall) | `arr-firewall.service` and `.timer` | yes | iptables and ip6tables rules |
-| [`backup-config`](#backup-config) | `arr-backup.timer`, `update` | yes | restic repositories, key file, metrics |
-| [`check-updates`](#check-updates) | `arr-updates.timer` | no | state file, metrics, ntfy |
-| [`health-check`](#health-check) | `arr-health.timer`, `update`, by hand | sudo | test file on the drive, throwaway containers, ntfy |
-| [`watch-activity`](#watch-activity) | `arr-watch.timer` | sudo if needed | state file, ntfy |
-| [`throttle-downloads`](#throttle-downloads) | `arr-throttle.timer` | no | qBittorrent speed limits |
-| [`sync-youtube.py`](#sync-youtubepy) | `arr-youtube.timer`, `stack-up` | no | Glance channel lists and video rows, metric; `.env` with `--login` |
-| [`notify-failure`](#notify-failure) | `arr-notify-failure@.service` | yes | ntfy only |
-| [`update`](#update) | by hand | sudo | pulls images, recreates containers, restores settings |
-| [`storage-off`](#storage-off) | by hand | sudo | stops the stack, unmounts and spins down the drive |
-| [`leak-test`](#leak-test) | by hand | no | nothing |
-| [`check-indexers`](#check-indexers) | by hand, `health-check` | sudo | nothing |
-| [`cleanuparr-state`](#cleanuparr-state) | `health-check` | no | nothing |
-| [`add-viewer.py`](#add-viewerpy) | by hand | no | Jellyfin, Seerr, SFTPGo, Navidrome and Needle accounts |
-| [`install-agent`](#install-agent) | by hand | no (refuses root) | user unit and agent config |
+| [`vpn-port-sync`](#vpn-port-sync) | `arr-port-sync.timer`, `stack-up`, `stack-update` | no | qBittorrent settings; may restart gluetun |
+| [`host-firewall`](#host-firewall) | `arr-firewall.service` and `.timer` | yes | iptables and ip6tables rules |
+| [`stack-backup`](#stack-backup) | `arr-backup.timer`, `stack-update` | yes | restic repositories, key file, metrics |
+| [`stack-update-check`](#stack-update-check) | `arr-updates.timer` | no | state file, metrics, ntfy |
+| [`stack-health`](#stack-health) | `arr-health.timer`, `stack-update`, by hand | sudo | test file on the drive, throwaway containers, ntfy |
+| [`activity-watch`](#activity-watch) | `arr-watch.timer` | sudo if needed | state file, ntfy |
+| [`downloads-throttle`](#downloads-throttle) | `arr-throttle.timer` | no | qBittorrent speed limits |
+| [`youtube-sync.py`](#youtube-syncpy) | `arr-youtube.timer`, `stack-up` | no | Glance channel lists and video rows, metric; `.env` with `--login` |
+| [`stack-failure-notify`](#stack-failure-notify) | `arr-notify-failure@.service` | yes | ntfy only |
+| [`stack-update`](#stack-update) | by hand | sudo | pulls images, recreates containers, restores settings |
+| [`drive-off`](#drive-off) | by hand | sudo | stops the stack, unmounts and spins down the drive |
+| [`vpn-leak-test`](#vpn-leak-test) | by hand | no | nothing |
+| [`indexers-check`](#indexers-check) | by hand, `stack-health` | sudo | nothing |
+| [`cleanuparr-state`](#cleanuparr-state) | `stack-health` | no | nothing |
+| [`viewer-add.py`](#viewer-addpy) | by hand | no | Jellyfin, Seerr, SFTPGo, Navidrome and Needle accounts |
+| [`agent-install`](#agent-install) | by hand | no (refuses root) | user unit and agent config |
 | [`stack_env.py`](#stack_envpy) | imported | not applicable | `.env` through `set_env` |
 | [`stack-env.sh`](#stack-envsh) | sourced | not applicable | nothing itself |
 | [`games_accounts.py`](#games_accountspy) | imported | not applicable | SFTPGo accounts |
 | [`aliases.zsh`](#aliaseszsh) | `~/.zshrc` or `~/.bashrc` | not applicable | nothing |
 | [`changelog.py`](#changelogpy) | release workflows | no | `CHANGELOG.md`, version files |
-| [`check`](#check) | CI, by hand | no | nothing |
+| [`repo-check`](#repo-check) | CI, by hand | no | nothing |
 
 ## Who runs what
 
@@ -80,22 +80,22 @@ flowchart LR
   end
   subgraph hand["by hand"]
     update["update"]
-    storageoff["storage-off"]
-    addviewer["add-viewer.py"]
+    storageoff["drive-off"]
+    addviewer["viewer-add.py"]
     confsftpgo["configure-sftpgo.py"]
   end
   udev -->|"drive on"| stacksvc
   stacksvc --> stackup["stack-up"]
   fwsvc --> firewall["firewall"]
   fwtimer --> firewall
-  porttimer --> syncport["sync-port"]
-  backuptimer --> backup["backup-config"]
-  updtimer --> checkupd["check-updates"]
-  healthtimer --> health["health-check"]
-  watchtimer --> watch["watch-activity"]
-  throttletimer --> throttle["throttle-downloads"]
-  yttimer --> youtube["sync-youtube.py"]
-  failsvc --> notifyfail["notify-failure"]
+  porttimer --> syncport["vpn-port-sync"]
+  backuptimer --> backup["stack-backup"]
+  updtimer --> checkupd["stack-update-check"]
+  healthtimer --> health["stack-health"]
+  watchtimer --> watch["activity-watch"]
+  throttletimer --> throttle["downloads-throttle"]
+  yttimer --> youtube["youtube-sync.py"]
+  failsvc --> notifyfail["stack-failure-notify"]
   stackup --> youtube
   stackup --> syncport
   update --> backup
@@ -105,22 +105,22 @@ flowchart LR
   health --> firewall
   health --> throttle
   health --> cstate["cleanuparr-state"]
-  health --> checkidx["check-indexers"]
+  health --> checkidx["indexers-check"]
   addviewer --> games["games_accounts.py"]
   confsftpgo --> games
 ```
 
-The Python scripts import [`stack_env.py`](#stack_envpy) and the bash scripts source [`stack-env.sh`](#stack-envsh) (all but `install-agent`, `changelog.py` and `check`); those links are left out of the diagram.
+The Python scripts import [`stack_env.py`](#stack_envpy) and the bash scripts source [`stack-env.sh`](#stack-envsh) (all but `agent-install`, `changelog.py` and `repo-check`); those links are left out of the diagram.
 
 ## Setup
 
-These run by hand while you set the server up, listed in the order [Getting started](../getting-started.md#configure-the-apps) runs them: `install-host`, then `configure-jellyfin.py` after the stack's first start, then the rest. All of them are safe to re-run, for example after changing a key in `.env`.
+These run by hand while you set the server up, listed in the order [Getting started](../getting-started.md#configure-the-apps) runs them: `host-install`, then `configure-jellyfin.py` after the stack's first start, then the rest. All of them are safe to re-run, for example after changing a key in `.env`.
 
-### install-host
+### host-install
 
 Installs the host side of the stack: renders every template in `host/systemd/` with values from `.env` (see [placeholders](systemd.md#how-the-templates-are-installed)) into `/etc/systemd/system` and `/etc/udev/rules.d`, installs the SSH hardening from `host/sshd_config.d/` and Docker's log rotation from `host/docker/daemon.json`, and switches rpcbind off. It checks prerequisites first and, for anything missing, prints the `apt-get` (Debian, Ubuntu) or `pacman` (Arch) command that installs it, then stops.
 
-- **File:** [`scripts/install-host`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/install-host)
+- **File:** [`scripts/host-install`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/host-install)
 - **Runs:** by hand, first; again after changing `STACK_USER`, `STORAGE_MOUNT`, `STORAGE_UUID` or any file in `host/systemd/`.
 - **Checks:** Docker with the compose and buildx plugins, restic, smartctl, hdparm, lsof, ip6tables, Tailscale, avahi-daemon, mDNS in `/etc/nsswitch.conf`, Python 3.9 or newer, passwordless sudo, the stack user in the docker group, and that `ARR_SUBNET` overlaps no other Docker network and holds `PROWLARR_IP`.
 - **Root:** sudo; it needs passwordless sudo (it checks `sudo -n true`).
@@ -190,11 +190,11 @@ Gives Lidarr its Soulseek source: installs the Tubifarry plugin (Lidarr runs its
 - **Why:** the Soulseek indexer gets priority 1 (default 25) so it wins over public torrents, which rarely have seeders for music. The indexer template leaves searching off because Soulseek has no RSS feed; rare albums answer slowly and often drop accents. Lidarr writes no tags, so Navidrome would show no cover without `folder.jpg`. The category saves under `torrents/` so hardlinks into `media/` work.
 - **Idempotent:** yes.
 
-### add-indexers.py
+### configure-indexers.py
 
 Adds public torrent indexers to Prowlarr (thepiratebay, yts, eztv, limetorrents, torrentproject2, Knaben, and the French torrent9 and world-torrent), plus the semi-private draupnirr and tr4ker once `DRAUPNIRR_API_KEY` or `TR4KER_API_KEY` is set, on an `RSS only` app profile, then runs a real search on every indexer and prints its hit count. Cloudflare-protected sites commonly fail the test; that is expected, not a configuration error. [Indexers](../operations/indexers.md) explains adding and fixing them.
 
-- **File:** [`scripts/add-indexers.py`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/add-indexers.py)
+- **File:** [`scripts/configure-indexers.py`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/configure-indexers.py)
 - **Runs:** by hand, after [`configure-arr.py`](#configure-arrpy) so Prowlarr syncs the new indexers to the apps.
 - **Root:** sudo if needed.
 - **Changes:** Prowlarr API (new indexers at priority 25; the `RSS only` app profile, which the account trackers use).
@@ -245,7 +245,7 @@ Configures Cleanuparr to remove stalled, failed and fake or malicious downloads:
 - **Flags:** `--dry-run` leaves (or puts) Cleanuparr in dry-run mode, where destructive actions are only logged.
 - **Root:** sudo if needed.
 - **Changes:** Cleanuparr API. It refuses to go live while the download cleaner is on.
-- **Why:** the stricter `blacklist` matches `*.srt`, `*.sub` and `*.idx` and would strip subtitles. Game releases legitimately ship `.exe` files and archives. The stall rule covers private torrents and removes them from qBittorrent too, because a tracker that refuses peers (for a low ratio, say) stalls its torrents for good. There is no "slow" rule, since slow is normal on public trackers. The download cleaner (seeding, orphan and no-hardlink removal) stays off because hardlinks mean seeding costs no disk space. [`health-check`](#health-check) verifies all three through [`cleanuparr-state`](#cleanuparr-state).
+- **Why:** the stricter `blacklist` matches `*.srt`, `*.sub` and `*.idx` and would strip subtitles. Game releases legitimately ship `.exe` files and archives. The stall rule covers private torrents and removes them from qBittorrent too, because a tracker that refuses peers (for a low ratio, say) stalls its torrents for good. There is no "slow" rule, since slow is normal on public trackers. The download cleaner (seeding, orphan and no-hardlink removal) stays off because hardlinks mean seeding costs no disk space. [`stack-health`](#stack-health) verifies all three through [`cleanuparr-state`](#cleanuparr-state).
 - **Idempotent:** yes.
 
 ### configure-questarr.py
@@ -253,7 +253,7 @@ Configures Cleanuparr to remove stalled, failed and fake or malicious downloads:
 Configures Questarr: the admin account (user `admin`, `QUESTARR_PASSWORD`), qBittorrent (category `games`, saving to `/data/torrents/games`), SABnzbd when `SABNZBD_API_KEY` is set, indexers synced from Prowlarr, IGDB credentials when `IGDB_CLIENT_ID` and `IGDB_CLIENT_SECRET` are set, and ntfy notifications through apprise when `NTFY_TOPIC` is set. It prints each downloader's connection test.
 
 - **File:** [`scripts/configure-questarr.py`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/configure-questarr.py)
-- **Runs:** by hand, after [`configure-sabnzbd.py`](#configure-sabnzbdpy) and [`add-indexers.py`](#add-indexerspy); again after setting the IGDB keys.
+- **Runs:** by hand, after [`configure-sabnzbd.py`](#configure-sabnzbdpy) and [`configure-indexers.py`](#configure-indexerspy); again after setting the IGDB keys.
 - **Root:** sudo if needed.
 - **Changes:** Questarr API; when the login fails, writes the password's bcrypt hash straight into Questarr's database through `docker exec`.
 - **Module:** `games`.
@@ -262,7 +262,7 @@ Configures Questarr: the admin account (user `admin`, `QUESTARR_PASSWORD`), qBit
 
 ### configure-sftpgo.py
 
-Sets up SFTPGo, the read-only games download page: creates `$DATA_ROOT/usenet/complete/games` (compose mounts it but won't create it) and `$CONFIG_ROOT/sftpgo`, starts `sftpgo`, limits its admin to logins from the server and Docker, and creates or repairs your account from `GAMES_USER` and `GAMES_PASSWORD`. Viewers' accounts come from [`add-viewer.py`](#add-viewerpy); both go through [`games_accounts.py`](#games_accountspy).
+Sets up SFTPGo, the read-only games download page: creates `$DATA_ROOT/usenet/complete/games` (compose mounts it but won't create it) and `$CONFIG_ROOT/sftpgo`, starts `sftpgo`, limits its admin to logins from the server and Docker, and creates or repairs your account from `GAMES_USER` and `GAMES_PASSWORD`. Viewers' accounts come from [`viewer-add.py`](#viewer-addpy); both go through [`games_accounts.py`](#games_accountspy).
 
 - **File:** [`scripts/configure-sftpgo.py`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/configure-sftpgo.py)
 - **Runs:** by hand.
@@ -340,11 +340,11 @@ Configures Uptime Kuma: the admin account, an ntfy notification that is the defa
 - **Why:** Kuma 2 has no REST API, so the script speaks socket.io and re-runs itself inside the venv. Kuma refuses weak passwords, so the one from `.env` is written as a bcrypt hash, fed through stdin so it never shows in a process list. Kuma's DNS cache kept a recreated container's old address and reported it down for good. Proton can stop handing out a forwarded port while the tunnel stays up, which quietly costs torrents their incoming peers.
 - **Idempotent:** yes.
 
-### render-scraparr-config
+### configure-scraparr
 
 Renders `$CONFIG_ROOT/scraparr/config.yaml` (mode 600) from `apps/scraparr/config.yaml.template`, filling in `SONARR_API_KEY`, `RADARR_API_KEY`, `PROWLARR_API_KEY` and `BAZARR_API_KEY`. Scraparr can't read environment variables from its YAML, so the rendered file holds live keys and is written outside the repository, never into it.
 
-- **File:** [`scripts/render-scraparr-config`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/render-scraparr-config)
+- **File:** [`scripts/configure-scraparr`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/configure-scraparr)
 - **Runs:** by hand, once the four keys are in `.env`, and after any of them changes; then `docker compose restart scraparr` so Scraparr reads the new file.
 - **Root:** no.
 - **Changes:** that one file.
@@ -361,10 +361,10 @@ Brings the stack up; it is `arr-stack.service`'s `ExecStart`. In order:
 
 1. Refuses to start (exit 1) unless `STORAGE_MOUNT` is a mount point.
 2. Creates every missing bind-mount folder under the app-data root (`CONFIG_ROOT`'s parent, which holds `config/` and `state/`) as the stack user. Docker would create them as root, and the services that run as `PUID` could then not write their own settings on a fresh install.
-3. Seeds any missing Glance YouTube list, and an empty video row until the first sync, with [`sync-youtube.py --offline`](#sync-youtubepy).
+3. Seeds any missing Glance YouTube list, and an empty video row until the first sync, with [`youtube-sync.py --offline`](#youtube-syncpy).
 4. Runs `docker compose up -d --remove-orphans`.
 5. Fails (exit 1) when a library service is not running: prowlarr, radarr, sonarr, lidarr, bazarr, seerr, plex, jellyfin, navidrome, each only when its module is on.
-6. When gluetun runs: waits up to 120 seconds for it to be healthy, then runs [`sync-port`](#sync-port), which restores downloaders only when the tunnel and forwarded port are ready. If the wait expires, the existing port-sync timer handles recovery later.
+6. When gluetun runs: waits up to 120 seconds for it to be healthy, then runs [`vpn-port-sync`](#vpn-port-sync), which restores downloaders only when the tunnel and forwarded port are ready. If the wait expires, the existing port-sync timer handles recovery later.
 7. Restarts Dozzle when it started before Docker could list the containers.
 
 A compose error with every library service up is only a warning (the VPN is probably still connecting), and the script exits 0.
@@ -372,11 +372,11 @@ A compose error with every library service up is only a warning (the VPN is prob
 - **File:** [`scripts/stack-up`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/stack-up)
 - **Runs:** [`arr-stack.service`](systemd.md#arr-stackservice), at boot and whenever the media drive mounts. Start it with `sudo systemctl start arr-stack.service` rather than directly.
 - **Root:** no; the unit runs it as the stack user.
-- **Changes:** creates and starts containers; may recreate qBittorrent and slskd and restart Dozzle; qBittorrent settings through `sync-port`.
+- **Changes:** creates and starts containers; may recreate qBittorrent and slskd and restart Dozzle; qBittorrent settings through `vpn-port-sync`.
 - **Why:** a VPN-only failure must not fail the unit, or systemd marks it failed and the `BindsTo=` drive binding stops working; gluetun retries on its own. After a boot, qBittorrent starts on its saved (stale) forwarded port, and syncing here closes the gap before the timer's next run. Dozzle lists containers once at start and never retries.
 - **Idempotent:** yes.
 
-### sync-port
+### vpn-port-sync
 
 Reconciles qBittorrent with the live VPN tunnel. It reads the tunnel address (`tun0` in gluetun) and Proton's forwarded port (gluetun's `/tmp/gluetun/forwarded_port`), then changes in qBittorrent only what differs:
 
@@ -389,15 +389,15 @@ Each run first requires a healthy VPN, tunnel address and valid forwarded port (
 
 After 15 minutes without a ready tunnel, it may restart gluetun, at most once every 2 hours. It waits up to 3 minutes for readiness; if that fails it leaves downloaders untouched and reports failure. Success is reported only after reattachment and port verification. No extra watcher or timer is needed. [VPN and ports](../flows/vpn-and-ports.md) tells the whole story.
 
-- **File:** [`scripts/sync-port`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/sync-port)
-- **Runs:** [`arr-port-sync.timer`](systemd.md#arr-port-synctimer) (90 seconds after boot, then every 15 minutes), [`stack-up`](#stack-up), [`update`](#update) after a gluetun update, by hand.
+- **File:** [`scripts/vpn-port-sync`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/vpn-port-sync)
+- **Runs:** [`arr-port-sync.timer`](systemd.md#arr-port-synctimer) (90 seconds after boot, then every 15 minutes), [`stack-up`](#stack-up), [`stack-update`](#stack-update) after a gluetun update, by hand.
 - **Root:** no.
 - **Changes:** qBittorrent preferences; the gluetun restart described above (an automatic exception the owner approved). State in `$STATE/port-forward-missing-since` and `$STATE/port-forward-last-heal`.
 - **Exit:** 1 when the tunnel is down, there is no valid port, or qBittorrent isn't listening; 0 otherwise.
 - **Why:** gluetun routes anything sent from the container's bridge address back out `eth0` (so the WebUI can reply), where its firewall drops tracker traffic and every tracker reports "Operation not permitted"; bound to the tunnel, qBittorrent also can't leak if the tunnel disappears. The tunnel address changes whenever Proton reconnects, hence the timer. The 15 minutes are timed by the clock since boot, not by run count, because two runs come about a minute apart at boot. The CSRF and Host checks stop a web page on a tailnet device from forging requests to the login-free API.
 - **Idempotent:** yes.
 
-### firewall
+### host-firewall
 
 The host firewall, for IPv4 (`iptables`) and IPv6 (`ip6tables`). It builds three chains and hooks them first into `INPUT` (`ARR-IN`), `OUTPUT` (`ARR-OUT`) and `DOCKER-USER` (`ARR-FWD`):
 
@@ -407,15 +407,15 @@ The host firewall, for IPv4 (`iptables`) and IPv6 (`ip6tables`). It builds three
 
 The rules are rebuilt only when the wanted rules change (for example a new IPv6 prefix): a hash of them is stored as a comment in `ARR-IN`. It refuses to apply while ufw or firewalld is active, or when Docker uses its nftables firewall backend, which ignores `DOCKER-USER`. [Security](../security.md) explains the policy.
 
-- **File:** [`scripts/firewall`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/firewall)
-- **Runs:** [`arr-firewall.service`](systemd.md#arr-firewallservice) at boot and [`arr-firewall.timer`](systemd.md#arr-firewalltimer) every 15 minutes; [`health-check`](#health-check) runs `firewall home-ports`; by hand with sudo.
+- **File:** [`scripts/host-firewall`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/host-firewall)
+- **Runs:** [`arr-firewall.service`](systemd.md#arr-firewallservice) at boot and [`arr-firewall.timer`](systemd.md#arr-firewalltimer) every 15 minutes; [`stack-health`](#stack-health) runs `host-firewall home-ports`; by hand with sudo.
 - **Subcommands:** none (apply); `off` removes every rule it added (they return with the next timer run); `status` prints the rules; `home-ports` prints the ports open to the home network.
 - **Root:** yes.
 - **Changes:** iptables and ip6tables chains.
 - **Why:** Docker's published ports never pass through `INPUT`, so the same policy is hooked into `DOCKER-USER`. Home ports accept only home-network sources, so a global IPv6 address or a router port forward never exposes them to the internet. SSH answers only on the tailnet, so a leaked key is useless from the home network. Macvlan containers have their own LAN addresses and never pass through these rules.
 - **Idempotent:** yes.
 
-### backup-config
+### stack-backup
 
 Backs up the stack's settings (never media) with restic. It stages:
 
@@ -426,26 +426,26 @@ Backs up the stack's settings (never media) with restic. It stages:
 
 It backs this up to `$STORAGE_MOUNT/backups/restic` (tag `arr-stack`, host `HOST_NAME`), prunes it (7 daily, 4 weekly, 6 monthly; the last 5 `pre-update` snapshots kept apart), copies it to a second repository on the system disk (`/var/backups/arr-stack/restic`), on Sundays reads back 5% of the data in both repositories, copies it offsite when `RESTIC_OFFSITE_REPO` is set, and records the time in `/var/lib/arr-backup/last-success` and the Prometheus metric `arr_backup_last_success_timestamp_seconds`. It also keeps `RESTIC_PASSWORD` in `$STORAGE_MOUNT/backups/RESTIC_PASSWORD` (mode 600). It does nothing when the drive isn't mounted. [Backups](../flows/backups.md) covers restoring.
 
-- **File:** [`scripts/backup-config`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/backup-config)
-- **Runs:** [`arr-backup.timer`](systemd.md#arr-backuptimer) daily at 04:30; [`update`](#update) as `backup-config pre-update`; by hand with `sudo`.
-- **Arguments:** any extra restic tags. With a tag (as `update` passes `pre-update`) it skips the Sunday read-back and the offsite copy; it always prints `snapshot <id>`.
+- **File:** [`scripts/stack-backup`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/stack-backup)
+- **Runs:** [`arr-backup.timer`](systemd.md#arr-backuptimer) daily at 04:30; [`stack-update`](#stack-update) as `stack-backup pre-update`; by hand with `sudo`.
+- **Arguments:** any extra restic tags. With a tag (as `stack-update` passes `pre-update`) it skips the Sunday read-back and the offsite copy; it always prints `snapshot <id>`.
 - **Root:** yes; the app configs are owned by several container UIDs.
 - **Changes:** restic repositories (created on the first run), key file, success stamp, metric.
 - **Why:** a WAL-mode database keeps its newest writes in the `-wal` file, so copying the `.db` alone loses them; the online backup API gives a consistent copy without stopping the app, and retries while an app holds its database mid-checkpoint. The second copy on the system disk keeps the history if the media drive dies; the key beside the repository keeps the drive's backups readable if the system disk dies. `pre-update` snapshots skip the daily thinning, which would otherwise drop one taken the same day.
 - **Idempotent:** each run adds a snapshot; retention keeps the repositories bounded.
 
-### check-updates
+### stack-update-check
 
-Checks every image the stack's containers run for a newer build upstream for this machine's architecture. It writes the result to `$STATE/updates` (read by [`health-check`](#health-check) and [`update`](#update)) and the metrics `arr_image_updates_available` and `arr_image_updates_checked_timestamp_seconds`, and pushes each update not seen before to ntfy once, flagging a major version change. It never pulls or restarts anything. [Updates](../flows/updates.md) covers the whole cycle.
+Checks every image the stack's containers run for a newer build upstream for this machine's architecture. It writes the result to `$STATE/updates` (read by [`stack-health`](#stack-health) and [`stack-update`](#stack-update)) and the metrics `arr_image_updates_available` and `arr_image_updates_checked_timestamp_seconds`, and pushes each update not seen before to ntfy once, flagging a major version change. It never pulls or restarts anything. [Updates](../flows/updates.md) covers the whole cycle.
 
-- **File:** [`scripts/check-updates`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/check-updates)
+- **File:** [`scripts/stack-update-check`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/stack-update-check)
 - **Runs:** [`arr-updates.timer`](systemd.md#arr-updatestimer) daily at 06:00; by hand.
 - **Root:** no.
 - **Changes:** `$STATE/updates`, `$STATE/updates.notified`, the metrics file, ntfy.
 - **Why:** it compares this architecture's manifest, not the multi-arch index, because the index changes whenever any architecture is rebuilt. Images labelled only `latest` (or not at all) show their build date, so an update never reads "latest -> latest". Dozens of registry lookups are too slow for every health check, hence a daily timer and a state file.
 - **Idempotent:** yes; each update notifies once.
 
-### health-check
+### stack-health
 
 One-shot status of the whole stack, grouped as STORAGE, HARDWARE (only where `vcgencmd` exists, as on a Raspberry Pi), SYSTEMD, SECURITY, BACKUPS, SERVICES, MONITORING, CLEANUP & INTROS, INDEXERS and VPN. It ends by listing available image updates from `$STATE/updates` (informational, never a failure) and exits 0 only when every check passes. Some of the thresholds:
 
@@ -458,57 +458,57 @@ One-shot status of the whole stack, grouped as STORAGE, HARDWARE (only where `vc
 | Units | a timer or `arr-stack.service` isn't enabled, or any systemd unit has failed |
 | Firewall | a chain isn't hooked, a port other than the firewall's `home-ports` is open to the home network, or SSH is |
 | VPN | the exit country isn't in `VPN_COUNTRIES` or is the United States, or qBittorrent isn't bound to the tunnel on the forwarded port |
-| qBittorrent | the alternative download limit is under 1,000,000 bytes/s, or the upload cap differs from `throttle-downloads --upload-cap` |
+| qBittorrent | the alternative download limit is under 1,000,000 bytes/s, or the upload cap differs from `downloads-throttle --upload-cap` |
 
-- **File:** [`scripts/health-check`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/health-check)
-- **Runs:** [`arr-health.timer`](systemd.md#arr-healthtimer) every 6 hours with `--notify`; [`update`](#update) after recreating containers; by hand (the `health` alias); the operational skills in `ai/homelab-plugin/skills/`.
+- **File:** [`scripts/stack-health`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/stack-health)
+- **Runs:** [`arr-health.timer`](systemd.md#arr-healthtimer) every 6 hours with `--notify`; [`stack-update`](#stack-update) after recreating containers; by hand (the `health` alias); the operational skills in `ai/homelab-plugin/skills/`.
 - **Flags:** `--notify` also pushes the names of the failing checks to ntfy.
-- **Calls:** [`firewall`](#firewall) `home-ports`, [`throttle-downloads`](#throttle-downloads) `--upload-cap`, [`cleanuparr-state`](#cleanuparr-state), [`check-indexers`](#check-indexers).
+- **Calls:** [`host-firewall`](#host-firewall) `home-ports`, [`downloads-throttle`](#downloads-throttle) `--upload-cap`, [`cleanuparr-state`](#cleanuparr-state), [`indexers-check`](#indexers-check).
 - **Root:** sudo (smartctl, iptables, `sshd -T`, the backup files).
 - **Changes:** not read-only: it creates and removes a hardlink test file in `$DATA_ROOT/torrents/movies` and `$DATA_ROOT/media/movies`, and starts throwaway `curlimages/curl` containers on the `arr` network. Don't run it during a look-only investigation.
 - **Module:** checks of a switched-off module's services are skipped.
 - **Why:** a container created while the memory cgroup was unavailable silently loses its `mem_limit`, and compose won't recreate it because its config is unchanged, hence the memory-limit check. A Jellyfin update can disable plugins built for the older version without anything else failing. Byparr's `/health` launches a real browser, so its container health status is read instead.
 - **Idempotent:** yes.
 
-### watch-activity
+### activity-watch
 
 Pushes alerts that need someone watching all the time: a stream Jellyfin transcodes in software (hardware transcodes are expected and skipped), a Jellyfin device never seen before, a failed Jellyfin login, and a Seerr request approved more than 48 hours ago that is out (Radarr: released; Sonarr: episodes aired) but still has nothing downloaded. Films not yet released are skipped, since Radarr waits for them on purpose. Each alert fires once; what was reported lives in `$STATE/watch-activity.json`, and the first run only records what already exists. When Jellyfin or Seerr answers with an HTTP error it exits quietly.
 
-- **File:** [`scripts/watch-activity`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/watch-activity)
+- **File:** [`scripts/activity-watch`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/activity-watch)
 - **Runs:** [`arr-watch.timer`](systemd.md#arr-watchtimer) every minute, from 3 minutes after boot.
 - **Root:** sudo if needed.
 - **Changes:** its state file; ntfy.
 - **Idempotent:** yes; an alert is not repeated.
 
-### throttle-downloads
+### downloads-throttle
 
 Keeps qBittorrent's speed limits: an alternative download limit of 20 MB/s and an upload limit of 10 Mbps in both normal and alternative mode. It switches the alternative (capped) mode on while anyone plays something in Jellyfin or Plex or the 5-minute load average is at least twice the CPU count, and off once nobody watches and the load is under the CPU count. It switches off only a cap it switched on itself (marked by `$STATE/throttle-by-script`), so a cap you set by hand stays. Downloads are otherwise unlimited.
 
-- **File:** [`scripts/throttle-downloads`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/throttle-downloads)
-- **Runs:** [`arr-throttle.timer`](systemd.md#arr-throttletimer) every minute, from 3 minutes after boot; `health-check` runs `--upload-cap`.
+- **File:** [`scripts/downloads-throttle`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/downloads-throttle)
+- **Runs:** [`arr-throttle.timer`](systemd.md#arr-throttletimer) every minute, from 3 minutes after boot; `stack-health` runs `--upload-cap`.
 - **Flags:** `--upload-cap` prints the upload cap as `<Mbps> <bytes per second>` and changes nothing.
 - **Root:** no.
 - **Changes:** qBittorrent preferences and speed limit mode (an automatic exception the owner approved).
 - **Why:** at full speed, decrypting the WireGuard tunnel takes most of the CPU, playback stutters and qBittorrent drops the arr apps' requests; at 40 MB/s the VPN alone kept a Raspberry Pi 5's CPU about 90% busy.
 - **Idempotent:** yes.
 
-### sync-youtube.py
+### youtube-sync.py
 
 Keeps Glance's YouTube channel lists in step with your subscriptions, read through the YouTube Data API (read-only). For each tab in `apps/glance/youtube-channels.json`, or in `$CONFIG_ROOT/glance/youtube-channels.json` when that private copy exists, pinned channels you still follow come first and the remaining slots go to channels whose YouTube topics match the tab (Gaming, Tech, Markets). Each list is written to `$CONFIG_ROOT/glance/youtube-<tab>.yml` only when it changed; a tab with no channels keeps its previous list. Then the newest 25 uploads of each tab's channels (Shorts left out) go to `$CONFIG_ROOT/glance/youtube/<tab>.json`, renamed into place, which Glance serves at `/assets/youtube/` and draws with a `custom-api` widget. Signed in, the uploads come from the Data API (`playlistItems`, one quota unit per channel); otherwise from YouTube's RSS feed. A channel that fails keeps its previous videos and is named in a `!` line. Every sync writes the metric `arr_youtube_sync_timestamp_seconds`.
 
-- **File:** [`scripts/sync-youtube.py`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/sync-youtube.py)
+- **File:** [`scripts/youtube-sync.py`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/youtube-sync.py)
 - **Runs:** [`arr-youtube.timer`](systemd.md#arr-youtubetimer) hourly; [`stack-up`](#stack-up) with `--offline`; by hand once with `--login`.
 - **Flags:** none syncs (without `YOUTUBE_REFRESH_TOKEN` it keeps the pinned lists, reads videos from the RSS feed and says so); `--login` signs in once with Google's device flow and stores `YOUTUBE_REFRESH_TOKEN` in `.env`; `--offline` writes only missing lists, from the pinned channels, and an empty video row for each missing tab.
 - **Root:** no.
 - **Changes:** the list files, the video rows, the metric; `.env` with `--login`.
-- **Module:** `dashboards` (`glance`). `health-check` expects a sync within the last day.
+- **Module:** `dashboards` (`glance`). `stack-health` expects a sync within the last day.
 - **Idempotent:** yes.
 
-### notify-failure
+### stack-failure-notify
 
 The `OnFailure=` handler: pushes "media stack: `<unit>` failed" with the unit's last 8 log lines (at most 1500 characters) to ntfy. Without `NTFY_TOPIC` it does nothing.
 
-- **File:** [`scripts/notify-failure`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/notify-failure)
+- **File:** [`scripts/stack-failure-notify`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/stack-failure-notify)
 - **Runs:** [`arr-notify-failure@.service`](systemd.md#arr-notify-failureservice), started with the failed unit's name when `arr-stack`, `arr-firewall`, `arr-backup`, `arr-updates` or `arr-youtube` fails.
 - **Arguments:** the unit name.
 - **Root:** yes (the unit runs as root).
@@ -516,52 +516,52 @@ The `OnFailure=` handler: pushes "media stack: `<unit>` failed" with the unit's 
 
 ## Day-to-day tools
 
-### update
+### stack-update
 
 Updates services safely, in four steps:
 
-1. Takes a settings snapshot with `sudo backup-config pre-update`, and stops if that fails or the drive is off.
+1. Takes a settings snapshot with `sudo stack-backup pre-update`, and stops if that fails or the drive is off.
 2. Notes each service's current image.
-3. Pulls and recreates the services. For each image that changed, the previous one is kept as `<repository>:rollback-<date>-<time>` (one per app; older rollback tags are removed) and recorded in `$STATE/rollback/<service>`. qBittorrent and slskd are recreated with gluetun. After a gluetun update, the script waits for VPN health before [`sync-port`](#sync-port) reattaches any detached clients and reconciles the port; a failed wait defers recovery to the existing timer. The updated images are marked current in `$STATE/updates`.
-4. Runs [`health-check`](#health-check); on a failure it waits for the containers to finish starting, 30 seconds more, and checks again.
+3. Pulls and recreates the services. For each image that changed, the previous one is kept as `<repository>:rollback-<date>-<time>` (one per app; older rollback tags are removed) and recorded in `$STATE/rollback/<service>`. qBittorrent and slskd are recreated with gluetun. After a gluetun update, the script waits for VPN health before [`vpn-port-sync`](#vpn-port-sync) reattaches any detached clients and reconciles the port; a failed wait defers recovery to the existing timer. The updated images are marked current in `$STATE/updates`.
+4. Runs [`stack-health`](#stack-health); on a failure it waits for the containers to finish starting, 30 seconds more, and checks again.
 
 It pushes ntfy when recreating or the final health check fails. [Updates](../flows/updates.md) covers the flow.
 
-- **File:** [`scripts/update`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/update)
-- **Usage:** `update` (every service `check-updates` found an update for); `update jellyfin sonarr` (just these); `update --rollback <service>` (the previous image and its settings from the pre-update snapshot); `update --rollback <service> --image-only` (the previous image, keeping current settings).
+- **File:** [`scripts/stack-update`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/stack-update)
+- **Usage:** `stack-update` (every service `stack-update-check` found an update for); `stack-update jellyfin sonarr` (just these); `stack-update --rollback <service>` (the previous image and its settings from the pre-update snapshot); `stack-update --rollback <service> --image-only` (the previous image, keeping current settings).
 - **Runs:** by hand (the `update` alias); the stack-update skill, which asks first.
 - **Root:** sudo (backup, restic restore, copying settings back).
 - **Changes:** pulls images, recreates containers, tags rollback images; a rollback stops the service, copies its settings folders under `$CONFIG_ROOT` back from the snapshot, fixes their ownership and recreates it.
 - **Why:** rollback restores settings by default because updates often migrate an app's database, and the older version can't open a migrated one. Stale `-wal` and `-shm` files beside a restored database are deleted, since they would be replayed on top of the complete copy and corrupt it. Settings are copied over the live folder, not swapped in, because backups leave out caches and artwork.
 - **Idempotent:** a second run finds nothing to update. Only an image that actually changed replaces the rollback record, so running it twice never makes the new image the one to roll back to.
 
-### storage-off
+### drive-off
 
 Stops the stack and unmounts the media drive so you can switch it off: `sudo systemctl stop arr-stack.service`, `sync`, unmount (three tries, 3 seconds apart; when it stays busy it shows what holds it with `lsof` or `fuser` and exits 1), then spins the disk down with `hdparm -Y`, unless the mount lives on the system disk. [Storage and boot](../flows/storage-and-boot.md) covers switching the drive back on.
 
-- **File:** [`scripts/storage-off`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/storage-off)
-- **Runs:** by hand (the `storage-off` alias); the stack-power skill, which asks first.
+- **File:** [`scripts/drive-off`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/drive-off)
+- **Runs:** by hand (the `drive-off` alias); the stack-power skill, which asks first.
 - **Root:** sudo.
 - **Changes:** stops every container of the stack, unmounts and spins down the drive.
 - **Idempotent:** yes; it exits 0 when the drive is already unmounted.
 
-### leak-test
+### vpn-leak-test
 
 Checks that qBittorrent's traffic leaves through the VPN: it compares the public IPv4 address seen by the host, by gluetun and by qBittorrent (from `api.ipify.org`), then compares Proton's forwarded port with qBittorrent's listen port.
 
-- **File:** [`scripts/leak-test`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/leak-test)
+- **File:** [`scripts/vpn-leak-test`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/vpn-leak-test)
 - **Runs:** by hand (the `leaktest` alias); the vpn-check skill.
 - **Exit:** 0 pass; 1 leak (gluetun's address equals the host's, or qBittorrent's differs from gluetun's); 2 inconclusive (an address couldn't be read). A port mismatch is printed but doesn't change the exit code.
 - **Root:** no.
 - **Changes:** nothing.
 - **Why:** ipify answers in plain text to every client, while ifconfig.me serves HTML to wget, which silently breaks the comparison. The port comes from gluetun's port file because its control API needs authentication.
 
-### check-indexers
+### indexers-check
 
 Tests every indexer in Prowlarr and prints a table (enabled, test result, queries, failures, average response time, error) and Prowlarr's health warnings. Prowlarr already tracks failures and disables a failing indexer with backoff on its own; this surfaces that on demand.
 
-- **File:** [`scripts/check-indexers`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/check-indexers)
-- **Runs:** by hand (the `indexers` alias); [`health-check`](#health-check), which needs at least one `PASS`.
+- **File:** [`scripts/indexers-check`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/indexers-check)
+- **Runs:** by hand (the `indexers` alias); [`stack-health`](#stack-health), which needs at least one `PASS`.
 - **Root:** sudo; it always reads Prowlarr's key from its `config.xml`.
 - **Changes:** nothing in the stack (Prowlarr records the test results as usual).
 
@@ -570,27 +570,27 @@ Tests every indexer in Prowlarr and prints a table (enabled, test result, querie
 Prints Cleanuparr's safety-relevant state on one line: `live|dryrun downloadcleaner=on|off ignored=<categories>`. It signs in as `admin` with `CLEANUPARR_PASSWORD`.
 
 - **File:** [`scripts/cleanuparr-state`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/cleanuparr-state)
-- **Runs:** [`health-check`](#health-check) (live, download cleaner off, games ignored); by hand.
+- **Runs:** [`stack-health`](#stack-health) (live, download cleaner off, games ignored); by hand.
 - **Root:** no.
 - **Changes:** nothing.
 
-### add-viewer.py
+### viewer-add.py
 
 Gives someone their own accounts, all with one password: a Jellyfin user (watches everything, can't administer or delete), a Seerr user imported from Jellyfin that can request (requests wait for your approval unless `--auto-approve`), a read-only login to the games download page, and a Navidrome user for Needle, named after `NAME` up to any `@`. [Viewers](../flows/viewers.md) covers the Tailscale side, which is a separate step.
 
-- **File:** [`scripts/add-viewer.py`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/add-viewer.py)
-- **Usage:** `add-viewer.py NAME [--auto-approve] [--music-requests] [--spotify]`. It asks for the password, or reads it from stdin when that isn't a terminal. `--music-requests` lets the account get albums and songs in Needle and `--spotify` lets it connect Spotify (both shown and changeable in Needle, Settings, People).
+- **File:** [`scripts/viewer-add.py`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/viewer-add.py)
+- **Usage:** `viewer-add.py NAME [--auto-approve] [--music-requests] [--spotify]`. It asks for the password, or reads it from stdin when that isn't a terminal. `--music-requests` lets the account get albums and songs in Needle and `--spotify` lets it connect Spotify (both shown and changeable in Needle, Settings, People).
 - **Runs:** by hand.
 - **Root:** no.
 - **Changes:** Jellyfin, Seerr, SFTPGo, Navidrome and Needle accounts through their APIs.
 - **Module:** the games login needs `games`; the Navidrome and Needle steps need `music`.
 - **Idempotent:** yes; existing accounts keep their password, and the flags only switch permissions on.
 
-### install-agent
+### agent-install
 
 Installs the always-on Telegram agent as a user service. It validates the agent's config and Telegram pairing through `ai/agent/gateway.py`, writes `~/.config/arr-agent/config.json` (keeping the old one as `config.previous.json`), renders `ai/agent/arr-agent.service` into `~/.config/systemd/user/` (keeping the old one as `arr-agent.service.previous`) and runs `systemctl --user daemon-reload`. It never starts the service and never replaces the agent's or Telegram's credentials; it prints the commands to check, start and inspect it, and the `loginctl enable-linger` command that lets it run without a login. [AI agent](../flows/ai-agent.md) covers the agent.
 
-- **File:** [`scripts/install-agent`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/install-agent)
+- **File:** [`scripts/agent-install`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/agent-install)
 - **Flags:** `--enable` enables the service for later boots of the user manager (without starting it); `--profile NAME` picks an existing paired pi-telegram profile (default `default`).
 - **Needs:** `node` and the `pi` agent CLI on `PATH`; repository, home and node paths without whitespace, quotes, backslashes or `%`.
 - **Runs:** by hand.
@@ -638,11 +638,11 @@ Accounts for SFTPGo, the read-only games download page, through its REST API as 
 - `exists(name)`, `login_works(name, password)`, `wait_ready()`.
 
 - **File:** [`scripts/games_accounts.py`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/games_accounts.py)
-- **Used by:** [`configure-sftpgo.py`](#configure-sftpgopy) (your account) and [`add-viewer.py`](#add-viewerpy) (everyone else's).
+- **Used by:** [`configure-sftpgo.py`](#configure-sftpgopy) (your account) and [`viewer-add.py`](#viewer-addpy) (everyone else's).
 
 ### aliases.zsh
 
-Terminal shortcuts, sourced from `~/.zshrc` or `~/.bashrc`: `arr` (managarr), `qbt` (qbt-tui), `dock` (lazydocker), `stack` (go to the repository), `health`, `update`, `indexers`, `leaktest` and `storage-off`. The paths use `MEDIA_STACK_DIR`, default `~/homelab-media-stack`. [Terminal](../operations/terminal.md) covers the tools.
+Terminal shortcuts, sourced from `~/.zshrc` or `~/.bashrc`: `arr` (managarr), `qbt` (qbt-tui), `dock` (lazydocker), `stack` (go to the repository), `health`, `stack-update`, `indexers`, `leaktest` and `drive-off`. The paths use `MEDIA_STACK_DIR`, default `~/homelab-media-stack`. [Terminal](../operations/terminal.md) covers the tools.
 
 - **File:** [`scripts/aliases.zsh`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/aliases.zsh)
 
@@ -654,20 +654,20 @@ Release tooling for this repository, not part of the server. Every change adds i
 
 - **File:** [`scripts/changelog.py`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/changelog.py)
 - **Subcommands:** `next <version-file>` prints the next version (nothing when `changelog.d/` is empty) and rejects a misnamed entry; `cut <version> <version-file>...` writes the entries into `CHANGELOG.md` under the version, deletes them, and writes the version into each JSON version file; `notes <version>` prints a released version's notes.
-- **Runs:** the release-pr and release GitHub workflows, `scripts/check`; by hand.
+- **Runs:** the release-pr and release GitHub workflows, `scripts/repo-check`; by hand.
 - **Changes:** `CHANGELOG.md`, `changelog.d/` and the version files, with `cut` only.
 - **Why:** one file per change, so two pull requests never edit the same lines of `CHANGELOG.md`.
 
-### check
+### repo-check
 
 Every check CI and releases run, each tool from a pinned container, so it needs only Docker and Python 3: Python syntax, shell syntax, shellcheck (warnings and up), ruff, the unit tests (`tests/` and the agent's), `docker compose config` against `.env.example` with every module, with none and with the GPU override, a gitleaks secret scan, a heading in these reference pages for every file in `scripts/` and `host/systemd/`, no em or en dashes in tracked files (the vendored Grafana dashboard excepted), every Mermaid diagram rendering, and a strict build of the documentation site. It prints the failed steps and exits 1 when any fails.
 
-- **File:** [`scripts/check`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/check)
+- **File:** [`scripts/repo-check`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/repo-check)
 - **Flags:** `--fast` skips rendering the diagrams and building the documentation site.
 - **Runs:** the CI workflow on pull requests and pushes to `main`, and before releases; by hand before you push.
 - **Root:** no.
 - **Changes:** nothing in the repository.
-- **Why:** on a kernel with 16 KiB memory pages, such as the Raspberry Pi 5's, ruff's arm64 build crashes on start, so `check` skips ruff there and says so; CI still runs it on every pull request.
+- **Why:** on a kernel with 16 KiB memory pages, such as the Raspberry Pi 5's, ruff's arm64 build crashes on start, so `repo-check` skips ruff there and says so; CI still runs it on every pull request.
 
 ## State files
 
@@ -675,14 +675,14 @@ What the scripts keep between runs. `$STATE` is the `state` folder next to `CONF
 
 | Path | Written by | Read by |
 |---|---|---|
-| `$STATE/updates`, `$STATE/updates.notified` | `check-updates`, `update` | `health-check`, `update` |
-| `$STATE/metrics/*.prom` | `check-updates`, `update`, `backup-config`, `sync-youtube.py` | node-exporter, `health-check` |
-| `$STATE/rollback/<service>` | `update` | `update --rollback` |
-| `$STATE/port-forward-missing-since`, `$STATE/port-forward-last-heal` | `sync-port` | `sync-port` |
-| `$STATE/throttle-by-script` | `throttle-downloads` | `throttle-downloads` |
-| `$STATE/watch-activity.json` | `watch-activity` | `watch-activity` |
+| `$STATE/updates`, `$STATE/updates.notified` | `stack-update-check`, `stack-update` | `stack-health`, `stack-update` |
+| `$STATE/metrics/*.prom` | `stack-update-check`, `stack-update`, `stack-backup`, `youtube-sync.py` | node-exporter, `stack-health` |
+| `$STATE/rollback/<service>` | `stack-update` | `stack-update --rollback` |
+| `$STATE/port-forward-missing-since`, `$STATE/port-forward-last-heal` | `vpn-port-sync` | `vpn-port-sync` |
+| `$STATE/throttle-by-script` | `downloads-throttle` | `downloads-throttle` |
+| `$STATE/watch-activity.json` | `activity-watch` | `activity-watch` |
 | `$STATE/venv` | `configure-uptime-kuma.py` | `configure-uptime-kuma.py` |
-| `$STORAGE_MOUNT/backups/restic` | `backup-config` | `update --rollback` |
-| `$STORAGE_MOUNT/backups/RESTIC_PASSWORD` | `backup-config` | `update --rollback`, `health-check` |
-| `/var/backups/arr-stack/restic` | `backup-config` | `health-check` |
-| `/var/lib/arr-backup/last-success` | `backup-config` | `health-check` |
+| `$STORAGE_MOUNT/backups/restic` | `stack-backup` | `stack-update --rollback` |
+| `$STORAGE_MOUNT/backups/RESTIC_PASSWORD` | `stack-backup` | `stack-update --rollback`, `stack-health` |
+| `/var/backups/arr-stack/restic` | `stack-backup` | `stack-health` |
+| `/var/lib/arr-backup/last-success` | `stack-backup` | `stack-health` |

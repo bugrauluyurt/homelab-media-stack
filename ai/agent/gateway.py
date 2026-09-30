@@ -106,7 +106,7 @@ def validate_config(config):
 
     expected = config.get("piVersion")
     if not expected or pi_version(config["piCli"]) != expected:
-        raise ValueError("Pi version changed: run install-agent and gateway --check before restarting")
+        raise ValueError("Pi version changed: run agent-install and gateway --check before restarting")
 
     if config.get("telegramVersion") != telegram_version(config["agentDir"]):
         raise ValueError("Telegram extension version changed: reinstall and check before restarting")

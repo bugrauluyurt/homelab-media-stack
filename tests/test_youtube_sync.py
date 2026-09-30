@@ -14,7 +14,7 @@ from unittest.mock import patch
 repo = Path(__file__).resolve().parents[1]
 config_dir = Path(tempfile.mkdtemp())
 
-spec = importlib.util.spec_from_file_location("sync_youtube", repo / "scripts/sync-youtube.py")
+spec = importlib.util.spec_from_file_location("sync_youtube", repo / "scripts/youtube-sync.py")
 sync = importlib.util.module_from_spec(spec)
 
 with patch.dict(sys.modules, {"stack_env": types.SimpleNamespace(

@@ -17,7 +17,7 @@ Each run then copies the snapshots to a second repository on the system disk,
 media drive dies. `docs/flows/backups.md` has the full picture.
 
 ```bash
-STACK=${MEDIA_STACK_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}; [ -x "$STACK/scripts/health-check" ] || STACK=~/homelab-media-stack
+STACK=${MEDIA_STACK_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}; [ -x "$STACK/scripts/stack-health" ] || STACK=~/homelab-media-stack
 ```
 
 ## Status (safe)
@@ -39,14 +39,14 @@ snapshots there with `restic copy`; a failure in either shows in the unit's log
 ## Take one now (safe, about a minute)
 
 ```bash
-sudo "$STACK/scripts/backup-config"            # or with a tag: backup-config pre-change
+sudo "$STACK/scripts/stack-backup"            # or with a tag: stack-backup pre-change
 ```
 
 It prints `snapshot <id>` at the end.
 
 ## Restore (only when the user explicitly asks, and after they say yes)
 
-- **An app changed by `update`:** `"$STACK/scripts/update" --rollback <service>` (restores its settings too)
+- **An app changed by `stack-update`:** `"$STACK/scripts/stack-update" --rollback <service>` (restores its settings too)
 - **Anything else:** restore into a temporary folder and show the user what differs
   before copying anything into `$CONFIG_ROOT`:
   ```bash

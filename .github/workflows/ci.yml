@@ -17,4 +17,4 @@ jobs:
         with:
           persist-credentials: false
 
-      - run: scripts/check
+      - run: scripts/repo-check

@@ -54,11 +54,11 @@ flowchart LR
 
 | From | Can reach | Enforced by |
 |---|---|---|
-| The home network (`LAN_CIDR`, `fe80::/10` and the network's IPv6 prefixes) | Jellyfin 8096, Seerr 5055 and the games page 8090 (IPv4 only), plus DHCP, mDNS, ICMP and Tailscale's own port. Everything else is dropped. | `scripts/firewall` |
+| The home network (`LAN_CIDR`, `fe80::/10` and the network's IPv6 prefixes) | Jellyfin 8096, Seerr 5055 and the games page 8090 (IPv4 only), plus DHCP, mDNS, ICMP and Tailscale's own port. Everything else is dropped. | `scripts/host-firewall` |
 | You, on the tailnet | Every port, including SSH | Tailscale policy: your login may reach everything |
 | Viewers, on the tailnet | Jellyfin 8096, Seerr 5055, Questarr 5000, the games page 8090, SFTP 2022 and Needle 4535; not Navidrome (Needle passes music through), not SSH | Tailscale policy: `group:viewers` |
-| The internet (a global IPv6 address, or a port forward on the router) | Tailscale's UDP 41641, mDNS, the DHCP client and ICMP only | `scripts/firewall` |
-| The server and its containers | The internet and the router; not other home devices, and not your tailnet devices | `scripts/firewall` (home devices), the `tag:media` tag (tailnet devices) |
+| The internet (a global IPv6 address, or a port forward on the router) | Tailscale's UDP 41641, mDNS, the DHCP client and ICMP only | `scripts/host-firewall` |
+| The server and its containers | The internet and the router; not other home devices, and not your tailnet devices | `scripts/host-firewall` (home devices), the `tag:media` tag (tailnet devices) |
 
 The reference policy is
 [`host/tailscale-policy.hujson`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/tailscale-policy.hujson);
@@ -80,7 +80,7 @@ before loosening either rule.
 
 ## The firewall
 
-`scripts/firewall` owns the host's packet filter for IPv4 (`iptables`) and IPv6
+`scripts/host-firewall` owns the host's packet filter for IPv4 (`iptables`) and IPv6
 (`ip6tables`). It installs three chains and hooks each into a built-in chain:
 
 | Chain | Hooked into | Covers |
@@ -130,9 +130,9 @@ computes the wanted rules, compares a hash stamped into `ARR-IN`, and rebuilds o
 differ (`+ iptables: rules rebuilt`, otherwise `= iptables: rules current`).
 
 ```bash
-sudo ~/homelab-media-stack/scripts/firewall status       # show the rules
-sudo ~/homelab-media-stack/scripts/firewall off          # remove them (the timer restores them within 15 minutes)
-~/homelab-media-stack/scripts/firewall home-ports        # the ports open to the home network
+sudo ~/homelab-media-stack/scripts/host-firewall status       # show the rules
+sudo ~/homelab-media-stack/scripts/host-firewall off          # remove them (the timer restores them within 15 minutes)
+~/homelab-media-stack/scripts/host-firewall home-ports        # the ports open to the home network
 ```
 
 **Guards.** The script refuses to apply, and says why, when:
@@ -159,7 +159,7 @@ locked down three ways:
 - **Keys only.** `host/sshd_config.d/10-arr-hardening.conf` turns off passwords, keyboard
   interactive login and root login. It is named to sort before Raspberry Pi OS's
   `50-cloud-init.conf`, which turns passwords back on, because `sshd` keeps the first value it
-  reads. `install-host` installs it and confirms it is active.
+  reads. `host-install` installs it and confirms it is active.
 - **Tailnet only.** Port 22 is not a home app, so the firewall drops it from the home network.
 - **Every key pinned.** Each line in `~/.ssh/authorized_keys` starts with a `from=` option
   naming where that key may be used from, so a leaked key is useless anywhere else. The
@@ -178,14 +178,14 @@ a keyboard and screen on the server.
 ## qBittorrent's web UI
 
 qBittorrent is login-free for the tailnet (`100.64.0.0/10`) and Docker (`172.16.0.0/12`), so
-Radarr and Sonarr reach it at `gluetun:8080` without storing a password. `scripts/sync-port`
+Radarr and Sonarr reach it at `gluetun:8080` without storing a password. `scripts/vpn-port-sync`
 sets exactly those two ranges on every run. Anyone else must log in, and the health check
 fails if a login-free range overlaps `LAN_CIDR`.
 
 Login-free access from the tailnet would let any web page open in a browser on a tailnet
 device send requests to it, so two checks stay on. CSRF protection refuses a request whose
 `Origin` or `Referer` is another site, and Host header validation refuses a request for a
-host name it does not know. `sync-port` keeps the accepted names current (`gluetun`,
+host name it does not know. `vpn-port-sync` keeps the accepted names current (`gluetun`,
 `127.0.0.1`, and the server's own names and IPv4 addresses). The health check sends a
 request with a foreign `Origin` and expects `401`. Dashboard links still work because
 Homepage and Glance send no `Referer`; browser extensions that send torrents are refused,
@@ -216,7 +216,7 @@ The games download page must never become a way to write to the server:
 
 - Every account may only `list` and `download`. FTP and WebDAV are refused per account, and
   the web client has uploads and shares switched off. Accounts are managed only through
-  `scripts/games_accounts.py`, which `configure-sftpgo.py` (yours) and `add-viewer.py`
+  `scripts/games_accounts.py`, which `configure-sftpgo.py` (yours) and `viewer-add.py`
   (viewers') call. Because every account is read-only, yours grants nothing a viewer's does not.
 - The game folders are mounted `read_only`, so even a flaw in SFTPGo cannot write to them.
 - The web admin is off, and so is the OpenAPI page. The admin account exists for the scripts
@@ -258,9 +258,9 @@ that the admin login is refused when tried from the server's tailnet address.
   registry). Most follow `:latest` or a major-version tag (`recyclarr:8`, `uptime-kuma:2`,
   `postgres:16-alpine`, `sftpgo:v2-alpine`, `needle:1`), not digests. Nothing is built
   locally unless you set `NEEDLE_IMAGE=needle:local`.
-- **Updates are reviewed, not automatic.** `check-updates` runs daily and notifies you;
-  `update` snapshots the settings, keeps the running images as rollback tags, pulls, recreates
-  and runs the health check, and `update --rollback` restores image and settings together
+- **Updates are reviewed, not automatic.** `stack-update-check` runs daily and notifies you;
+  `stack-update` snapshots the settings, keeps the running images as rollback tags, pulls, recreates
+  and runs the health check, and `stack-update --rollback` restores image and settings together
   ([Updates](flows/updates.md)).
 - **Needle's image** is published from its own repository with build provenance. Verify the
   image you run:

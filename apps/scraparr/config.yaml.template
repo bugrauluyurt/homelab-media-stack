@@ -1,6 +1,6 @@
 # Template only. scraparr has no env-var interpolation, so the rendered
 # file would contain live API keys - it is written to $CONFIG_ROOT
-# (outside this repo) by scripts/render-scraparr-config.
+# (outside this repo) by scripts/configure-scraparr.
 general:
   port: 7100
   # The arr APIs are not fast; keep this well under Prometheus' 60s interval.

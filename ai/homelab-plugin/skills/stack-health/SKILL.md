@@ -13,8 +13,8 @@ before running it, or check individual services instead.
 ## Run it
 
 ```bash
-STACK=${MEDIA_STACK_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}; [ -x "$STACK/scripts/health-check" ] || STACK=~/homelab-media-stack
-"$STACK/scripts/health-check"
+STACK=${MEDIA_STACK_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}; [ -x "$STACK/scripts/stack-health" ] || STACK=~/homelab-media-stack
+"$STACK/scripts/stack-health"
 ```
 
 It prints sections (STORAGE, SYSTEMD, SERVICES, BACKUPS, VPN, ...). Each line is
@@ -25,7 +25,7 @@ For history ("since when is it down?", "has it been flaky?"), the Uptime
 Kuma status page has every service's recent checks. Its JSON is at
 `http://127.0.0.1:3003/api/status-page/heartbeat/stack?t=<now>`; the `t`
 parameter avoids its 5-minute cache. Kuma also pushes DOWN/UP alerts to ntfy,
-and `arr-health.timer` runs `health-check --notify` every 6 hours, pushing any
+and `arr-health.timer` runs `stack-health --notify` every 6 hours, pushing any
 failure there too.
 
 ## Report
@@ -43,9 +43,9 @@ failure there too.
 | FAIL | Usual meaning |
 |---|---|
 | `<STORAGE_MOUNT> is mounted` | The media drive is off or unplugged; every other check depends on it |
-| `forwarded port is in sync` | The VPN reconnected with a new port. `scripts/sync-port` fixes it, and a 15-minute timer also does. If `sync-port` says "no valid forwarded port", Proton gave none: see "No forwarded port at all" in the known issues |
+| `forwarded port is in sync` | The VPN reconnected with a new port. `scripts/vpn-port-sync` fixes it, and a 15-minute timer also does. If `vpn-port-sync` says "no valid forwarded port", Proton gave none: see "No forwarded port at all" in the known issues |
 | `qbittorrent bound to the tunnel` | qBittorrent lost gluetun's network after gluetun restarted. `scripts/stack-up` re-attaches it |
 | `byparr ... healthy` | The Cloudflare solver's probe timed out while it was busy; usually clears by itself |
 | `last backup under 48h old` | The nightly backup was skipped, usually because the drive was off at 04:30 |
-| `firewall loaded ...` | The rules are missing, e.g. right after boot or a Docker restart. `arr-firewall.timer` restores them within 15 minutes; `sudo scripts/firewall` does it now |
-| `qbittorrent: home network must log in` | Someone re-added the LAN to qBittorrent's no-login list. The next `scripts/sync-port` run (every 15 minutes) removes it |
+| `firewall loaded ...` | The rules are missing, e.g. right after boot or a Docker restart. `arr-firewall.timer` restores them within 15 minutes; `sudo scripts/host-firewall` does it now |
+| `qbittorrent: home network must log in` | Someone re-added the LAN to qBittorrent's no-login list. The next `scripts/vpn-port-sync` run (every 15 minutes) removes it |

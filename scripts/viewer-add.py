@@ -3,7 +3,7 @@
 login to the games download page (SFTPGo) and a Navidrome account for music in Needle,
 all with the same password.
 
-  add-viewer.py NAME [--auto-approve] [--music-requests] [--spotify]
+  viewer-add.py NAME [--auto-approve] [--music-requests] [--spotify]
                                           asks for the password (or reads it from stdin)
 
 The account watches and listens to everything but can't manage the servers or delete

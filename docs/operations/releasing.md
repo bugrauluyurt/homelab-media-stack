@@ -19,7 +19,7 @@ conflict with a pull request still open. The headings decide the next version, f
 | `fixed` or `security` | Patch (`1.4.2` to `1.4.3`) | A bug fix or a security fix |
 
 The highest bump present wins: one `.removed.md` among ten `.fixed.md` files makes a major
-release. A misnamed file, or one whose entry isn't a `- ` bullet, fails `scripts/check` and so
+release. A misnamed file, or one whose entry isn't a `- ` bullet, fails `scripts/repo-check` and so
 the pull request. The current version is the `version` field of `ai/homelab-plugin/plugin.json`.
 
 ```text
@@ -55,7 +55,7 @@ flowchart TD
     push --> rel["release workflow"]
     rel --> tag{"Tag vX.Y.Z already exists?"}
     tag -->|yes| skip["Nothing to release"]
-    tag -->|no| checks["Checks: scripts/check"]
+    tag -->|no| checks["Checks: scripts/repo-check"]
     checks --> draft["Draft release with the notes, the source archive and its signed provenance"]
     draft --> publish["Publish: the tag and assets are locked and an attestation signed"]
 ```
@@ -70,7 +70,7 @@ On every push to `main`, two workflows run:
    pull request the workflow's own token opened until a maintainer approves the run.
 2. **release** (`.github/workflows/release.yml`) reads the version from `plugin.json`. If the
    tag `vX.Y.Z` already exists, there is nothing new and it stops; that is the case for every
-   ordinary push. Otherwise it runs the full checks (`scripts/check`, the same as CI), creates a
+   ordinary push. Otherwise it runs the full checks (`scripts/repo-check`, the same as CI), creates a
    **draft** release titled "homelab-media-stack X.Y.Z" with the changelog notes, attaches the
    source archive `homelab-media-stack-X.Y.Z.tar.gz` and its signed build provenance
    (`.intoto.jsonl`, the attestation that names this workflow and commit), then publishes it as

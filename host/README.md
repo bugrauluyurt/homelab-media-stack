@@ -1,6 +1,6 @@
 # Host files
 
-Files for the machines themselves, outside Docker. `scripts/install-host` installs the first two:
+Files for the machines themselves, outside Docker. `scripts/host-install` installs the first two:
 
 - `systemd/`: the unit, timer and udev templates, filled in from `.env` and installed into
   `/etc/systemd/system` and `/etc/udev/rules.d`. Each one has an entry in

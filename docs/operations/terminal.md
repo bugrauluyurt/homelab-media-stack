@@ -10,11 +10,11 @@ them in zsh or bash.
 
 | Alias | Runs | For |
 |---|---|---|
-| `health` | `scripts/health-check` | One-shot status of the whole stack ([Troubleshooting](../troubleshooting.md)) |
-| `update` | `scripts/update` | Snapshot, update, health check; `update --rollback <service>` ([Updates](../flows/updates.md)) |
-| `leaktest` | `scripts/leak-test` | Proves torrent traffic exits through the VPN ([VPN and ports](../flows/vpn-and-ports.md)) |
-| `indexers` | `scripts/check-indexers` | Which indexers work ([Indexers](indexers.md#testing-indexers-check-indexers)) |
-| `storage-off` | `scripts/storage-off` | Stops the stack and unmounts the media drive before you switch it off ([Storage and boot](../flows/storage-and-boot.md)) |
+| `health` | `scripts/stack-health` | One-shot status of the whole stack ([Troubleshooting](../troubleshooting.md)) |
+| `update` | `scripts/stack-update` | Snapshot, update, health check; `update --rollback <service>` ([Updates](../flows/updates.md)) |
+| `leaktest` | `scripts/vpn-leak-test` | Proves torrent traffic exits through the VPN ([VPN and ports](../flows/vpn-and-ports.md)) |
+| `indexers` | `scripts/indexers-check` | Which indexers work ([Indexers](indexers.md#testing-indexers-check-indexers)) |
+| `drive-off` | `scripts/drive-off` | Stops the stack and unmounts the media drive before you switch it off ([Storage and boot](../flows/storage-and-boot.md)) |
 | `stack` | `cd $MEDIA_STACK_DIR` | Jump to the repository |
 | `qbt` | qbt-tui | What is downloading: torrents, speed, peers, progress |
 | `arr` | managarr | Radarr, Sonarr and Lidarr: library, queue, history, blocklist |
@@ -47,7 +47,7 @@ A live list of every torrent: name, progress, speed, seeds and peers, time left.
 `Enter` shows details (files, trackers, peers), `q` quits.
 
 It talks to qBittorrent's API on `127.0.0.1:8080` and needs no login: requests from the Docker
-network and the tailnet skip it, while the home network must always log in. `sync-port` keeps
+network and the tailnet skip it, while the home network must always log in. `vpn-port-sync` keeps
 that setting in place.
 
 ### arr: Radarr, Sonarr and Lidarr

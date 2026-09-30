@@ -52,7 +52,7 @@ The page is SFTPGo, set up read-only: nobody can upload, rename, delete or share
 | Anywhere, over Tailscale | `http://<tailscale-ip>:8090` |
 
 Log in with your games login: the owner's is `GAMES_USER` / `GAMES_PASSWORD` from `.env`, and
-viewers get their own from `add-viewer.py` (the same password as their Jellyfin one). The page
+viewers get their own from `viewer-add.py` (the same password as their Jellyfin one). The page
 shows two folders, *Torrent* and *Usenet*.
 
 - **One file:** click it to download.

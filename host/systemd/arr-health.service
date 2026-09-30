@@ -8,4 +8,4 @@ After=arr-stack.service
 Type=oneshot
 User=@STACK_USER@
 Group=@STACK_GROUP@
-ExecStart=@REPO@/scripts/health-check --notify
+ExecStart=@REPO@/scripts/stack-health --notify

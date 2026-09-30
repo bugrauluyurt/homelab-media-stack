@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 
 
-path = Path(__file__).resolve().parents[1] / "scripts/firewall"
+path = Path(__file__).resolve().parents[1] / "scripts/host-firewall"
 loader = importlib.machinery.SourceFileLoader("firewall", str(path))
 firewall = importlib.util.module_from_spec(importlib.util.spec_from_loader("firewall", loader))
 

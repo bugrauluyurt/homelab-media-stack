@@ -19,7 +19,7 @@ for service in json.load(sys.stdin)["services"].values():
             print(volume["source"])' | xargs -r mkdir -p
 
 # Seed any missing YouTube list from the pinned channels, and an empty video row until the first sync.
-"$REPO/scripts/sync-youtube.py" --offline
+"$REPO/scripts/youtube-sync.py" --offline
 
 docker compose up -d --remove-orphans
 rc=$?
@@ -40,7 +40,7 @@ fi
 # After a boot qBittorrent starts on a stale forwarded port; sync now rather than wait for the timer.
 if docker compose ps --status running --format '{{.Service}}' | grep -qx gluetun; then
   if wait_gluetun_healthy 120; then
-    "$REPO/scripts/sync-port" || echo "WARN: port sync failed; the timer will retry."
+    "$REPO/scripts/vpn-port-sync" || echo "WARN: port sync failed; the timer will retry."
   else
     echo "WARN: VPN is not healthy; the port-sync timer will restore downloaders after recovery."
   fi

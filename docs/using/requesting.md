@@ -14,7 +14,7 @@ Open **Seerr**:
 | At home, on the home network | `http://<lan-ip>:5055` |
 
 Sign in with your Jellyfin account. The owner uses `JELLYFIN_USER` / `JELLYFIN_PASSWORD` from
-`.env`; everyone else gets an account from `add-viewer.py` (see [Giving someone access](../flows/viewers.md)).
+`.env`; everyone else gets an account from `viewer-add.py` (see [Giving someone access](../flows/viewers.md)).
 Seerr works the same in a phone's browser, which is handy for requesting from the sofa.
 
 You can also request without leaving Jellyfin: its search shows Seerr results with a request
@@ -65,7 +65,7 @@ stateDiagram-v2
 ```
 
 - **Approval.** The owner's requests go straight through. A viewer's request waits for the
-  owner's approval, unless the viewer was added with `add-viewer.py --auto-approve` or given
+  owner's approval, unless the viewer was added with `viewer-add.py --auto-approve` or given
   Auto-Approve in Seerr → Users.
 - **Search and download.** Seerr hands the request to Radarr (movies) or Sonarr (series). They ask
   Prowlarr to search every indexer, pick the best release that fits the quality rules, and send
@@ -141,7 +141,7 @@ A few details of the rules:
 
 In qBittorrent, the turtle icon means the automatic 20 MB/s download cap is on: someone is
 watching, or the server is busy. It lifts by itself once nobody watches and the load drops
-(`throttle-downloads`, every minute). Uploads are always capped at 10 Mbps, turtle or not.
+(`downloads-throttle`, every minute). Uploads are always capped at 10 Mbps, turtle or not.
 
 ## For the owner: asking Radarr or Sonarr directly
 

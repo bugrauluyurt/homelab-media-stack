@@ -222,5 +222,5 @@ def main(extra_tags):
 
 
 if __name__ == "__main__":
-    # Optional extra restic tags, e.g. `backup-config pre-update` from scripts/update.
+    # Optional extra restic tags, e.g. `stack-backup pre-update` from scripts/stack-update.
     main(sys.argv[1:])

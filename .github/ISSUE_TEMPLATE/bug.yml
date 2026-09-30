@@ -44,6 +44,6 @@ body:
   - type: textarea
     id: health
     attributes:
-      label: scripts/health-check output
+      label: scripts/stack-health output
       description: Remove host names and anything else private first. It never prints secrets.
       render: text

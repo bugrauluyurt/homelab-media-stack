@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Update stack services safely: take a settings snapshot, keep the running
-# images as <repo>:rollback-<stamp>, pull and recreate, then run health-check.
+# images as <repo>:rollback-<stamp>, pull and recreate, then run stack-health.
 #
-#   update                        every service check-updates found an update for
+#   update                        every service stack-update-check found an update for
 #   update jellyfin sonarr        just these services
 #   update --rollback jellyfin    previous image AND its settings from the pre-update snapshot
 #   update --rollback jellyfin --image-only
@@ -104,7 +104,7 @@ else
   mapfile -t pending_images < <(awk '$1=="update"{print $2}' "$UPDATES" 2>/dev/null)
   read -r -a services <<< "$(services_using "${pending_images[@]}")"
 fi
-[ ${#services[@]} -gt 0 ] || { echo "Nothing to update (per the last check-updates run)."; exit 0; }
+[ ${#services[@]} -gt 0 ] || { echo "Nothing to update (per the last stack-update-check run)."; exit 0; }
 
 echo "Updating:"
 for svc in "${services[@]}"; do
@@ -113,7 +113,7 @@ for svc in "${services[@]}"; do
 done
 
 echo "[1/4] settings snapshot"
-out=$(sudo "$REPO/scripts/backup-config" pre-update 2>&1) || { echo "$out" | tail -5; echo "backup failed - not updating"; exit 1; }
+out=$(sudo "$REPO/scripts/stack-backup" pre-update 2>&1) || { echo "$out" | tail -5; echo "backup failed - not updating"; exit 1; }
 snapshot=$(sed -n 's/^snapshot //p' <<< "$out")
 [ -n "$snapshot" ] || { echo "$out"; echo "no snapshot taken (is the drive mounted?) - not updating"; exit 1; }
 echo "  snapshot $snapshot"
@@ -145,12 +145,12 @@ recreate=("${services[@]}")
 # qBittorrent and slskd share gluetun's network namespace and lose it when gluetun is recreated.
 [[ " ${services[*]} " == *" gluetun "* ]] && recreate+=(qbittorrent) && { ! service_enabled slskd || recreate+=(slskd); }
 docker compose up -d "${recreate[@]}" || {
-  notify "media stack: update failed" warning "Recreating ${services[*]} failed. Check with scripts/health-check; roll back with scripts/update --rollback <service>."
+  notify "media stack: update failed" warning "Recreating ${services[*]} failed. Check with scripts/stack-health; roll back with scripts/stack-update --rollback <service>."
   echo "recreate failed - roll back with: update --rollback <service>"; exit 1; }
 
 if [[ " ${recreate[*]} " == *" gluetun "* ]]; then
   if wait_gluetun_healthy; then
-    "$REPO/scripts/sync-port" || echo "WARN: port sync failed; the timer will retry."
+    "$REPO/scripts/vpn-port-sync" || echo "WARN: port sync failed; the timer will retry."
   else
     echo "WARN: VPN is not healthy; the port-sync timer will restore downloaders after recovery."
   fi
@@ -163,13 +163,13 @@ write_update_metrics
 
 echo "[4/4] health check"
 # Freshly recreated apps can take a minute to answer, so retry once quietly before failing.
-"$REPO/scripts/health-check" >/dev/null 2>&1 || {
+"$REPO/scripts/stack-health" >/dev/null 2>&1 || {
   timeout 120 bash -c "until docker compose ps --format '{{.Health}}' ${services[*]} | grep -qv starting; do sleep 5; done"
   sleep 30
 }
-"$REPO/scripts/health-check" && exit 0
+"$REPO/scripts/stack-health" && exit 0
 
-notify "media stack: health check failed after update" warning "Updated ${services[*]}, then scripts/health-check failed. Roll back with scripts/update --rollback <service>."
+notify "media stack: health check failed after update" warning "Updated ${services[*]}, then scripts/stack-health failed. Roll back with scripts/stack-update --rollback <service>."
 echo
 echo "Health check failed. To undo:  update --rollback <service>   (restores its settings too; --image-only to keep them)"
 exit 1

@@ -6,9 +6,9 @@ apps/glance/youtube-channels.json (or your private copy in $CONFIG_ROOT/glance/)
 Then writes each tab's latest uploads to $CONFIG_ROOT/glance/youtube/<tab>.json, which
 Glance renders; a channel that fails keeps its previous videos.
 
-  sync-youtube.py            sync lists and videos (the hourly arr-youtube timer)
-  sync-youtube.py --login    one-time sign-in; stores YOUTUBE_REFRESH_TOKEN in .env
-  sync-youtube.py --offline  write missing lists from the pinned channels and empty rows (stack-up)
+  youtube-sync.py            sync lists and videos (the hourly arr-youtube timer)
+  youtube-sync.py --login    one-time sign-in; stores YOUTUBE_REFRESH_TOKEN in .env
+  youtube-sync.py --offline  write missing lists from the pinned channels and empty rows (stack-up)
 """
 import json
 import re
@@ -249,7 +249,7 @@ def main():
             print(f"  synced from {len(subs)} subscriptions")
         else:
             print("  ~ not signed in to YouTube; the pinned lists stay and videos come from its RSS feed "
-                  "(run scripts/sync-youtube.py --login)")
+                  "(run scripts/youtube-sync.py --login)")
 
         write_feeds(token)
 

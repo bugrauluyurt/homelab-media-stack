@@ -23,4 +23,4 @@ changelog.d/uptime-kuma-recreated.fixed.md
 ```
 
 `python3 scripts/changelog.py next ai/homelab-plugin/plugin.json` prints the version these files
-would release and rejects a misnamed file; `scripts/check` runs it on every pull request.
+would release and rejects a misnamed file; `scripts/repo-check` runs it on every pull request.

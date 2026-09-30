@@ -92,8 +92,8 @@ How it works, and what to know when you change it:
   pinned YouTube channels ship as generic examples; replace them with your own. Keep your pins out
   of the repository by copying `apps/glance/youtube-channels.json` to `$CONFIG_ROOT/glance/`: when that
   copy exists, the sync reads it instead.
-- **Pending updates and the last backup** reach Glance through Prometheus: `check-updates`,
-  `update` and `backup-config` write them as metrics, which node-exporter exports, so Grafana has
+- **Pending updates and the last backup** reach Glance through Prometheus: `stack-update-check`,
+  `stack-update` and `stack-backup` write them as metrics, which node-exporter exports, so Grafana has
   their history too.
 - **Container states** come through the read-only socket proxy. Glance has no login, so it stays
   tailnet-only like everything here.
@@ -104,7 +104,7 @@ To open Glance's Lab page in every new Chrome tab, with the cursor in its search
 ### YouTube rows follow your subscriptions
 
 The Tech, Gaming and Markets video rows show the latest uploads of a list of channels per tab.
-Every hour (`arr-youtube.timer`) `sync-youtube.py` writes the lists to
+Every hour (`arr-youtube.timer`) `youtube-sync.py` writes the lists to
 `$CONFIG_ROOT/glance/youtube-*.yml` and each tab's newest 25 videos to
 `$CONFIG_ROOT/glance/youtube/<tab>.json`, which Glance reads from `/assets/youtube/` and draws like
 its own videos widget. The sync reads your subscriptions, most relevant first, keeps the **pinned** channels in
@@ -126,12 +126,12 @@ One-time setup:
    which is fine for your own account.
 3. **Clients → Create client → TVs and Limited Input devices.** Put its ID and secret in `.env` as
    `YOUTUBE_CLIENT_ID` / `YOUTUBE_CLIENT_SECRET`.
-4. Run `scripts/sync-youtube.py --login`, open the address it prints on any device and enter the
+4. Run `scripts/youtube-sync.py --login`, open the address it prints on any device and enter the
    code. Google warns that the app is unverified: **Advanced → continue**. Access is read-only,
    and the script stores the refresh token in `.env` itself.
-5. Run `scripts/sync-youtube.py` to sync at once; the timer does it hourly after that.
+5. Run `scripts/youtube-sync.py` to sync at once; the timer does it hourly after that.
 
-`health-check` fails if the rows haven't synced in a day.
+`stack-health` fails if the rows haven't synced in a day.
 
 ## Grafana
 
@@ -156,7 +156,7 @@ is in [Monitoring](../flows/monitoring.md).
 The status page, `http://<tailscale-ip>:3003/status/stack`, shows every service's recent checks;
 it is also the Uptime Kuma tile on Homepage. Kuma checks every service once a minute and pushes
 **DOWN** and **UP** alerts to your phone through ntfy. It is the always-on watcher that tells you
-*when* something broke; `health-check` is the deep check you run on demand. What it watches and
+*when* something broke; `stack-health` is the deep check you run on demand. What it watches and
 how the alerts flow: [Monitoring](../flows/monitoring.md).
 
 ## Dozzle
@@ -172,7 +172,7 @@ proxy refuses writes anyway. `configure-dozzle.py` applies the login from `.env`
 `http://<tailscale-ip>:3006` keeps the media drive's SMART attributes, temperature and health over
 time, collected every six hours. `STORAGE_DEVICE` in `.env` names the drive (default `/dev/sda`);
 behind a USB enclosure it reads through the bridge with the `sat` device type
-(`apps/scrutiny/collector.yaml`). Alerts still come from `health-check`, which checks SMART every 6
+(`apps/scrutiny/collector.yaml`). Alerts still come from `stack-health`, which checks SMART every 6
 hours; Scrutiny is for the history. Its metrics database is left out of backups.
 
 ## ChangeDetection.io
@@ -217,5 +217,5 @@ while and keep the one you prefer.
 - `configure-jellydash.py` creates its own Jellyfin API key (stored in `.env`), sets the admin
   login and adds both download clients. JellyDash normally insists on 8-character passwords; the
   script writes the `.env` password as a hash, so a shorter one works.
-- The project is young and releases often. If an update misbehaves, `update --rollback jellydash`
+- The project is young and releases often. If an update misbehaves, `stack-update --rollback jellydash`
   ([Updates](../flows/updates.md)).

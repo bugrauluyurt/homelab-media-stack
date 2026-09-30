@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Block commits that contain credentials or scripts that don't parse; scripts/check runs gitleaks for the rest.
+# Block commits that contain credentials or scripts that don't parse; scripts/repo-check runs gitleaks for the rest.
 # Enable with: git config core.hooksPath .githooks
 
 set -uo pipefail

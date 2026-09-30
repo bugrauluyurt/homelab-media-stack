@@ -75,7 +75,7 @@ FIREWALL_EVERY=$(sed -n 's/^OnUnitActiveSec=//p' "$REPO/host/systemd/arr-firewal
 chk "firewall re-applied at boot + every $FIREWALL_EVERY" "systemctl is-enabled -q arr-firewall.service && systemctl is-enabled -q arr-firewall.timer"
 
 # Exactly the firewall's HOME_APPS are open to the home network, only to home sources; all else drops.
-HOME_PORTS=$("$REPO/scripts/firewall" home-ports)
+HOME_PORTS=$("$REPO/scripts/host-firewall" home-ports)
 home_ports_ok() {
   local ipt
   for ipt in iptables ip6tables; do
@@ -178,7 +178,7 @@ chk "cleanuparr has no media mount"   "! docker inspect -f '{{range .Mounts}}{{.
 chk "intro skipper plugin removed"    "! docker exec jellyfin sh -c 'ls /config/data/plugins' | grep -qi 'Intro Skipper'"
 
 echo "INDEXERS"
-chk "prowlarr has working indexers"      "test \$(./scripts/check-indexers 2>/dev/null | grep -c ' PASS ') -ge 1"
+chk "prowlarr has working indexers"      "test \$(./scripts/indexers-check 2>/dev/null | grep -c ' PASS ') -ge 1"
 # Byparr's /health launches a real browser (15 to 20s), so read its container healthcheck instead.
 chk "byparr (cloudflare solver) healthy" "test \"\$(docker inspect -f '{{.State.Health.Status}}' byparr 2>/dev/null)\" = healthy"
 
@@ -207,9 +207,9 @@ qbit_on_tunnel() {
   [ -n "$ip" ] && [ -n "$port" ] && docker exec gluetun sh -c "netstat -tuln | grep -q ' $ip:$port '"
 }
 chk "qbittorrent bound to the tunnel"    "qbit_on_tunnel"
-# throttle-downloads switches on qBittorrent's alternative limit; at the 10 KiB/s default it would stall downloads.
+# downloads-throttle switches on qBittorrent's alternative limit; at the 10 KiB/s default it would stall downloads.
 chk "qbittorrent throttle cap set (not the 10 KiB/s default)" "[ \"\$(qbit_prefs | json_get alt_dl_limit)\" -ge 1000000 ]"
-read -r UPLOAD_MBIT UPLOAD_CAP < <("$REPO/scripts/throttle-downloads" --upload-cap)
+read -r UPLOAD_MBIT UPLOAD_CAP < <("$REPO/scripts/downloads-throttle" --upload-cap)
 chk "qbittorrent upload capped at $UPLOAD_MBIT Mbps in both modes" "[ \"\$(qbit_prefs | json_get up_limit)\" -eq $UPLOAD_CAP ] && [ \"\$(qbit_prefs | json_get alt_up_limit)\" -eq $UPLOAD_CAP ]"
 chk "forwarded port is in sync"          "test \"\$(forwarded_port)\" = \"\$(qbit_prefs | json_get listen_port)\""
 
@@ -232,7 +232,7 @@ echo "  $pass passed, $fail failed"
 if [ "$fail" -gt 0 ] && [ "${1:-}" = "--notify" ]; then
   notify "media stack: $fail health check(s) failing" warning "$(printf '%s\n' "${failed[@]}")
 
-Run scripts/health-check for details."
+Run scripts/stack-health for details."
 fi
 
 [ "$fail" -eq 0 ]

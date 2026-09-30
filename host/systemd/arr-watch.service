@@ -8,4 +8,4 @@ After=arr-stack.service
 Type=oneshot
 User=@STACK_USER@
 Group=@STACK_GROUP@
-ExecStart=@REPO@/scripts/watch-activity
+ExecStart=@REPO@/scripts/activity-watch

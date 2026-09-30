@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Every check CI and releases run: syntax, lint, tests, compose, secrets, diagrams, docs, style.
 # Needs only Docker and Python 3; each tool runs from a pinned container.
-#   scripts/check           everything
-#   scripts/check --fast    skip rendering the diagrams and building the docs site
+#   scripts/repo-check           everything
+#   scripts/repo-check --fast    skip rendering the diagrams and building the docs site
 
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1

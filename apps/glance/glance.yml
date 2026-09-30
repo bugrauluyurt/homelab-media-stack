@@ -314,7 +314,7 @@ pages:
                 limit: 20
                 collapse-after: 5
 
-          # Latest uploads written hourly by scripts/sync-youtube.py (YouTube's RSS feed is unreliable),
+          # Latest uploads written hourly by scripts/youtube-sync.py (YouTube's RSS feed is unreliable),
           # in the markup of Glance's own videos widget.
           - &youtube
             type: custom-api

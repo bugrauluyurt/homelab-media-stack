@@ -3,4 +3,4 @@ Description=Push a failure notice for %i to ntfy
 
 [Service]
 Type=oneshot
-ExecStart=@REPO@/scripts/notify-failure %i
+ExecStart=@REPO@/scripts/stack-failure-notify %i

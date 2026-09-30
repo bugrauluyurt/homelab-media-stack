@@ -25,7 +25,7 @@ stateDiagram-v2
   Mounted --> Starting: the mount unit wants arr-stack.service
   Starting --> Running: core services up
   Starting --> Mounted: a core service missing, the unit fails
-  Running --> Stopped: storage-off stops arr-stack.service
+  Running --> Stopped: drive-off stops arr-stack.service
   Stopped --> Stopped: still busy, lists what holds it
   Stopped --> Unmounted: sync, then umount
   Unmounted --> SpunDown: hdparm -Y on the disk behind the mount
@@ -61,7 +61,7 @@ stateDiagram-v2
 
 ### Switching it off
 
-Run [`storage-off`](../reference/scripts.md#storage-off) **first**, then flip the switch. Cutting
+Run [`drive-off`](../reference/scripts.md#drive-off) **first**, then flip the switch. Cutting
 power to a mounted filesystem risks losing data and a journal recovery on the next mount. In order,
 it:
 
@@ -75,7 +75,7 @@ it:
 6. Stops there if the mount is on the system disk: that disk is never spun down.
 7. Spins the drive down with `hdparm -Y`, then tells you it is safe to switch off.
 
-If the power goes without `storage-off`, `BindsTo=` still stops the stack, but only after the
+If the power goes without `drive-off`, `BindsTo=` still stops the stack, but only after the
 drive has gone, so writes in flight can be lost.
 
 ### The empty mount point
@@ -93,12 +93,12 @@ While the drive is off, nothing may land on the system disk in its place:
 
 If your media disk is always connected, leave `STORAGE_UUID` empty:
 
-- [`install-host`](../reference/scripts.md#install-host) then skips the udev rule (and removes one
+- [`host-install`](../reference/scripts.md#host-install) then skips the udev rule (and removes one
   installed earlier): there is nothing to hot-plug.
 - `/etc/fstab` mounts the disk at boot. On a single-disk machine, bind-mount a folder instead
   (`/srv/media /mnt/storage none bind 0 0`); `STORAGE_MOUNT` must still be a real mount point.
 - `arr-stack.service` starts at boot through `multi-user.target` and is still bound to the mount.
-- `storage-off` still stops the stack and unmounts, and never spins down the system disk.
+- `drive-off` still stops the stack and unmounts, and never spins down the system disk.
 
 `STORAGE_DEVICE` (the whole disk, ideally a `/dev/disk/by-id/` path) tells Scrutiny which disk to
 read SMART data from. The keys are in [Configuration](../reference/configuration.md#storage_uuid).
@@ -109,7 +109,7 @@ read SMART data from. The keys are in [Configuration](../reference/configuration
 flowchart TD
   mount{"STORAGE_MOUNT mounted?"} -->|no| fatal1["FATAL, exit 1"]
   mount -->|yes| metrics["Create the state/metrics folder"]
-  metrics --> youtube["sync-youtube.py --offline"]
+  metrics --> youtube["youtube-sync.py --offline"]
   youtube --> up["docker compose up -d --remove-orphans"]
   up --> core{"Core services running?"}
   core -->|no| fatal2["FATAL, exit 1"]
@@ -117,7 +117,7 @@ flowchart TD
   gluetun -->|yes| wait["Wait up to 120 s for it to be healthy"]
   wait --> attached{"qBittorrent and slskd answer?"}
   attached -->|no| reattach["Recreate them in gluetun's network"]
-  attached -->|yes| sync["sync-port"]
+  attached -->|yes| sync["vpn-port-sync"]
   reattach --> sync
   sync --> dozzle{"Dozzle failed to list containers?"}
   gluetun -->|no| dozzle
@@ -129,7 +129,7 @@ flowchart TD
 1. **Refuses to start without the drive** (`mountpoint -q "$STORAGE_MOUNT"`).
 2. **Creates `$STATE_ROOT/metrics`** as the stack user, before Docker would create it as root for
    node-exporter.
-3. **Seeds Glance's YouTube lists** (`sync-youtube.py --offline`), and an empty video row per tab
+3. **Seeds Glance's YouTube lists** (`youtube-sync.py --offline`), and an empty video row per tab
    until the first hourly sync.
 4. **Starts every container** in the active profiles (`docker compose up -d --remove-orphans`).
 5. **Checks the core library services** are running: Prowlarr, Radarr, Sonarr, Lidarr, Bazarr,
@@ -137,7 +137,7 @@ flowchart TD
    The VPN pair is allowed to be down: gluetun retries on its own, and a VPN-only failure must not
    fail the unit, or systemd would mark it failed and the drive binding would stop working.
 6. **Settles the VPN** if gluetun is running: waits up to 120 seconds for it to be healthy,
-   recreates qBittorrent and slskd if they don't answer, and runs `sync-port`, because after a
+   recreates qBittorrent and slskd if they don't answer, and runs `vpn-port-sync`, because after a
    boot qBittorrent starts on a stale forwarded port (see [VPN and ports](vpn-and-ports.md)). A
    failed sync is only a warning; the timer retries.
 7. **Restarts Dozzle** if its log since start says "failed to list containers": Dozzle lists
@@ -162,14 +162,14 @@ Nothing needs starting by hand:
 
 | Timer | When (from `host/systemd/`) | Runs | Skipped while the drive is off |
 |---|---|---|---|
-| [`arr-firewall.timer`](../reference/systemd.md#arr-firewalltimer) | `OnBootSec=30sec`, then `OnUnitActiveSec=15min` | `firewall` (rebuilds only when the rules changed) | no |
-| [`arr-port-sync.timer`](../reference/systemd.md#arr-port-synctimer) | `OnBootSec=90sec`, then `OnUnitActiveSec=15min` | `sync-port` | no: the run fails, without an alert |
-| [`arr-throttle.timer`](../reference/systemd.md#arr-throttletimer) | `OnBootSec=3min`, then `OnUnitActiveSec=1min` | `throttle-downloads` | yes |
-| [`arr-watch.timer`](../reference/systemd.md#arr-watchtimer) | `OnBootSec=3min`, then `OnUnitActiveSec=1min` | `watch-activity` | yes |
-| [`arr-health.timer`](../reference/systemd.md#arr-healthtimer) | `OnCalendar=00/6:20` (00:20, 06:20, 12:20, 18:20), up to 10 min later | `health-check --notify` | yes |
-| [`arr-backup.timer`](../reference/systemd.md#arr-backuptimer) | `OnCalendar=*-*-* 04:30:00`, up to 15 min later | `backup-config` | yes |
-| [`arr-updates.timer`](../reference/systemd.md#arr-updatestimer) | `OnCalendar=*-*-* 06:00:00`, up to 30 min later | `check-updates` | no |
-| [`arr-youtube.timer`](../reference/systemd.md#arr-youtubetimer) | `OnCalendar=hourly`, up to 10 min later | `sync-youtube.py` | no |
+| [`arr-firewall.timer`](../reference/systemd.md#arr-firewalltimer) | `OnBootSec=30sec`, then `OnUnitActiveSec=15min` | `host-firewall` (rebuilds only when the rules changed) | no |
+| [`arr-port-sync.timer`](../reference/systemd.md#arr-port-synctimer) | `OnBootSec=90sec`, then `OnUnitActiveSec=15min` | `vpn-port-sync` | no: the run fails, without an alert |
+| [`arr-throttle.timer`](../reference/systemd.md#arr-throttletimer) | `OnBootSec=3min`, then `OnUnitActiveSec=1min` | `downloads-throttle` | yes |
+| [`arr-watch.timer`](../reference/systemd.md#arr-watchtimer) | `OnBootSec=3min`, then `OnUnitActiveSec=1min` | `activity-watch` | yes |
+| [`arr-health.timer`](../reference/systemd.md#arr-healthtimer) | `OnCalendar=00/6:20` (00:20, 06:20, 12:20, 18:20), up to 10 min later | `stack-health --notify` | yes |
+| [`arr-backup.timer`](../reference/systemd.md#arr-backuptimer) | `OnCalendar=*-*-* 04:30:00`, up to 15 min later | `stack-backup` | yes |
+| [`arr-updates.timer`](../reference/systemd.md#arr-updatestimer) | `OnCalendar=*-*-* 06:00:00`, up to 30 min later | `stack-update-check` | no |
+| [`arr-youtube.timer`](../reference/systemd.md#arr-youtubetimer) | `OnCalendar=hourly`, up to 10 min later | `youtube-sync.py` | no |
 
 - "Up to N min later" is `RandomizedDelaySec`. The throttle and watch timers use `AccuracySec=10s`
   so they really run every minute.
@@ -189,7 +189,7 @@ What each timer's job does is in [Monitoring](monitoring.md), [Backups](backups.
 ### Installing the units
 
 The files in [`host/systemd/`](https://github.com/bugrauluyurt/homelab-media-stack/tree/main/host/systemd)
-are templates. [`install-host`](../reference/scripts.md#install-host) fills in `@REPO@`,
+are templates. [`host-install`](../reference/scripts.md#host-install) fills in `@REPO@`,
 `@STACK_USER@`, `@STACK_GROUP@`, `@STORAGE_UUID@`, `@STORAGE_MOUNT@` and `@STORAGE_UNIT@` from
 `.env`, installs units into `/etc/systemd/system` and the udev rule into `/etc/udev/rules.d`, and
 reloads both. It enables nothing: a new unit needs `sudo systemctl enable --now <unit>` once (the
@@ -203,8 +203,8 @@ list is in [Getting started](../getting-started.md)). Check them with
 | `99-arr-storage.rules` | Asks for the mount unit when the drive with `STORAGE_UUID` appears | [systemd](../reference/systemd.md#99-arr-storagerules) |
 | `arr-stack.service` | Starts the stack with the drive, stops it without | [systemd](../reference/systemd.md#arr-stackservice) |
 | `stack-up` | Starts the containers and settles the VPN | [scripts](../reference/scripts.md#stack-up) |
-| `storage-off` | Stops, unmounts and spins the drive down | [scripts](../reference/scripts.md#storage-off) |
-| `install-host` | Renders and installs the units and the udev rule | [scripts](../reference/scripts.md#install-host) |
+| `drive-off` | Stops, unmounts and spins the drive down | [scripts](../reference/scripts.md#drive-off) |
+| `host-install` | Renders and installs the units and the udev rule | [scripts](../reference/scripts.md#host-install) |
 | `stack-env.sh` | `STORAGE_MOUNT`, profiles, and the disk behind a mount | [scripts](../reference/scripts.md#stack-envsh) |
 | `arr-firewall.service` | Loads the firewall at boot | [systemd](../reference/systemd.md#arr-firewallservice) |
 | `arr-notify-failure@.service` | Pushes a failed unit's log to ntfy | [systemd](../reference/systemd.md#arr-notify-failureservice) |
@@ -214,8 +214,8 @@ list is in [Getting started](../getting-started.md)). Check them with
 - **The drive won't mount:**
   [the media drive won't mount](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/ai/homelab-plugin/skills/stack-logs/references/known-issues.md#the-media-drive-wont-mount).
   After reformatting, put the new UUID (`lsblk -f`) in `STORAGE_UUID` and in `/etc/fstab`, and
-  re-run `install-host`.
-- **`storage-off` says the drive is busy:** it lists the processes holding it; stop them (often a
+  re-run `host-install`.
+- **`drive-off` says the drive is busy:** it lists the processes holding it; stop them (often a
   shell sitting in the folder) and run it again.
 - **The stack didn't start:** `systemctl status arr-stack.service` and
   `journalctl -u arr-stack.service` show `stack-up`'s output, including which core service was

@@ -7,6 +7,6 @@ OnFailure=arr-notify-failure@%n.service
 
 [Service]
 Type=oneshot
-ExecStart=@REPO@/scripts/backup-config
+ExecStart=@REPO@/scripts/stack-backup
 Nice=10
 IOSchedulingClass=idle

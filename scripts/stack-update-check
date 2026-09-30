@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Report which stack images have a newer build upstream for this machine's architecture, pushing each new one to ntfy once.
-# Notify only: it never pulls or restarts. arr-updates.timer runs it daily; health-check reads the result.
+# Notify only: it never pulls or restarts. arr-updates.timer runs it daily; stack-health reads the result.
 
 set -uo pipefail
 . "$(dirname "$0")/stack-env.sh"
@@ -100,5 +100,5 @@ unknown=$(printf '%s\n' "$results" | awk '$1=="unknown"{print $2}')
 echo "$(printf '%s\n' "$results" | grep -c '^current') current, $(printf '%s\n' "$updates" | grep -c .) with updates"
 printf '%s\n' "$results" | awk '$1=="update"{printf "  update available: %s  %s -> %s\n", $2, $3, $4}'
 [ -n "$unknown" ] && printf '  could not check:  %s\n' $unknown
-[ -n "$updates" ] && echo "  apply with:       $REPO/scripts/update   (all, or name services)"
+[ -n "$updates" ] && echo "  apply with:       $REPO/scripts/stack-update   (all, or name services)"
 exit 0

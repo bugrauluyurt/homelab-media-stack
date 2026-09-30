@@ -19,11 +19,11 @@ there are the review checklist.
    `security`, `removed`, `breaking`) decides the next version; see
    [docs/operations/releasing.md](../docs/operations/releasing.md). One file per change means your
    pull request never conflicts with another one over the changelog.
-4. Run `scripts/check` (Docker is enough: every tool runs in a container). CI runs the same.
+4. Run `scripts/repo-check` (Docker is enough: every tool runs in a container). CI runs the same.
 5. Enable the hooks once: `git config core.hooksPath .githooks`. `pre-commit` keeps secrets
    out of commits, and `commit-msg` checks the commit message format below.
 6. If the change touches the server, run it on real hardware and include the output of
-   `scripts/health-check` in the pull request. Say which platform you tested on
+   `scripts/stack-health` in the pull request. Say which platform you tested on
    (Raspberry Pi 5 or x86-64; Debian, Ubuntu or Arch).
 
 ## Commit messages
@@ -51,7 +51,7 @@ Commits follow [Conventional Commits](https://www.conventionalcommits.org), the 
   | `perf` | Faster or lighter, same behaviour |
   | `test` | Tests only |
   | `build` | Images, compose, dependencies |
-  | `ci` | GitHub workflows and `scripts/check` |
+  | `ci` | GitHub workflows and `scripts/repo-check` |
   | `chore` | Upkeep that fits nothing above, such as releases |
   | `style` | Formatting only |
   | `revert` | Undoing an earlier commit |

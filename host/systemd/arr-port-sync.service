@@ -7,6 +7,6 @@ Requires=docker.service
 
 [Service]
 Type=oneshot
-ExecStart=@REPO@/scripts/sync-port
+ExecStart=@REPO@/scripts/vpn-port-sync
 User=@STACK_USER@
 Group=@STACK_GROUP@

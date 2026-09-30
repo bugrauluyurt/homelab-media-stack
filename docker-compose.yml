@@ -511,7 +511,7 @@ services:
       WEATHER_LOCATION: ${WEATHER_LOCATION:-}
     volumes:
       - ./apps/glance:/app/config:ro
-      # Latest YouTube uploads written by scripts/sync-youtube.py, served at /assets/youtube/.
+      # Latest YouTube uploads written by scripts/youtube-sync.py, served at /assets/youtube/.
       - ${CONFIG_ROOT}/glance/youtube:/app/config/assets/youtube:ro
       - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - type: bind
@@ -583,7 +583,7 @@ services:
     command:
       - --path.rootfs=/host
       - --collector.thermal_zone
-      # Backup and pending-update metrics, written by backup-config and check-updates.
+      # Backup and pending-update metrics, written by stack-backup and stack-update-check.
       - --collector.textfile.directory=/textfile
     volumes:
       - /:/host:ro,rslave

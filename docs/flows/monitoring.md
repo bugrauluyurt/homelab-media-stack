@@ -11,12 +11,12 @@ Each piece answers a different question:
 |---|---|---|
 | How has the server behaved over time? | Prometheus and Grafana | Always, 30 days of history |
 | Is every service up right now? | Uptime Kuma | Every 60 seconds |
-| Is everything configured the way it should be? | `health-check --notify` | Every 6 hours |
-| Is someone transcoding, or signing in from a new device? | `watch-activity` | Every minute |
-| Will downloads make playback stutter? | `throttle-downloads` | Every minute |
-| Did a scheduled job fail? | `notify-failure` | When a unit fails |
+| Is everything configured the way it should be? | `stack-health --notify` | Every 6 hours |
+| Is someone transcoding, or signing in from a new device? | `activity-watch` | Every minute |
+| Will downloads make playback stutter? | `downloads-throttle` | Every minute |
+| Did a scheduled job fail? | `stack-failure-notify` | When a unit fails |
 
-`health-check` and Uptime Kuma overlap on purpose. `health-check` is the deep check (hardlinks,
+`stack-health` and Uptime Kuma overlap on purpose. `stack-health` is the deep check (hardlinks,
 VPN binding, firewall, backups, plugins); Kuma is the always-on watcher that tells you *when*
 something broke.
 
@@ -46,14 +46,14 @@ flowchart LR
 
    | File | Metric | Written by |
    |---|---|---|
-   | `updates.prom` | `arr_image_updates_available`, `arr_image_updates_checked_timestamp_seconds` | `check-updates` and `update` ([Updates](updates.md)) |
-   | `backup.prom` | `arr_backup_last_success_timestamp_seconds` | `backup-config` ([Backups](backups.md)) |
-   | `youtube.prom` | `arr_youtube_sync_timestamp_seconds` | `sync-youtube.py` (Glance's YouTube rows) |
+   | `updates.prom` | `arr_image_updates_available`, `arr_image_updates_checked_timestamp_seconds` | `stack-update-check` and `stack-update` ([Updates](updates.md)) |
+   | `backup.prom` | `arr_backup_last_success_timestamp_seconds` | `stack-backup` ([Backups](backups.md)) |
+   | `youtube.prom` | `arr_youtube_sync_timestamp_seconds` | `youtube-sync.py` (Glance's YouTube rows) |
 
    The update and backup files are written whole and renamed into place, so a scrape never sees
    half a file.
 2. **scraparr** reads Radarr, Sonarr, Prowlarr and Bazarr from one container. It cannot read
-   environment variables in its YAML, so `scripts/render-scraparr-config` fills the API keys from
+   environment variables in its YAML, so `scripts/configure-scraparr` fills the API keys from
    `.env` into `$CONFIG_ROOT/scraparr/config.yaml` (mode 600). The rendered file holds live keys,
    which is why it is written outside the repository.
 3. **Prometheus** scrapes node-exporter every 30 seconds and scraparr every 60 seconds (with a
@@ -113,7 +113,7 @@ checks in a row (one failure plus two retries, 60 seconds apart) it sends **DOWN
   stops handing one out while the tunnel stays up; torrents keep working but get no incoming peers
   and slow down, which no other check notices. gluetun's control server opens only that one
   read-only route, without credentials, and only to containers on the stack's network
-  (`apps/gluetun/auth.toml`). `sync-port` usually repairs it on its own
+  (`apps/gluetun/auth.toml`). `vpn-port-sync` usually repairs it on its own
   ([VPN and ports](vpn-and-ports.md)).
 - **gluetun healthy:** gluetun's own container health check, read through the read-only Docker
   socket proxy.
@@ -136,7 +136,7 @@ environment in `$STATE_ROOT/venv` with `python-socketio`.
 
 ## The health check every 6 hours
 
-[`arr-health.timer`](../reference/systemd.md#arr-healthtimer) runs `scripts/health-check --notify` at
+[`arr-health.timer`](../reference/systemd.md#arr-healthtimer) runs `scripts/stack-health --notify` at
 00:20, 06:20, 12:20 and 18:20 (up to 10 minutes later), as the stack user, only while the media drive
 is mounted: the whole stack is down while the drive is off. Any failing check is pushed to ntfy as
 **"media stack: N health check(s) failing"**, listing each one.
@@ -157,13 +157,13 @@ module that is switched off are skipped. A few of the less obvious ones, and why
 | INDEXERS | Byparr healthy | Its `/health` launches a real browser and takes 15 to 20 seconds, so the container's own health result is read instead |
 | VPN | qBittorrent bound to the tunnel, upload cap in both modes, forwarded port in sync | P2P must never leave the VPN ([VPN and ports](vpn-and-ports.md)) |
 
-`health-check` is not read-only: it writes a hardlink test file on the drive and starts throwaway
+`stack-health` is not read-only: it writes a hardlink test file on the drive and starts throwaway
 `curlimages/curl` containers. Keep it for validating changes, not for a look-only investigation. Run
-it first whenever something seems off: `scripts/health-check` (the `health` alias).
+it first whenever something seems off: `scripts/stack-health` (the `health` alias).
 
-## watch-activity: things someone should know about
+## activity-watch: things someone should know about
 
-[`arr-watch.timer`](../reference/systemd.md#arr-watchtimer) runs `scripts/watch-activity` every
+[`arr-watch.timer`](../reference/systemd.md#arr-watchtimer) runs `scripts/activity-watch` every
 minute (from three minutes after boot, only while the drive is mounted). Each alert fires once;
 what was already reported lives in `$STATE_ROOT/watch-activity.json`. The first run only records
 the devices and log entries that already exist, so installing it does not flood your phone. If
@@ -176,12 +176,12 @@ Jellyfin or Seerr does not answer, the run ends quietly and tries again a minute
 | **"Failed Jellyfin login"** | Jellyfin's activity log records a failed sign-in |
 | **"Request still not downloaded"** | A Seerr request approved more than 48 hours ago is out (Radarr says the movie is available; Sonarr has aired episodes) but nothing has downloaded. Films not yet released are skipped: Radarr waits for them on purpose. It may not be on any indexer |
 
-## throttle-downloads: keeping playback smooth
+## downloads-throttle: keeping playback smooth
 
 At full speed (about 90 MB/s) decrypting the WireGuard tunnel takes most of the CPU; playback
 stutters and qBittorrent drops the arr apps' requests. At 40 MB/s the VPN alone kept the CPU about
 90% busy. [`arr-throttle.timer`](../reference/systemd.md#arr-throttletimer) runs
-`scripts/throttle-downloads` every minute to prevent that:
+`scripts/downloads-throttle` every minute to prevent that:
 
 - **The cap** is qBittorrent's alternative download limit, **20 MB/s**. It switches on while anyone
   plays something in Jellyfin or Plex, or while the 5 minute load average reaches **twice the number
@@ -192,16 +192,16 @@ stutters and qBittorrent drops the arr apps' requests. At 40 MB/s the VPN alone 
 - **A limit you switch on by hand is left alone.** The script only switches off a limit it switched
   on itself (it marks that with `$STATE_ROOT/throttle-by-script`).
 
-Downloads are otherwise unlimited by choice. This cap and `sync-port`'s VPN restart are the only
-things allowed to act on their own; don't add other limits without deciding to. `health-check`
+Downloads are otherwise unlimited by choice. This cap and `vpn-port-sync`'s VPN restart are the only
+things allowed to act on their own; don't add other limits without deciding to. `stack-health`
 confirms the alternative limit is set (not qBittorrent's 10 KiB/s default, which would stall
-downloads) and reads the upload cap from `throttle-downloads --upload-cap` rather than keeping its
+downloads) and reads the upload cap from `downloads-throttle --upload-cap` rather than keeping its
 own copy.
 
-## notify-failure: when a scheduled job fails
+## stack-failure-notify: when a scheduled job fails
 
 The units below have `OnFailure=arr-notify-failure@%n.service`. When one fails,
-`scripts/notify-failure` pushes **"media stack: *unit* failed"** with the unit's last eight log lines
+`scripts/stack-failure-notify` pushes **"media stack: *unit* failed"** with the unit's last eight log lines
 and the `journalctl` command for the rest.
 
 | Unit | Job |
@@ -217,12 +217,12 @@ and the `journalctl` command for the rest.
 ```mermaid
 flowchart LR
     KUMA["Uptime Kuma, every minute"] --> TOPIC(("ntfy topic"))
-    CU["check-updates, daily"] --> TOPIC
+    CU["stack-update-check, daily"] --> TOPIC
     UPD["update, by hand"] --> TOPIC
-    HC["health-check --notify, every 6 h"] --> TOPIC
-    WA["watch-activity, every minute"] --> TOPIC
-    SP["sync-port, every 15 min"] --> TOPIC
-    UNITS["arr-backup, arr-updates, arr-firewall, arr-stack, arr-youtube"] -->|"OnFailure"| NF["notify-failure"]
+    HC["stack-health --notify, every 6 h"] --> TOPIC
+    WA["activity-watch, every minute"] --> TOPIC
+    SP["vpn-port-sync, every 15 min"] --> TOPIC
+    UNITS["arr-backup, arr-updates, arr-firewall, arr-stack, arr-youtube"] -->|"OnFailure"| NF["stack-failure-notify"]
     NF --> TOPIC
     ARR["Radarr, Sonarr, Lidarr, Prowlarr"] --> TOPIC
     SEERR["Seerr"] --> TOPIC
@@ -234,12 +234,12 @@ flowchart LR
 | Alert | Source | Set up by |
 |---|---|---|
 | A service **DOWN** after three failed checks, **UP** when it recovers | Uptime Kuma | `configure-uptime-kuma.py` |
-| "N update(s) available", each update once, **MAJOR** flagged | `check-updates` (`arr-updates.timer`) | [Updates](updates.md) |
-| "update failed", "health check failed after update" | `update` | [Updates](updates.md) |
-| "N health check(s) failing", including the media drive's SMART health, bad sectors and temperature | `health-check --notify` (`arr-health.timer`) | This page |
-| Software transcode, new Jellyfin device, failed Jellyfin login, request stuck 48 hours | `watch-activity` (`arr-watch.timer`) | This page |
-| "VPN forwarded port restored", "VPN still has no forwarded port" | `sync-port` (`arr-port-sync.timer`) | [VPN and ports](vpn-and-ports.md) |
-| "*unit* failed", with its last log lines | `notify-failure` | This page |
+| "N update(s) available", each update once, **MAJOR** flagged | `stack-update-check` (`arr-updates.timer`) | [Updates](updates.md) |
+| "update failed", "health check failed after update" | `stack-update` | [Updates](updates.md) |
+| "N health check(s) failing", including the media drive's SMART health, bad sectors and temperature | `stack-health --notify` (`arr-health.timer`) | This page |
+| Software transcode, new Jellyfin device, failed Jellyfin login, request stuck 48 hours | `activity-watch` (`arr-watch.timer`) | This page |
+| "VPN forwarded port restored", "VPN still has no forwarded port" | `vpn-port-sync` (`arr-port-sync.timer`) | [VPN and ports](vpn-and-ports.md) |
+| "*unit* failed", with its last log lines | `stack-failure-notify` | This page |
 | Health errors, a download that needs a manual import, failed downloads or imports | Radarr, Sonarr, Lidarr, Prowlarr | `configure-arr.py` |
 | A request is available to watch, or failed to reach Sonarr or Radarr | Seerr | `configure-seerr.py` |
 | Someone starts watching (any user), a new Seerr request | JellyDash (`NTFY_URL` and `NTFY_TOPIC` in compose) | [Dashboards](../using/dashboards.md) |
@@ -267,14 +267,14 @@ change the topic in their notification settings by hand.
 |---|---|---|
 | `configure-uptime-kuma.py` | Admin, ntfy, monitors from compose, status page | [scripts](../reference/scripts.md#configure-uptime-kumapy) |
 | `configure-grafana-watch.py` | Least-privilege Jellystat reader for Grafana | [scripts](../reference/scripts.md#configure-grafana-watchpy) |
-| `render-scraparr-config` | Fills scraparr's config with API keys, outside the repo | [scripts](../reference/scripts.md#render-scraparr-config) |
-| `health-check` | The deep check; `--notify` pushes failures | [scripts](../reference/scripts.md#health-check) |
+| `configure-scraparr` | Fills scraparr's config with API keys, outside the repo | [scripts](../reference/scripts.md#configure-scraparr) |
+| `stack-health` | The deep check; `--notify` pushes failures | [scripts](../reference/scripts.md#stack-health) |
 | `arr-health.timer` / `.service` | Every 6 hours, with the drive mounted | [systemd](../reference/systemd.md#arr-healthtimer) |
-| `watch-activity` | Transcodes, new devices, failed logins, stuck requests | [scripts](../reference/scripts.md#watch-activity) |
+| `activity-watch` | Transcodes, new devices, failed logins, stuck requests | [scripts](../reference/scripts.md#activity-watch) |
 | `arr-watch.timer` / `.service` | Every minute, with the drive mounted | [systemd](../reference/systemd.md#arr-watchtimer) |
-| `throttle-downloads` | The 20 MB/s cap and the permanent upload cap | [scripts](../reference/scripts.md#throttle-downloads) |
+| `downloads-throttle` | The 20 MB/s cap and the permanent upload cap | [scripts](../reference/scripts.md#downloads-throttle) |
 | `arr-throttle.timer` / `.service` | Every minute, with the drive mounted | [systemd](../reference/systemd.md#arr-throttletimer) |
-| `notify-failure` | Pushes a failed unit's last log lines | [scripts](../reference/scripts.md#notify-failure) |
+| `stack-failure-notify` | Pushes a failed unit's last log lines | [scripts](../reference/scripts.md#stack-failure-notify) |
 | `arr-notify-failure@.service` | The `OnFailure=` handler | [systemd](../reference/systemd.md#arr-notify-failureservice) |
 | `stack-env.sh` / `stack_env.py` | The shared `notify` helpers and `write_update_metrics` | [scripts](../reference/scripts.md#stack-envsh) |
 
@@ -294,5 +294,5 @@ change the topic in their notification settings by hand.
   [Dozzle lists containers but can't open their logs](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/ai/homelab-plugin/skills/stack-logs/references/known-issues.md#dozzle-lists-containers-but-cant-open-their-logs)
   and `docker logs homepage | grep -i sock`.
 - **A Prometheus target is DOWN.** Open `http://<tailscale-ip>:9090/targets`; for scraparr,
-  rerun `scripts/render-scraparr-config` after an API key changed.
+  rerun `scripts/configure-scraparr` after an API key changed.
 - For anything else, start with [Troubleshooting](../troubleshooting.md).

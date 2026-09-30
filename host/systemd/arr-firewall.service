@@ -6,7 +6,7 @@ OnFailure=arr-notify-failure@%n.service
 
 [Service]
 Type=oneshot
-ExecStart=@REPO@/scripts/firewall
+ExecStart=@REPO@/scripts/host-firewall
 
 [Install]
 WantedBy=multi-user.target

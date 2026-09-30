@@ -10,13 +10,13 @@ explicit yes first**, and check that nothing is playing (see the `stack-update`
 skill for the Jellyfin sessions check).
 
 ```bash
-STACK=${MEDIA_STACK_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}; [ -x "$STACK/scripts/health-check" ] || STACK=~/homelab-media-stack
+STACK=${MEDIA_STACK_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}; [ -x "$STACK/scripts/stack-health" ] || STACK=~/homelab-media-stack
 ```
 
 ## Power the drive off safely
 
 ```bash
-"$STACK/scripts/storage-off"
+"$STACK/scripts/drive-off"
 ```
 
 This stops the stack, flushes writes and unmounts the media mount (`STORAGE_MOUNT` in `.env`, default `/mnt/storage`). Only then is it
@@ -32,7 +32,7 @@ sudo systemctl start arr-stack.service     # or: "$STACK/scripts/stack-up"
 ```
 
 `stack-up` refuses to start without the drive, re-attaches qBittorrent and
-slskd to the VPN, and syncs the forwarded port. Afterwards, run `health-check`.
+slskd to the VPN, and syncs the forwarded port. Afterwards, run `stack-health`.
 
 ## Rebooting the server
 

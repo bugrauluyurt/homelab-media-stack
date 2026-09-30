@@ -7,7 +7,7 @@ DHCP, mDNS and Tailscale); SSH and every other port answer only on the tailnet.
   firewall         apply (only rebuilds when the wanted rules changed)
   firewall off      remove every rule this script added
   firewall status   show the rules
-  firewall home-ports  the ports open to the home network (health-check reads this)
+  firewall home-ports  the ports open to the home network (stack-health reads this)
 """
 import hashlib
 import ipaddress

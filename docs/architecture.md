@@ -156,7 +156,7 @@ flowchart LR
   off in the namespace, so nothing leaks over it either. qBittorrent is also bound to the
   tunnel interface itself.
 - **One forwarded port.** Proton forwards a single port. gluetun pushes it into qBittorrent
-  whenever it changes, and `sync-port` reconciles it every 15 minutes.
+  whenever it changes, and `vpn-port-sync` reconciles it every 15 minutes.
 - **Outside the boundary:** the host, Tailscale, SABnzbd, the arr apps, Prowlarr (so indexer
   searches go out directly), Jellyfin and Plex. Your own streams stay direct and fast.
 
@@ -312,7 +312,7 @@ would have routed everything, including Jellyfin streams and Tailscale, through 
 The cost is a coupling: when gluetun is restarted or recreated, qBittorrent and slskd keep
 "running" with a dead network until they are recreated too. Compose's
 `depends_on: {condition: service_healthy, restart: true}` covers restarts, and
-`scripts/stack-up` and `scripts/sync-port` re-attach them whenever their web UIs stop
+`scripts/stack-up` and `scripts/vpn-port-sync` re-attach them whenever their web UIs stop
 answering.
 
 ### Usenet outside the VPN
@@ -327,7 +327,7 @@ delay profile prefers Usenet and waits before falling back to torrents.
 
 Docker publishes a port by rewriting packets before they reach the host's `INPUT` chain, so a
 rule in `INPUT` (and a tool like ufw that writes there) never sees traffic to a published
-container port. `scripts/firewall` therefore installs the same policy twice: in `INPUT` for
+container port. `scripts/host-firewall` therefore installs the same policy twice: in `INPUT` for
 the host's own services and in `DOCKER-USER` for containers, for IPv4 and IPv6. One script
 owning the rules is also why ufw and firewalld must be off. Details are in
 [Security: the firewall](security.md#the-firewall).
@@ -375,7 +375,7 @@ nothing needs it:
   it caps tailnet clients' bitrate and forces a transcode.
 - Real-time folder watching is off in Jellyfin and Plex so the drive can sleep; the arr apps
   tell Jellyfin to rescan on every import instead.
-- `watch-activity` sends an alert when a stream is being transcoded anyway.
+- `activity-watch` sends an alert when a stream is being transcoded anyway.
 
 A typical home upload also limits streaming away from home to about 1080p, so both limits
 point the same way. With Intel or AMD graphics on an x86-64 machine, `compose.gpu.yml` and

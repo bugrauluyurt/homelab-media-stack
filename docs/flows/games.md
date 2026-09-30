@@ -90,7 +90,7 @@ accounts are made, and it applies the same settings to each:
 [`configure-sftpgo.py`](../reference/scripts.md#configure-sftpgopy) creates the Usenet games
 folder (compose mounts it but won't create it), starts SFTPGo, limits its admin and creates your
 login from `GAMES_USER` and `GAMES_PASSWORD`.
-[`add-viewer.py`](../reference/scripts.md#add-viewerpy) creates a viewer's (see
+[`viewer-add.py`](../reference/scripts.md#viewer-addpy) creates a viewer's (see
 [Viewers](viewers.md)). Questarr's own login is `admin` with `QUESTARR_PASSWORD`, shared by
 everyone, so the rule for viewers is: mark games *Wanted* and leave picking the release to you.
 
@@ -120,10 +120,10 @@ before you run anything from it; public trackers carry fakes.
 | `configure-questarr.py` | Questarr's admin, qBittorrent and SABnzbd clients, indexers from Prowlarr, IGDB, ntfy | [scripts](../reference/scripts.md#configure-questarrpy) |
 | `configure-sftpgo.py` | Starts SFTPGo, locks its admin, creates your login | [scripts](../reference/scripts.md#configure-sftpgopy) |
 | `games_accounts.py` | The read-only account settings, shared by both scripts | [scripts](../reference/scripts.md#games_accountspy) |
-| `add-viewer.py` | A viewer's games login | [scripts](../reference/scripts.md#add-viewerpy) |
+| `viewer-add.py` | A viewer's games login | [scripts](../reference/scripts.md#viewer-addpy) |
 | `configure-sabnzbd.py` | SABnzbd's `games` category | [scripts](../reference/scripts.md#configure-sabnzbdpy) |
 | `configure-cleanuparr.py` | Puts `games` on Cleanuparr's ignore list | [scripts](../reference/scripts.md#configure-cleanuparrpy) |
-| `firewall` | Opens 8090 to the home network | [scripts](../reference/scripts.md#firewall) |
+| `host-firewall` | Opens 8090 to the home network | [scripts](../reference/scripts.md#host-firewall) |
 
 ## When it goes wrong
 

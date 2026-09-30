@@ -62,7 +62,7 @@ fi
 [ "$os_family" = arch ] && ! grep -q mdns /etc/nsswitch.conf &&
   problems+=("after installing nss-mdns, add 'mdns_minimal [NOTFOUND=return]' before 'resolve' on the hosts line of /etc/nsswitch.conf")
 
-# The timers run health-check and the firewall checks with sudo, unattended.
+# The timers run stack-health and the firewall checks with sudo, unattended.
 sudo -n true 2>/dev/null ||
   problems+=("$STACK_USER needs passwordless sudo: echo '$STACK_USER ALL=(ALL) NOPASSWD: ALL' | sudo tee /etc/sudoers.d/homelab-media-stack")
 
