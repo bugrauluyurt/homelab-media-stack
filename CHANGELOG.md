@@ -7,6 +7,16 @@ a minor version adds features, and a patch fixes bugs. A change records its entr
 next version, and merging the release pull request writes the entries here and publishes it
 ([how releases work](docs/operations/releasing.md)).
 
+## 2.6.0 - 2026-09-30
+
+### Added
+- NZBFinder can join NZBgeek as a Usenet indexer: set `NZBFINDER_API_KEY` in `.env` and re-run
+  `configure-arr.py`, which adds it to Prowlarr and so to every app.
+
+### Changed
+- Cleanuparr now removes stalled private torrents too, such as those a tracker refuses for a low
+  ratio, and watches Lidarr's downloads. Re-run `configure-cleanuparr.py` to apply it.
+
 ## 2.5.0 - 2026-09-30
 
 ### Added
