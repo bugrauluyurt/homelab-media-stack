@@ -107,6 +107,85 @@ no_dashes() {
   ! tracked_files | grep -v '^apps/grafana/dashboards/node-exporter-full.json$' | xargs grep -I -n -P '[\x{2013}\x{2014}]'
 }
 
+# A script run as ./scripts/NAME needs its executable bit in git.
+scripts_executable() {
+  local mode file status=0
+
+  while read -r mode file; do
+    head -1 "$file" | grep -q '^#!' && [ "$mode" != 100755 ] && { echo "  not executable in git: $file"; status=1; }
+  done < <(git ls-files -s scripts | awk '{print $1, $4}')
+
+  return $status
+}
+
+# Every script opens with who runs it and what it changes; helpers say who uses them.
+script_headers() {
+  local file missing=()
+
+  for file in $(git ls-files scripts); do
+    head -30 "$file" | grep -qE '^(# )?(Runs|Used by): ' && head -30 "$file" | grep -qE '^(# )?Changes: ' || missing+=("$file")
+  done
+
+  [ ${#missing[@]} -eq 0 ] || { printf '  no Runs (or Used by) and Changes header: %s\n' "${missing[@]}"; return 1; }
+}
+
+# A missing or untracked ./ bind source makes Docker create an empty root-owned folder in its place.
+bind_sources_tracked() {
+  local source missing=()
+
+  while read -r source; do
+    [ -n "$(git ls-files --cached --others --exclude-standard -- "$source")" ] || missing+=("$source")
+  done < <(COMPOSE_PROFILES='*' docker compose --env-file .env.example -f docker-compose.yml -f compose.gpu.yml config --format json |
+    python3 -c 'import json, os, sys
+repo = os.getcwd() + "/"
+for service in json.load(sys.stdin)["services"].values():
+    for volume in service.get("volumes", []):
+        if volume.get("type") == "bind" and volume["source"].startswith(repo):
+            print(volume["source"][len(repo):])')
+
+  [ ${#missing[@]} -eq 0 ] || { printf '  bind source not in git: %s\n' "${missing[@]}"; return 1; }
+}
+
+# Links to this repo's files break silently when a file moves; the strict docs build covers only docs/.
+repo_links_resolve() {
+  python3 - <<'PYTHON'
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+files = subprocess.run(["git", "ls-files", "--cached", "--others", "--exclude-standard"],
+                       capture_output=True, text=True, check=True).stdout.splitlines()
+existing = set(files) | {str(parent) for file_name in files for parent in Path(file_name).parents}
+broken = []
+
+for file_name in files:
+    path = Path(file_name)
+    if file_name == "CHANGELOG.md" or path.is_symlink() or not path.is_file():
+        continue
+
+    try:
+        text = path.read_text()
+    except UnicodeDecodeError:
+        continue
+
+    for match in re.finditer(r"github\.com/bugrauluyurt/homelab-media-stack/(?:blob|tree)/main/([^)\s#?\"'`>]+)", text):
+        if match.group(1).rstrip("/.") not in existing:
+            broken.append(f"{file_name}: {match.group(0)}")
+
+    if file_name.endswith(".md") and not file_name.startswith("docs/"):
+        for match in re.finditer(r"\]\(([^)#\s]+)(?:#[^)]*)?\)", text):
+            target = match.group(1)
+            if re.match(r"^[a-z]+:", target):
+                continue
+            if str(Path(path.parent, target).resolve().relative_to(Path.cwd())) not in existing:
+                broken.append(f"{file_name}: {target}")
+
+print("\n".join(f"  broken link: {link}" for link in broken))
+sys.exit(1 if broken else 0)
+PYTHON
+}
+
 step "Python syntax" python_syntax
 step "shell syntax" shell_syntax
 step "shellcheck" shellcheck
@@ -117,6 +196,10 @@ step "compose configs (every profile, none, GPU overlay)" compose_configs
 step "secrets (gitleaks)" secrets
 step "reference covers every script and unit" docs_cover_every_file
 step "no em or en dashes" no_dashes
+step "scripts are executable" scripts_executable
+step "every script has a header" script_headers
+step "compose bind sources are in git" bind_sources_tracked
+step "repo links resolve" repo_links_resolve
 
 if ! $fast; then
   step "diagrams render" diagrams

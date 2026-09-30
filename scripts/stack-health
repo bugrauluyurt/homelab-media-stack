@@ -66,6 +66,10 @@ for t in arr-backup arr-updates arr-port-sync arr-health arr-watch arr-throttle 
   chk "$t.timer enabled"               "systemctl is-enabled -q $t.timer"
 done
 chk "no failed systemd units"            "[ -z \"\$(systemctl --failed --no-legend)\" ]"
+# After a script rename the installed units keep the old path until host-install re-runs.
+chk "installed units run existing scripts" "! sed -n 's/^ExecStart=//p' /etc/systemd/system/arr-*.service | awk '{print \$1}' | grep '^/' | xargs -r -n1 sh -c 'test -x \"\$0\" || echo \"\$0\"' | grep -q ."
+# Docker creates a missing bind source as an empty root-owned folder, and the app starts unconfigured.
+chk "repo has no root-owned paths"       "test -z \"\$(find '$REPO' -maxdepth 3 \\( -path '$REPO/.git' -o -name __pycache__ \\) -prune -o -user root -print -quit)\""
 
 chk "memory limits supported by kernel" "grep -qw memory /sys/fs/cgroup/cgroup.controllers"
 # A container created while the memory cgroup was unavailable silently loses its
