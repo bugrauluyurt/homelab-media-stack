@@ -90,7 +90,8 @@ Why a torrent waits: Radarr, Sonarr and Lidarr search Usenet and torrents on eve
 their delay profile makes a torrent release wait 60 minutes before it can be grabbed. If a Usenet
 release turns up in that hour, it wins. Usenet downloads at the full speed of your line and
 shares nothing, so it is the preferred source; torrents are the fallback for titles Usenet lacks,
-often old or rare ones.
+often old or rare ones. French series (tagged `french` in Sonarr) don't wait: Usenet rarely has
+their current seasons, and on the French ratio trackers an early grab is what earns ratio.
 
 Radarr's automatic searches wait until a film is out for home viewing, so a film still in
 cinemas isn't grabbed early (fakes labelled "WEB-DL" circulate on public trackers).

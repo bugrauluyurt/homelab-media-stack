@@ -154,7 +154,7 @@ Configures SABnzbd: the Usenet server from `USENET_*`, download folders `/data/u
 Sets up Radarr and Sonarr, Lidarr when the music module is on, and Prowlarr's links to them.
 
 - Radarr and Sonarr: root folder (`/data/media/movies`, `/data/media/tv`); hardlinks, extra files and media info on, recycle bin off; qBittorrent at `gluetun:QBIT_PORT` (category `radarr` or `sonarr`); SABnzbd when `USENET_HOST` is set; a delay profile preferring Usenet, with torrents waiting 60 minutes; a Jellyfin connection that rescans on import; an `Audio Description` custom format scored -10000 in the `HD Bluray + WEB` (Radarr) and `WEB-1080p` (Sonarr) profiles; ntfy alerts for health issues, manual interaction, failed downloads and failed imports when `NTFY_TOPIC` is set.
-- Sonarr only: new series folders named `{Series Title} [tvdbid-{TvdbId}]`, and an auto-tag `french` for French-language series, which picks Bazarr's French profile.
+- Sonarr only: new series folders named `{Series Title} [tvdbid-{TvdbId}]`, an auto-tag `french` for French-language series, which picks Bazarr's French profile, and a delay profile for that tag with no torrent wait, because new French episodes come from the ratio trackers, where an early grab earns ratio.
 - Lidarr: root folder `/data/media/music` with new artists unmonitored, hardlinks, qBittorrent (category `music`), SABnzbd, a delay profile of Soulseek, then Usenet, then torrents after 60 minutes, every import list off, ntfy.
 - Prowlarr: Radarr, Sonarr (and Lidarr) linked with full sync and their Newznab categories, NZBgeek and NZBFinder, each when its API key (`NZBGEEK_API_KEY`, `NZBFINDER_API_KEY`) is set, ntfy.
 
