@@ -32,7 +32,7 @@ Jellyfin, Plex and the arr apps are untouched by it, so your own streams stay di
   conflict). Custom mode has no automatic server failover: changing the endpoint or key, and
   recreating gluetun with its downloaders, is a deliberate step.
 - **Exit country.** `VPN_COUNTRIES` lists the countries the exit may be in. It doesn't choose a
-  server (the endpoint in `wg0.conf` does); `health-check` reads the country from gluetun's log and
+  server (the endpoint in `wg0.conf` does); `stack-health` reads the country from gluetun's log and
   fails if it isn't listed, and always fails for the United States.
 - **Port forwarding.** `VPN_PORT_FORWARDING=on` with Proton's provider. gluetun asks the server for
   a port over NAT-PMP and writes it to `/tmp/gluetun/forwarded_port` inside the container.
@@ -62,9 +62,9 @@ Jellyfin, Plex and the arr apps are untouched by it, so your own streams stay di
 ## qBittorrent's side
 
 The seed config,
-[`qbittorrent/qBittorrent.conf`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/qbittorrent/qBittorrent.conf),
+[`apps/qbittorrent/qBittorrent.conf`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/apps/qbittorrent/qBittorrent.conf),
 is copied into `$CONFIG_ROOT/qbittorrent/qBittorrent/` before the first start, and
-[`sync-port`](../reference/scripts.md#sync-port) keeps the live settings in line with it.
+[`vpn-port-sync`](../reference/scripts.md#vpn-port-sync) keeps the live settings in line with it.
 
 - **Bound to the tunnel.** qBittorrent binds to `tun0` and its current address. gluetun routes
   anything sent from the container's Docker bridge address back out `eth0`, so the published web
@@ -79,7 +79,7 @@ is copied into `$CONFIG_ROOT/qbittorrent/qBittorrent/` before the first start, a
   [troubleshooting notes](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/ai/homelab-plugin/skills/stack-logs/references/known-issues.md#vpn-fails-shortly-after-torrents-start-then-recovers-about-an-hour-later).
 - **Login-free networks.** The Docker network (`172.16.0.0/12`: the arr apps, Homepage) and the
   tailnet (`100.64.0.0/10`: your phone) skip the login, so the apps need no stored credential. The
-  home network always has to log in; `health-check` fails if a login-free range overlaps
+  home network always has to log in; `stack-health` fails if a login-free range overlaps
   `LAN_CIDR`.
 - **CSRF and Host checks stay on.** Without them, any web page open on a tailnet device could forge
   requests to the login-free API. The accepted host names are `gluetun`, `127.0.0.1`, `HOST_NAME`,
@@ -90,9 +90,9 @@ is copied into `$CONFIG_ROOT/qbittorrent/qBittorrent/` before the first start, a
   attack (a page on a name like `gluetun.attacker.example` that resolves to the server) isn't
   stopped. Only a login on the tailnet would close that.
 
-## sync-port
+## vpn-port-sync
 
-[`sync-port`](../reference/scripts.md#sync-port) reconciles qBittorrent with the live tunnel. It
+[`vpn-port-sync`](../reference/scripts.md#vpn-port-sync) reconciles qBittorrent with the live tunnel. It
 runs from [`arr-port-sync.timer`](../reference/systemd.md#arr-port-synctimer) 90 seconds after boot
 and then every 15 minutes, from `stack-up` as soon as the tunnel is healthy after the stack starts,
 and by hand. In order, it:
@@ -115,7 +115,7 @@ differs, so running it again is harmless.
 ## A reconnect
 
 Proton hands out a new forwarded port when the tunnel reconnects, and the tunnel address can change
-too. gluetun's up command fixes the port at once; the next `sync-port` run fixes the rest:
+too. gluetun's up command fixes the port at once; the next `vpn-port-sync` run fixes the rest:
 
 ```mermaid
 sequenceDiagram
@@ -123,7 +123,7 @@ sequenceDiagram
   participant G as gluetun
   participant Q as qBittorrent
   participant T as arr-port-sync.timer
-  participant S as sync-port
+  participant S as vpn-port-sync
   P->>G: Tunnel reconnects with a new forwarded port
   G->>G: Write the port file
   G->>Q: Up command sets listen_port
@@ -137,14 +137,14 @@ sequenceDiagram
 ```
 
 After a boot, qBittorrent starts on its saved port, which is stale by then. `stack-up` runs
-`sync-port` as soon as gluetun is healthy, and the timer runs 90 seconds after boot, so a
-`health-check` in the first minute may catch "forwarded port is in sync" failing mid-flight.
+`vpn-port-sync` as soon as gluetun is healthy, and the timer runs 90 seconds after boot, so a
+`stack-health` in the first minute may catch "forwarded port is in sync" failing mid-flight.
 
 ## When Proton gives no port
 
 Proton sometimes stops answering NAT-PMP after a reconnect while the tunnel stays up. gluetun gives
 up after nine tries. Torrents stay inside the VPN but no peers can connect in, so they slow down;
-Usenet is unaffected. `sync-port` heals this by itself:
+Usenet is unaffected. `vpn-port-sync` heals this by itself:
 
 ```mermaid
 stateDiagram-v2
@@ -183,7 +183,7 @@ To do it by hand (it pauses torrents and Soulseek for about a minute):
 ```bash
 docker compose restart gluetun                    # wait until it's healthy
 docker compose up -d --force-recreate qbittorrent slskd
-./scripts/sync-port && ./scripts/leak-test
+./scripts/vpn-port-sync && ./scripts/vpn-leak-test
 ```
 
 ## Re-attaching qBittorrent and slskd
@@ -198,12 +198,12 @@ every script uses:
 - `reattach_vpn_apps` runs `docker compose up -d --force-recreate qbittorrent` (plus `slskd` when
   the music module is on; naming a service would start it even with its profile off).
 
-`stack-up` re-attaches them at boot when they don't answer, `sync-port` after its gluetun restart,
-and `update` after updating gluetun (see [Updates](updates.md)).
+`stack-up` re-attaches them at boot when they don't answer, `vpn-port-sync` after its gluetun restart,
+and `stack-update` after updating gluetun (see [Updates](updates.md)).
 
 ## Leak test
 
-[`leak-test`](../reference/scripts.md#leak-test) proves the torrent traffic leaves through Proton:
+[`vpn-leak-test`](../reference/scripts.md#vpn-leak-test) proves the torrent traffic leaves through Proton:
 
 1. It asks `https://api.ipify.org` (plain text for every client; some services send HTML to `wget`,
    which silently breaks the comparison) for the public IPv4 address three times: from the server,
@@ -212,7 +212,7 @@ and `update` after updating gluetun (see [Updates](updates.md)).
    gluetun's. **INCONCLUSIVE** (exit 2) if any of the three couldn't reach the service. **PASS**
    otherwise.
 3. It then compares gluetun's forwarded port with qBittorrent's `listen_port` and suggests
-   `sync-port` on a mismatch. It reads gluetun's port file, because gluetun's control-server API
+   `vpn-port-sync` on a mismatch. It reads gluetun's port file, because gluetun's control-server API
    requires authentication.
 
 Right after qBittorrent restarts, expect an inconclusive result for about a minute: many torrents
@@ -221,7 +221,7 @@ re-announcing at once briefly swamp the VPN's DNS.
 ## The forwarded-port monitor
 
 gluetun's control server (port 8000, not published) requires authentication on every route.
-[`gluetun/auth.toml`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/gluetun/auth.toml)
+[`apps/gluetun/auth.toml`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/apps/gluetun/auth.toml)
 opens exactly one route without credentials, read-only: `GET /v1/portforward`. Only containers on
 the `arr` network can reach it.
 [`configure-uptime-kuma.py`](../reference/scripts.md#configure-uptime-kumapy) adds a
@@ -230,7 +230,7 @@ above 0, next to gluetun's Docker health and the qBittorrent and slskd ports. Wh
 handing out a port, Kuma sends DOWN, then UP once a new one is in place. See
 [Monitoring](monitoring.md).
 
-`health-check` covers the rest: gluetun running, the exit country, qBittorrent answering and
+`stack-health` covers the rest: gluetun running, the exit country, qBittorrent answering and
 reachable from Radarr, bound to the tunnel, the forwarded port in sync, the home network required to
 log in, and cross-site requests refused.
 
@@ -238,15 +238,15 @@ log in, and cross-site requests refused.
 
 | Name | Role | Reference |
 |---|---|---|
-| `sync-port` | Binds qBittorrent to the tunnel, syncs the port and WebUI settings, heals a missing port | [scripts](../reference/scripts.md#sync-port) |
-| `arr-port-sync.timer` | Runs `sync-port` 90 seconds after boot, then every 15 minutes | [systemd](../reference/systemd.md#arr-port-synctimer) |
-| `arr-port-sync.service` | The `sync-port` job, after `arr-stack.service` | [systemd](../reference/systemd.md#arr-port-syncservice) |
+| `vpn-port-sync` | Binds qBittorrent to the tunnel, syncs the port and WebUI settings, heals a missing port | [scripts](../reference/scripts.md#vpn-port-sync) |
+| `arr-port-sync.timer` | Runs `vpn-port-sync` 90 seconds after boot, then every 15 minutes | [systemd](../reference/systemd.md#arr-port-synctimer) |
+| `arr-port-sync.service` | The `vpn-port-sync` job, after `arr-stack.service` | [systemd](../reference/systemd.md#arr-port-syncservice) |
 | `stack-up` | Re-attaches the VPN apps and syncs the port at boot | [scripts](../reference/scripts.md#stack-up) |
 | `stack-env.sh` | Tunnel, port and re-attach helpers | [scripts](../reference/scripts.md#stack-envsh) |
-| `leak-test` | Proves qBittorrent exits through Proton | [scripts](../reference/scripts.md#leak-test) |
+| `vpn-leak-test` | Proves qBittorrent exits through Proton | [scripts](../reference/scripts.md#vpn-leak-test) |
 | `configure-uptime-kuma.py` | The forwarded-port monitor | [scripts](../reference/scripts.md#configure-uptime-kumapy) |
-| `health-check` | The VPN checks | [scripts](../reference/scripts.md#health-check) |
-| `gluetun/auth.toml` | The one open control-server route | [file](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/gluetun/auth.toml) |
+| `stack-health` | The VPN checks | [scripts](../reference/scripts.md#stack-health) |
+| `apps/gluetun/auth.toml` | The one open control-server route | [file](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/apps/gluetun/auth.toml) |
 
 ## When it goes wrong
 

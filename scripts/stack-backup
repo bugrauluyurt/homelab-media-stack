@@ -1,0 +1,230 @@
+#!/usr/bin/python3
+"""Back up the stack's settings (never media) to a restic repo on the media drive,
+then copy it to a second repo on the NVMe.
+
+Runs: arr-backup.timer daily at 04:30; stack-update as stack-backup pre-update; by hand with sudo.
+Changes: restic repositories (created on the first run), key file, success stamp, metric.
+Idempotent: each run adds a snapshot; retention keeps the repositories bounded.
+
+Runs as root: app configs are owned by several container UIDs.
+"""
+import datetime
+import os
+import shutil
+import sqlite3
+import stat
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+# Runs as root: don't leave root-owned __pycache__ in the repo.
+sys.dont_write_bytecode = True
+from stack_env import CONFIG, ENV, STATE as STACK_STATE, REPO as STACK, STORAGE, enabled_services  # noqa: E402
+
+HOME = Path(f"~{ENV['STACK_USER']}").expanduser()
+
+MOUNT = STORAGE
+DEST = MOUNT / "backups"
+REPO = DEST / "restic"
+KEYFILE = DEST / "RESTIC_PASSWORD"
+
+# Second copy on the system disk: keeps the snapshot history if the media drive dies.
+MIRROR = Path("/var/backups/arr-stack/restic")
+CHECK_SUBSET = "5%"
+
+STAGE = Path("/var/tmp/arr-backup")
+STATE = Path("/var/lib/arr-backup/last-success")
+METRICS = STACK_STATE / "metrics"
+
+EXTRA = [STACK / ".env",
+         HOME / ".config/managarr",
+         HOME / ".config/qbt-tui",
+         STACK_STATE]
+
+# Hand-made host changes (docs/operations/host.md) a reinstall would lose.
+HOST_FILES = [Path("/etc/fstab"), Path("/boot/firmware/cmdline.txt"), Path("/etc/docker/daemon.json"),
+              Path("/etc/avahi/avahi-daemon.conf"), HOME / ".ssh/authorized_keys"]
+
+# Offsite copy, e.g. s3:... or b2:...; the backend's credentials are passed through from .env.
+OFFSITE = ENV.get("RESTIC_OFFSITE_REPO")
+OFFSITE_ENV = ("AWS_", "B2_", "AZURE_", "GOOGLE_", "RCLONE_")
+
+# Regenerable: re-downloaded, rebuilt or re-fetched by the apps themselves.
+SKIP_DIRS = {"logs", "Logs", "cache", "Cache", "transcodes", "Backups",
+             "Crash Reports", "Codecs", "Media", "Metadata", "metadata", "MediaCover", "venv"}
+SKIP_PATHS = {CONFIG / "grafana/plugins", CONFIG / "recyclarr/resources", CONFIG / "scrutiny/influxdb",
+              CONFIG / "gluetun/servers", CONFIG / "jellystat-db",
+              CONFIG / "jellyfin/data/data/subtitles"}
+
+DB_SUFFIXES = (".db", ".sqlite", ".sqlite3")
+LIVE_DB_SIDECARS = ("-wal", "-shm", "-journal")
+
+
+def write_backup_metric():
+    """Last successful backup for Prometheus, via node-exporter's textfile collector."""
+    METRICS.mkdir(exist_ok=True)
+    owner = STACK_STATE.stat()
+    os.chown(METRICS, owner.st_uid, owner.st_gid)
+
+    tmp = METRICS / "backup.prom.tmp"
+    tmp.write_text(f"arr_backup_last_success_timestamp_seconds {int(time.time())}\n")
+    tmp.chmod(0o644)
+    tmp.replace(METRICS / "backup.prom")
+
+
+def restic(*args, check=True, repo=REPO):
+    env = {**os.environ, "RESTIC_PASSWORD": ENV["RESTIC_PASSWORD"], "RESTIC_FROM_PASSWORD": ENV["RESTIC_PASSWORD"],
+           **{k: v for k, v in ENV.items() if k.startswith(OFFSITE_ENV)}}
+
+    return subprocess.run(["restic", "-r", str(repo), *args], check=check, env=env, capture_output=True, text=True)
+
+
+def forget(repo):
+    # Pre-update snapshots skip the daily thinning, which would drop one taken the same day.
+    restic("forget", "--tag", "arr-stack", "--keep-tag", "pre-update", "--keep-daily", "7",
+           "--keep-weekly", "4", "--keep-monthly", "6", "--prune", repo=repo)
+    restic("forget", "--tag", "pre-update", "--keep-last", "5", "--prune", repo=repo)
+
+
+def copy_to(repo):
+    if restic("cat", "config", repo=repo, check=False).returncode:
+        # Same chunker parameters as the local repo, so copies deduplicate.
+        restic("init", "--from-repo", str(REPO), "--copy-chunker-params", repo=repo)
+        print(f"initialised {repo}")
+
+    restic("copy", "--from-repo", str(REPO), repo=repo)
+    forget(repo)
+    print(f"copied to {repo}")
+
+
+def snapshot_db(src, dst):
+    # The online backup API keeps WAL writes that copying the .db file alone would lose.
+    dst.parent.mkdir(parents=True, exist_ok=True)
+
+    # An app mid-checkpoint can hold its database briefly; retry instead of failing the backup.
+    for attempt in range(5):
+        try:
+            with sqlite3.connect(f"file:{src}?mode=ro", uri=True, timeout=30) as s, \
+                 sqlite3.connect(dst) as d:
+                s.backup(d)
+            return
+        except sqlite3.OperationalError as e:
+            if attempt == 4:
+                raise RuntimeError(f"{src}: {e}") from e
+
+            dst.unlink(missing_ok=True)
+            time.sleep(3)
+        except sqlite3.DatabaseError as e:
+            if "not a database" not in str(e):
+                raise RuntimeError(f"{src}: {e}") from e
+
+            dst.unlink(missing_ok=True)
+            shutil.copy2(src, dst)
+            return
+
+
+def stage_tree(root, into):
+    dbs = 0
+
+    for dirpath, dirnames, filenames in os.walk(root):
+        here = Path(dirpath)
+        dirnames[:] = [d for d in dirnames
+                       if d not in SKIP_DIRS and here / d not in SKIP_PATHS]
+
+        for name in filenames:
+            src = here / name
+            mode = src.lstat().st_mode
+
+            # Sockets and FIFOs (e.g. qBittorrent's ipc-socket) are runtime-only.
+            if not (stat.S_ISREG(mode) or stat.S_ISLNK(mode)):
+                continue
+
+            dst = into / src.relative_to(root)
+            if name.endswith(LIVE_DB_SIDECARS) or name.endswith(".log") or name == "logs.db":
+                continue
+
+            if name.endswith(DB_SUFFIXES):
+                snapshot_db(src, dst)
+                dbs += 1
+                continue
+
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dst, follow_symlinks=False)
+
+    return dbs
+
+
+def main(extra_tags):
+    if not os.path.ismount(MOUNT):
+        print("media drive not mounted; skipping backup")
+        return
+
+    DEST.mkdir(exist_ok=True)
+
+    # Kept beside the repo too, so a dead NVMe (and its .env) cannot leave these backups unreadable.
+    key = ENV["RESTIC_PASSWORD"] + "\n"
+    if not KEYFILE.exists() or KEYFILE.read_text() != key:
+        KEYFILE.touch(mode=0o600)
+        KEYFILE.chmod(0o600)
+        KEYFILE.write_text(key)
+
+    if not (REPO / "config").exists():
+        restic("init")
+        print(f"initialised restic repo at {REPO}")
+
+    shutil.rmtree(STAGE, ignore_errors=True)
+    STAGE.mkdir(mode=0o700, parents=True)
+    try:
+        dbs = stage_tree(CONFIG, STAGE / "config")
+
+        for extra in EXTRA:
+            if extra.is_dir():
+                dbs += stage_tree(extra, STAGE / "home" / extra.name)
+            elif extra.exists():
+                (STAGE / "home").mkdir(exist_ok=True)
+                shutil.copy2(extra, STAGE / "home" / extra.name)
+
+        for f in HOST_FILES:
+            if f.exists():
+                dst = STAGE / "host" / f.relative_to("/")
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(f, dst)
+
+        if "jellystat-db" in enabled_services():
+            with open(STAGE / "jellystat.dump", "wb") as f:
+                subprocess.run(["docker", "exec", "jellystat-db", "pg_dump", "-U", ENV["JELLYSTAT_DB_USER"],
+                                "-d", "jfstat", "-Fc"], check=True, stdout=f)
+
+        tags = [a for t in ["arr-stack", *extra_tags] for a in ("--tag", t)]
+        out = restic("backup", *tags, "--host", ENV["HOST_NAME"], str(STAGE)).stdout
+        forget(REPO)
+    finally:
+        shutil.rmtree(STAGE, ignore_errors=True)
+
+    MIRROR.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    copy_to(MIRROR)
+
+    # Weekly, read back a slice of the stored data to catch a drive silently corrupting it.
+    if datetime.date.today().weekday() == 6 and not extra_tags:
+        for repo in (REPO, MIRROR):
+            restic("check", f"--read-data-subset={CHECK_SUBSET}", repo=repo)
+        print(f"repository checks passed ({CHECK_SUBSET} of data read back on both drives)")
+
+    if OFFSITE and not extra_tags:
+        copy_to(OFFSITE)
+
+    STATE.parent.mkdir(parents=True, exist_ok=True)
+    STATE.write_text(datetime.datetime.now().isoformat(timespec="seconds") + "\n")
+    write_backup_metric()
+
+    added = next((line for line in out.splitlines() if line.startswith("Added to the repository")), "")
+    print(f"backed up {dbs} databases + Jellystat dump. {added}")
+
+    snapshot = next((line.split()[1] for line in out.splitlines() if line.startswith("snapshot ") and " saved" in line), "")
+    print(f"snapshot {snapshot}")
+
+
+if __name__ == "__main__":
+    # Optional extra restic tags, e.g. `stack-backup pre-update` from scripts/stack-update.
+    main(sys.argv[1:])

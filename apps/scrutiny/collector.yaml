@@ -1,0 +1,7 @@
+# Scrutiny's collector: the drive to read SMART data from, and its device type.
+# Read by: scrutiny, mounted read-only.
+# Applies: when scrutiny restarts.
+version: 1
+devices:
+  - device: /dev/sda
+    type: sat

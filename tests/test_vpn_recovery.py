@@ -19,7 +19,7 @@ class RecoveryTests(unittest.TestCase):
         self.boot = self.now - 3600
         (self.repo / 'scripts').mkdir()
         (self.repo / 'state').mkdir()
-        shutil.copy2(ROOT / 'scripts/sync-port', self.repo / 'scripts/sync-port')
+        shutil.copy2(ROOT / 'scripts/vpn-port-sync', self.repo / 'scripts/vpn-port-sync')
         self.prefs = {
             'listen_port': 49094,
             'current_interface_address': '10.2.0.2',
@@ -83,7 +83,7 @@ docker() {
         env = dict(os.environ, TEST_REPO=str(self.repo), PREFS=json.dumps(self.prefs),
                    TEST_NOW=str(self.now), TEST_BOOT=str(self.boot))
         env.update(options)
-        result = subprocess.run(['bash', str(self.repo / 'scripts/sync-port')],
+        result = subprocess.run(['bash', str(self.repo / 'scripts/vpn-port-sync')],
                                 env=env, text=True, capture_output=True, timeout=10)
         events = self.repo / 'events'
         return result, events.read_text().splitlines() if events.exists() else []
@@ -188,11 +188,11 @@ docker() {
         self.assertEqual(events, ['restart', 'reattach', 'notify:media stack: VPN forwarded port restored'])
 
     def test_boot_and_update_defer_sync_until_healthy(self):
-        probe = self.repo / 'scripts/sync-port'
+        probe = self.repo / 'scripts/vpn-port-sync'
         probe.write_text('#!/bin/sh\necho synced\n')
         probe.chmod(0o755)
         for name, marker in [('stack-up', 'if docker compose ps --status running'),
-                             ('update', 'if [[ " ${recreate[*]} "')]:
+                             ('stack-update', 'if [[ " ${recreate[*]} "')]:
             source = (ROOT / 'scripts' / name).read_text()
             start = source.index(marker)
             block = source[start:source.index('\nfi', start) + 3]

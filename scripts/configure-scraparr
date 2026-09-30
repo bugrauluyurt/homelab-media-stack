@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Render scraparr's config from the template, substituting API keys from .env.
+# scraparr can't read env vars, so the output holds live keys: keep it outside the repo.
+# Runs: by hand, once the four keys are in .env, and after any of them changes; then docker compose
+#   restart scraparr so Scraparr reads the new file.
+# Changes: that one file.
+# Idempotent: yes.
+
+set -euo pipefail
+. "$(dirname "$0")/stack-env.sh"
+
+service_enabled scraparr || { echo "  ~ scraparr is off (COMPOSE_PROFILES in .env); skipped"; exit 0; }
+cd "$REPO"
+
+out="${CONFIG_ROOT}/scraparr"
+mkdir -p "$out"
+
+(
+  umask 077
+  sed -e "s|__SONARR_API_KEY__|${SONARR_API_KEY}|" \
+      -e "s|__RADARR_API_KEY__|${RADARR_API_KEY}|" \
+      -e "s|__PROWLARR_API_KEY__|${PROWLARR_API_KEY}|" \
+      -e "s|__BAZARR_API_KEY__|${BAZARR_API_KEY}|" \
+      apps/scraparr/config.yaml.template > "$out/config.yaml"
+)
+chmod 600 "$out/config.yaml"
+echo "rendered $out/config.yaml"

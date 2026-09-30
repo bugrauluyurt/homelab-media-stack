@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 """Configure SABnzbd: the Usenet server from .env, download folders on the
-media drive, and one category per app. Idempotent.
+media drive, and one category per app.
+
+Runs: by hand, before configure-arr.py when you use Usenet.
+Changes: writes SABNZBD_API_KEY into .env; writes local_ranges (LAN_CIDR, 100.64.0.0/10,
+  172.16.0.0/12, 127.0.0.0/8) straight into sabnzbd.ini with SABnzbd stopped, then starts it again;
+  everything else through SABnzbd's API.
+Idempotent: yes.
 """
 import json
 import subprocess
@@ -9,7 +15,7 @@ import time
 import urllib.parse
 import urllib.request
 
-from stack_env import CONFIG, ENV, REPO, set_env
+from stack_env import CONFIG, ENV, REPO, set_env, sabnzbd_key
 
 URL = "http://127.0.0.1:8085/api"
 SERVER = "usenet"
@@ -29,8 +35,7 @@ MISC = {"download_dir": "/data/usenet/incomplete", "complete_dir": "/data/usenet
         "username": ENV.get("SABNZBD_USER", ""), "password": ENV.get("SABNZBD_PASSWORD", "")}
 
 INI = CONFIG / "sabnzbd" / "sabnzbd.ini"
-KEY = subprocess.run(["sudo", "grep", "-oP", r"^api_key = \K\S+", f"{CONFIG}/sabnzbd/sabnzbd.ini"],
-                     capture_output=True, text=True).stdout.strip()
+KEY = sabnzbd_key()
 
 if ENV.get("SABNZBD_API_KEY") != KEY:
     set_env("SABNZBD_API_KEY", KEY)

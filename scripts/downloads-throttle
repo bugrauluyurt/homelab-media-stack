@@ -1,0 +1,75 @@
+#!/usr/bin/env python3
+"""Cap qBittorrent while someone is watching or the server is overloaded; run every minute by arr-throttle.timer.
+
+Runs: arr-throttle.timer every minute, from 3 minutes after boot; stack-health runs --upload-cap.
+Changes: qBittorrent preferences and speed limit mode (an automatic exception the owner approved).
+Idempotent: yes.
+
+Uploads always stay capped at 10 Mbps. Downloads get the alternative speed limit while anyone
+plays in Jellyfin or Plex or the 5-minute load is LOAD_ON or more, until nobody watches and
+the load is under LOAD_OFF. A limit switched on by hand is left alone.
+
+  downloads-throttle --upload-cap   print the upload cap (stack-health reads it)
+"""
+import json
+import os
+import sys
+import urllib.parse
+import urllib.request
+
+from stack_env import ENV, STATE, enabled_services, http, jellyfin_headers
+
+QBIT = f"http://127.0.0.1:{ENV['QBIT_PORT']}/api/v2"
+
+# At 40 MB/s the VPN alone kept the CPU ~90% busy.
+DOWNLOAD_MB_S, UPLOAD_MBIT_S = 20, 10
+# qBittorrent stores limits in whole KiB per second.
+CAP = DOWNLOAD_MB_S * 1_000_000 // 1024 * 1024
+UPLOAD_CAP = UPLOAD_MBIT_S * 125_000 // 1024 * 1024
+
+# Twice the cores switches the cap on, back under the core count switches it off.
+LOAD_ON, LOAD_OFF = 2 * (os.cpu_count() or 4), os.cpu_count() or 4
+
+# stack-health asks for the configured upload cap instead of keeping its own copy.
+if sys.argv[1:] == ["--upload-cap"]:
+    print(UPLOAD_MBIT_S, UPLOAD_CAP)
+    sys.exit()
+
+OURS = STATE / "throttle-by-script"
+
+
+def qbit(path, form=None):
+    data = urllib.parse.urlencode(form).encode() if form is not None else None
+
+    with urllib.request.urlopen(urllib.request.Request(QBIT + path, data=data), timeout=15) as r:
+        return r.read().decode()
+
+
+def watching():
+    jellyfin = http("http://127.0.0.1:8096/Sessions", timeout=10, fatal=False,
+                    headers=jellyfin_headers()) or []
+    plex = http("http://127.0.0.1:32400/status/sessions", timeout=10, fatal=False,
+                headers={"Accept": "application/json"}) if "plex" in enabled_services() else None
+    plex = plex or {}
+
+    return any(s.get("NowPlayingItem") for s in jellyfin) or plex.get("MediaContainer", {}).get("size", 0) > 0
+
+
+prefs = json.loads(qbit("/app/preferences"))
+limits = {"alt_dl_limit": CAP, "up_limit": UPLOAD_CAP, "alt_up_limit": UPLOAD_CAP}
+if any(prefs[k] != v for k, v in limits.items()):
+    qbit("/app/setPreferences", {"json": json.dumps(limits)})
+    print(f"speed limits set: alternative download {DOWNLOAD_MB_S} MB/s, upload {UPLOAD_MBIT_S} Mbps in both modes")
+
+on = qbit("/transfer/speedLimitsMode").strip() == "1"
+load = float(open("/proc/loadavg").read().split()[1])
+viewer = watching()
+
+if not on and (viewer or load >= LOAD_ON):
+    qbit("/transfer/toggleSpeedLimitsMode", {})
+    OURS.touch()
+    print(f"limit on ({'someone is watching' if viewer else f'load {load:.1f}'})")
+elif on and OURS.exists() and not viewer and load < LOAD_OFF:
+    qbit("/transfer/toggleSpeedLimitsMode", {})
+    OURS.unlink()
+    print(f"limit off (nobody watching, load {load:.1f})")

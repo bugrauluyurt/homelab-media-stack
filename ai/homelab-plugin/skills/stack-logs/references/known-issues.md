@@ -4,11 +4,11 @@ Each entry says what you see, why it happens, and what to do.
 
 ## qBittorrent stops answering after gluetun restarts
 - **Symptom:** Radarr, Sonarr, Lidarr or Questarr say "connection refused" to
-  `gluetun:8080` or "Failed to connect to qBittorrent", or `health-check` fails
+  `gluetun:8080` or "Failed to connect to qBittorrent", or `stack-health` fails
   "qbittorrent bound to the tunnel". qBittorrent itself still shows as running.
 - **Cause:** qBittorrent and slskd live in gluetun's network namespace. When
   gluetun is recreated they keep running, but their network is gone.
-- **Fix:** `scripts/sync-port` reattaches them once gluetun is healthy and has a valid forwarded
+- **Fix:** `scripts/vpn-port-sync` reattaches them once gluetun is healthy and has a valid forwarded
   port. The existing timer also restores clients left stopped during an outage. It does not
   recreate clients while the VPN is unhealthy, or restart unrelated services.
 
@@ -38,18 +38,18 @@ Each entry says what you see, why it happens, and what to do.
 
 ## Forwarded port out of sync
 - **Cause:** Proton assigns a new port on every reconnect.
-- **Fix:** `scripts/sync-port`. A 15-minute timer also does it. An "up command
+- **Fix:** `scripts/vpn-port-sync`. A 15-minute timer also does it. An "up command
   exit status 4" line in gluetun's log just means qBittorrent wasn't up yet; it's harmless.
-- **Right after a reboot** `health-check` may fail "forwarded port is in sync": qBittorrent
+- **Right after a reboot** `stack-health` may fail "forwarded port is in sync": qBittorrent
   comes back on its saved, now stale port. `scripts/stack-up` re-syncs it once the tunnel
   reports healthy, and `arr-port-sync.timer` runs 90 seconds after boot, so a check in the
-  first minute can catch it mid-flight. Run `scripts/sync-port` to fix it at once.
+  first minute can catch it mid-flight. Run `scripts/vpn-port-sync` to fix it at once.
 
 ## Torrents stuck at 0 peers, trackers say "Operation not permitted"
 - **Cause 1:** qBittorrent bound to the Docker bridge instead of the VPN tunnel. gluetun
   routes traffic from the bridge address back out `eth0` so the published WebUI can reply,
   so tracker packets leave outside the tunnel and gluetun's firewall drops them.
-- **Fix:** `scripts/sync-port` binds qBittorrent to the tunnel's current address. That
+- **Fix:** `scripts/vpn-port-sync` binds qBittorrent to the tunnel's current address. That
   address changes on every Proton reconnect, which is why a timer runs it every 15 minutes.
 - **Cause 2:** DNS answered with IPv6 (AAAA) addresses the tunnel has no route for.
   `DOT_IPV6: "off"` on gluetun in `docker-compose.yml` prevents it; keep it off.
@@ -60,7 +60,7 @@ Each entry says what you see, why it happens, and what to do.
   tracker refusing the announce, e.g. TR4KER's "ratio insuffisant; uploadez avant de télécharger".
 - **Cause:** the account's ratio is below the tracker's minimum, so it hands out no peers. Private
   torrents have DHT and PeX off, so the tracker is their only source. Well-seeded French TV has
-  hardly any leechers, so seeding it barely raises the ratio. `add-indexers.py` keeps the account
+  hardly any leechers, so seeding it barely raises the ratio. `configure-indexers.py` keeps the account
   trackers on Prowlarr's `RSS only` app profile so backlog searches can't drain the ratio again.
 - **What happens already:** Cleanuparr's stall rule removes such a download after about an hour
   (from qBittorrent too) and blocklists it, and the app searches again.
@@ -76,18 +76,18 @@ Each entry says what you see, why it happens, and what to do.
   `getent hosts <domain>` before blaming the VPN.
 
 ## No forwarded port at all ("vpn forwarded port" DOWN in Kuma)
-- **Symptom:** Kuma alerts "vpn forwarded port"; `sync-port` says "no valid forwarded
+- **Symptom:** Kuma alerts "vpn forwarded port"; `vpn-port-sync` says "no valid forwarded
   port"; gluetun's log shows `port forwarding ... i/o timeout (tries 1 ... 9)` and then
   gives up. The tunnel is still up and torrents stay inside it, but get no incoming peers.
 - **Cause:** the Proton server stopped answering NAT-PMP after a reconnect.
-- **Usually fixes itself:** `sync-port` restarts gluetun once the port has been missing 15 min
+- **Usually fixes itself:** `vpn-port-sync` restarts gluetun once the port has been missing 15 min
   (at most once every 2 h; state in `$STATE_ROOT/port-forward-*`, reset at boot) and reports on ntfy.
   Act only if the user got "VPN still has no forwarded port".
 - **Manual fix (ask first, it pauses torrents and Soulseek for about a minute):**
   `docker compose restart gluetun`, wait until it's healthy and
   `/tmp/gluetun/forwarded_port` has a number, then
-  `docker compose up -d --force-recreate qbittorrent slskd` and `scripts/sync-port`.
-  Confirm with `scripts/leak-test`.
+  `docker compose up -d --force-recreate qbittorrent slskd` and `scripts/vpn-port-sync`.
+  Confirm with `scripts/vpn-leak-test`.
 
 ## Questarr says "added to qBittorrent" but nothing downloads
 - **Cause:** Prowlarr writes the host it was called on into its download links,
@@ -137,7 +137,7 @@ Each entry says what you see, why it happens, and what to do.
 - Searches through Byparr take about 15 to 20 s while the challenge clears. That is normal.
 
 ## Searches find nothing, or an indexer keeps failing
-- **See which work:** `scripts/check-indexers` tests every indexer and prints Prowlarr's own
+- **See which work:** `scripts/indexers-check` tests every indexer and prints Prowlarr's own
   query and failure counts. Prowlarr already does this continuously: it disables a failing
   indexer with exponential backoff and re-enables it when it recovers (Prowlarr → System → Health).
 - **Cloudflare errors:** the indexer needs Byparr. Give it the `byparr` tag in Prowlarr and
@@ -163,7 +163,7 @@ Each entry says what you see, why it happens, and what to do.
   flag, separate from `CONTAINERS`. Dozzle's log shows "403 Forbidden ...
   administrative rules".
 - **Fix:** `ALLOW_LOGS: 1` on `socket-proxy` in compose (a read-only GET; `POST` stays
-  0). `health-check` checks both that logs are readable and that writes are refused.
+  0). `stack-health` checks both that logs are readable and that writes are refused.
 
 ## Dozzle shows no CPU or memory (avg CPU/memory empty)
 - **Cause:** Dozzle lists containers once at start and never retries. When the whole
@@ -186,7 +186,7 @@ Each entry says what you see, why it happens, and what to do.
 - **Cause:** a big batch downloading at full speed (~90 MB/s). Decrypting the VPN tunnel then
   takes most of the CPU (load 15+, mostly `napi/tun` and `ksoftirqd`), rather than the disk.
   Many simultaneous torrents (60+) can also saturate the USB drive. Queueing is off by choice.
-- **What happens already:** `throttle-downloads` (every minute) switches on qBittorrent's
+- **What happens already:** `downloads-throttle` (every minute) switches on qBittorrent's
   alternative limit, 20 MB/s, while anyone plays in Jellyfin or Plex or the 5-minute load reaches
   twice the core count (8 on a Pi 5), and off once nobody watches and the load is under the core
   count. Check `journalctl -u arr-throttle`.
@@ -244,22 +244,22 @@ Each entry says what you see, why it happens, and what to do.
   isn't one, so phones on the tailnet were refused.
 - **Fix:** `configure-sabnzbd.py` writes `local_ranges` (LAN, tailnet, Docker, localhost)
   into `sabnzbd.ini` with the container stopped. SABnzbd silently ignores API changes to
-  that setting. `health-check` verifies the tailnet is listed.
+  that setting. `stack-health` verifies the tailnet is listed.
 
 ## "Pool overlaps with other one on this address space" when the stack starts
 - **Cause:** another Docker network on the machine already uses the `arr` network's subnet.
   Docker gives `172.18.0.0/16`, the default `ARR_SUBNET`, to the first other compose project.
-- **Fix:** `scripts/install-host` names the clashing network. Set a free `/16` as `ARR_SUBNET` in
+- **Fix:** `scripts/host-install` names the clashing network. Set a free `/16` as `ARR_SUBNET` in
   `.env` (for example `172.28.0.0/16`) and move `PROWLARR_IP` into it (`172.28.0.200`), then
   start the stack and re-run `configure-questarr.py`, which stores Prowlarr's address.
 
 ## An app won't open from home Wi-Fi, only Jellyfin, Seerr and the games page do
-- **This is by design:** the host firewall (`scripts/firewall`) lets the home network
+- **This is by design:** the host firewall (`scripts/host-firewall`) lets the home network
   reach only Jellyfin (8096), Seerr (5055) and the games page (8090); SSH and SFTP (2022)
   are Tailscale only. Use the Tailscale address, at home too.
 - Seerr is open because TV apps such as JellySee (home network, no Tailscale) load
   "Upcoming", trending and requests from it. If those sections fail but playback works,
-  check the `ctorigdstport 5055` rule in `ARR-FWD` (`sudo scripts/firewall status`).
+  check the `ctorigdstport 5055` rule in `ARR-FWD` (`sudo scripts/host-firewall status`).
 - Macvlan containers have their own home-network addresses and bypass the host's
   firewall entirely; leave them to their own project.
 
@@ -270,7 +270,7 @@ Each entry says what you see, why it happens, and what to do.
   the Tailscale app is connected (it pauses while the TV sleeps).
 - They reach only 8096, 5055, 5000, 8090, 2022 (SFTP) and 4535 (Needle) by design (see `host/tailscale-policy.hujson`).
 - Their Jellyfin, Seerr, game downloads (SFTPGo) and Navidrome (Needle) logins come from
-  `scripts/add-viewer.py`; the Navidrome username is their name up to any "@". Needle is
+  `scripts/viewer-add.py`; the Navidrome username is their name up to any "@". Needle is
   on 4535 for viewers too (the policy's viewer grant must include `tcp:4535`). What they
   may do in Needle (request music, Spotify) is in Needle → Settings → People; they appear
   there after their first sign-in.
@@ -282,11 +282,11 @@ Each entry says what you see, why it happens, and what to do.
 - A **single file** resumes (HTTP ranges); a **zip of several items** is built on the fly
   and can't. For big games over the internet, download files one by one.
 - Its admin can't log in from the tailnet by design (allow-list `127.0.0.0/8`,
-  `172.16.0.0/12`); `configure-sftpgo.py` and `add-viewer.py` run on the server.
+  `172.16.0.0/12`); `configure-sftpgo.py` and `viewer-add.py` run on the server.
 
 ## Lidarr: "Connection refused (gluetun:5030)" from SlskdDownloadManager
 - **Cause:** slskd lives in gluetun's network namespace, so while gluetun restarts
-  (an update, or `sync-port`'s automatic VPN restart) Lidarr can't reach it for a few
+  (an update, or `vpn-port-sync`'s automatic VPN restart) Lidarr can't reach it for a few
   seconds. Lidarr keeps its cached items and retries on its own.
 - **Harmless if it's one error per VPN restart.** If it repeats, slskd lost gluetun's
   network: `docker compose up -d --force-recreate slskd`.
@@ -294,7 +294,7 @@ Each entry says what you see, why it happens, and what to do.
 ## SSH refused ("Permission denied (publickey)") from a device of yours
 - SSH is Tailscale only, and each key has a `from=` list: the owner's keys accept the
   tailnet ranges, and other keys only the devices they belong to. Connect over Tailscale, or add that
-  device's source to the key's `from=` (keep it pinned; `health-check` checks).
+  device's source to the key's `from=` (keep it pinned; `stack-health` checks).
 
 ## Radarr downloaded a fake of a movie still in cinemas
 - **Cause:** a search started through Radarr's API (`MissingMoviesSearch`, `MoviesSearch`)
@@ -316,16 +316,16 @@ cache at once.
 - **Check:** the drive is powered on, then `systemctl status <unit>.mount`, where the unit is
   `systemd-escape --path --suffix=mount "$STORAGE_MOUNT"` (`mnt-storage.mount` for `/mnt/storage`).
 - **After reformatting:** the udev rule matches the filesystem UUID. Put the new UUID
-  (`lsblk -f`) in `STORAGE_UUID` in `.env` and in `/etc/fstab`, then re-run `scripts/install-host`.
+  (`lsblk -f`) in `STORAGE_UUID` in `.env` and in `/etc/fstab`, then re-run `scripts/host-install`.
 - The stack refuses to start without the mount (`arr-stack.service` checks `mountpoint`), so
   media never lands on the system disk.
 
 ## Glance's video rows are empty or stale
 - **Cause:** Glance reads `/assets/youtube/<tab>.json`, which `arr-youtube.timer` rewrites hourly.
-  Check `systemctl status arr-youtube.service` and run `scripts/sync-youtube.py`: `!` lines name
+  Check `systemctl status arr-youtube.service` and run `scripts/youtube-sync.py`: `!` lines name
   channels that failed and kept their last videos.
 - Not signed in (`YOUTUBE_REFRESH_TOKEN` empty), the videos come from YouTube's RSS feed, which
-  answers 404 for hours at a time; sign in with `sync-youtube.py --login` to use the Data API.
+  answers 404 for hours at a time; sign in with `youtube-sync.py --login` to use the Data API.
 - `quotaExceeded` from the API resets at midnight Pacific time; the rows keep their last videos.
 
 ## Things never to do
@@ -337,5 +337,5 @@ cache at once.
 - Printing or committing secrets from `.env`.
 - Triggering Radarr searches through the API for movies that aren't `isAvailable`: it
   bypasses "wait until released" and grabs fakes.
-- Opening more ports to the home network, or leaving `scripts/firewall off` in place.
+- Opening more ports to the home network, or leaving `scripts/host-firewall off` in place.
   Guests share that network; new access goes through Tailscale and its access rules.

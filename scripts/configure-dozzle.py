@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """Configure Dozzle's login from DOZZLE_USER / DOZZLE_PASSWORD in .env.
 
-Idempotent: when the login already works nothing changes; otherwise users.yml is
+Runs: by hand.
+Changes: users.yml; docker compose up -d dozzle, and a restart when the login changed.
+Idempotent: yes.
+
+When the login already works nothing changes; otherwise users.yml is
 regenerated with Dozzle's own generator and the container restarted.
 """
 import subprocess

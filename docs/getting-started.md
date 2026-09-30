@@ -10,14 +10,14 @@ flowchart TD
   clone --> disk["Mount the media disk, create the data folders"]
   disk --> vpn["Proton key in .env, wg0.conf"]
   vpn --> seed["Seed qBittorrent's config"]
-  seed --> host["install-host: preflight, units, SSH, Docker logs"]
+  seed --> host["host-install: preflight, units, SSH, Docker logs"]
   host --> policy["Tailscale policy and tag:media"]
   policy --> fw["Enable the firewall"]
   fw --> start["Pull images, enable arr-stack.service"]
   start --> keys["First visits and API keys into .env"]
   keys --> configure["Configure scripts, in order"]
   configure --> timers["Enable the timers"]
-  timers --> health["health-check: 0 failed"]
+  timers --> health["stack-health: 0 failed"]
 ```
 
 ## Before you start
@@ -37,7 +37,7 @@ Tailscale address and `<lan-ip>` its home-network address.
 
 ## Install the prerequisites
 
-`scripts/install-host` checks for all of these and prints the exact install command for
+`scripts/host-install` checks for all of these and prints the exact install command for
 anything missing, so you can also run it first and copy what it prints.
 
 | Needed for | Debian and Ubuntu | Arch |
@@ -113,7 +113,7 @@ Use a Linux filesystem such as ext4: imports rely on hardlinks and Unix permissi
 exFAT and NTFS do not give you. Pick one of three setups.
 
 **A USB drive you switch on and off by hand.** Add it to `/etc/fstab` by UUID with `nofail`,
-and put the same UUID in `STORAGE_UUID`. `install-host` then installs a udev rule that mounts
+and put the same UUID in `STORAGE_UUID`. `host-install` then installs a udev rule that mounts
 the drive when it powers on, and the stack starts and stops with it
 ([Storage and boot](flows/storage-and-boot.md)).
 
@@ -127,7 +127,7 @@ sudo mount /mnt/storage
 ```
 
 **An always-on disk.** The same `/etc/fstab` line, and leave `STORAGE_UUID` empty.
-`install-host` then skips the udev rule.
+`host-install` then skips the udev rule.
 
 **A single-disk machine.** Bind-mount a folder onto the mount point, and leave `STORAGE_UUID`
 empty:
@@ -188,7 +188,7 @@ with `openssl rand -hex 24`.
 | [`DATA_ROOT`](reference/configuration.md#data_root) | A folder inside `STORAGE_MOUNT`, such as `/mnt/storage/data` |
 | [`CONFIG_ROOT`](reference/configuration.md#config_root) | App settings on the system disk, outside the repo, such as `/home/<you>/homelab-media-stack-data/config` |
 | [`LAN_CIDR`](reference/configuration.md#lan_cidr) | Your home network, such as `192.168.1.0/24` |
-| [`ARR_SUBNET`](reference/configuration.md#arr_subnet), [`PROWLARR_IP`](reference/configuration.md#prowlarr_ip), [`QBIT_PORT`](reference/configuration.md#qbit_port) | Keep the defaults unless they clash; `install-host` reports a subnet another Docker network already uses |
+| [`ARR_SUBNET`](reference/configuration.md#arr_subnet), [`PROWLARR_IP`](reference/configuration.md#prowlarr_ip), [`QBIT_PORT`](reference/configuration.md#qbit_port) | Keep the defaults unless they clash; `host-install` reports a subnet another Docker network already uses |
 | [`COMPOSE_PROFILES`](reference/configuration.md#compose_profiles) | Your modules, see [Pick your modules](#pick-your-modules) |
 | [`MEDIA_CPUS`](reference/configuration.md#media_cpus) | Cores Jellyfin, Plex and Byparr may each use; below your core count |
 | [`HOMEPAGE_ALLOWED_HOSTS`](reference/configuration.md#homepage_allowed_hosts) | Every `host:3000` you open Homepage on; SABnzbd and Jellyfin's plugins reuse this list |
@@ -295,26 +295,26 @@ States.
 
 **Other VPN providers.** gluetun supports many providers, and you can change
 `VPN_SERVICE_PROVIDER` and its settings in `docker-compose.yml`. Port forwarding here is
-Proton-specific, though: `VPN_PORT_FORWARDING_PROVIDER` is `protonvpn`, and `sync-port`,
-`leak-test` and the health check expect Proton's forwarded port. Without a forwarded port,
+Proton-specific, though: `VPN_PORT_FORWARDING_PROVIDER` is `protonvpn`, and `vpn-port-sync`,
+`vpn-leak-test` and the health check expect Proton's forwarded port. Without a forwarded port,
 torrents still run inside the VPN but reach only peers that accept incoming connections.
 
 ## Seed qBittorrent's config
 
-qBittorrent starts from the settings in `qbittorrent/`: bound to the tunnel interface, login
+qBittorrent starts from the settings in `apps/qbittorrent/`: bound to the tunnel interface, login
 free only for the tailnet and Docker, CSRF and Host checks on, and categories that save into
 `/data/torrents`. Copy them into place before its first start (in the shell where you loaded `.env`):
 
 ```bash
 install -d "$CONFIG_ROOT/qbittorrent/qBittorrent"
-cp qbittorrent/qBittorrent.conf qbittorrent/categories.json "$CONFIG_ROOT/qbittorrent/qBittorrent/"
+cp apps/qbittorrent/qBittorrent.conf apps/qbittorrent/categories.json "$CONFIG_ROOT/qbittorrent/qBittorrent/"
 ```
 
 Why each setting matters is in [Security: qBittorrent](security.md#qbittorrents-web-ui).
 
 ## Install the host side
 
-First make sure no other firewall owns the rules. `scripts/firewall` refuses to apply while
+First make sure no other firewall owns the rules. `scripts/host-firewall` refuses to apply while
 ufw or firewalld is active (either would drop what its rules allow), or while Docker uses its
 nftables firewall backend (which ignores the `DOCKER-USER` chain the rules hook into):
 
@@ -327,10 +327,10 @@ docker info --format '{{.FirewallBackend.Driver}}'   # anything but nftables
 Also check that your SSH key is in `~/.ssh/authorized_keys` and pinned with `from="..."`
 ([Security: SSH](security.md#ssh)): the next step turns SSH passwords off.
 
-Then run `install-host` as the stack user (it uses `sudo` itself):
+Then run `host-install` as the stack user (it uses `sudo` itself):
 
 ```bash
-./scripts/install-host
+./scripts/host-install
 ```
 
 It first checks the prerequisites. When something is missing it prints what to run and stops,
@@ -353,7 +353,7 @@ When everything is there it installs the host side:
   rpcbind off (no NFS here)
 ```
 
-That is: the systemd units and the udev rule from `systemd/`, filled in from `.env`; SSH
+That is: the systemd units and the udev rule from `host/systemd/`, filled in from `.env`; SSH
 set to keys only with root login off; Docker's log rotation in `/etc/docker/daemon.json`;
 and `rpcbind` disabled and masked. It enables nothing, and it is safe to re-run after
 changing `.env`. Restart Docker once (`sudo systemctl restart docker`) so the log rotation
@@ -434,7 +434,7 @@ this order, since each builds on the ones before:
 | 2 | `./scripts/configure-arr.py` | SABnzbd configured; `JELLYFIN_API_KEY` |
 | 3 | `./scripts/configure-bazarr.py` | Radarr and Sonarr set up |
 | 4 | `./scripts/configure-lidarr.py` (music) | step 2; creates the Navidrome admin |
-| 5 | `./scripts/add-indexers.py` | Prowlarr linked in step 2 |
+| 5 | `./scripts/configure-indexers.py` | Prowlarr linked in step 2 |
 | 6 | `./scripts/configure-plex.py` (plex) | Plex started once |
 | 7 | `./scripts/configure-seerr.py` | Jellyfin, Radarr and Sonarr; then copy Seerr's API key (**Settings**, **General**) into `SEERR_API_KEY` |
 | 8 | `./scripts/configure-jellyfin-plugins.py` | `JELLYFIN_API_KEY` and `SEERR_API_KEY` |
@@ -447,7 +447,7 @@ this order, since each builds on the ones before:
 | 15 | `./scripts/configure-grafana-watch.py` (monitoring and stats) | Jellystat's first visit; gives Grafana read-only viewing history |
 | 16 | `./scripts/configure-navidrome.py` (music) | the Navidrome admin from step 4 |
 | 17 | `./scripts/configure-uptime-kuma.py` (monitoring) | last: one monitor per published port |
-| 18 | `./scripts/render-scraparr-config` (monitoring), then `docker compose restart scraparr` | the Radarr, Sonarr, Prowlarr and Bazarr keys in `.env` |
+| 18 | `./scripts/configure-scraparr` (monitoring), then `docker compose restart scraparr` | the Radarr, Sonarr, Prowlarr and Bazarr keys in `.env` |
 
 Jellystat's first visit (stats module): open `http://<tailscale-ip>:3002`, create its own
 login, and connect it to Jellyfin with URL `http://jellyfin:8096` and the
@@ -464,7 +464,7 @@ sudo systemctl enable --now arr-health.timer arr-watch.timer arr-throttle.timer
 sudo systemctl enable --now arr-youtube.timer      # dashboards module only
 ```
 
-They are enabled last because `watch-activity` and `throttle-downloads` read Jellyfin and
+They are enabled last because `activity-watch` and `downloads-throttle` read Jellyfin and
 Seerr with the API keys from the previous steps. Every unit and when it runs is in
 [systemd](reference/systemd.md).
 
@@ -488,7 +488,7 @@ group themselves). Recreate them with `docker compose up -d`, then run
 ## Check that it is healthy
 
 ```bash
-./scripts/health-check
+./scripts/stack-health
 ```
 
 It checks the drive, the systemd units, the firewall and SSH, the backups, every enabled
@@ -513,7 +513,7 @@ VPN
 
 It exits non-zero when anything fails. On a new install, expect a few failures until the
 first night has passed: the backup checks want a backup under 48 hours old (run
-`sudo ./scripts/backup-config` once to satisfy them now), and the port sync can lag a minute
+`sudo ./scripts/stack-backup` once to satisfy them now), and the port sync can lag a minute
 behind a fresh VPN connection. The health check also runs every 6 hours by itself and pushes
 failures to ntfy. When a check stays red, see [Troubleshooting](troubleshooting.md).
 

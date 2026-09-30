@@ -2,7 +2,7 @@
 
 This page is for the owner who wants family or a friend to watch, request, listen or download games
 from their own home. It covers the Tailscale invite, the access policy that limits what they reach,
-and `scripts/add-viewer.py`, which creates their accounts in every app with one password.
+and `scripts/viewer-add.py`, which creates their accounts in every app with one password.
 
 Four steps: you do the first two in Tailscale's admin console and the third on the server; they do
 the fourth. Nothing is published to the internet: viewers come in through your tailnet, and the
@@ -13,7 +13,7 @@ sequenceDiagram
     actor Owner
     participant TS as Tailscale admin console
     actor Viewer
-    participant AV as add-viewer.py
+    participant AV as viewer-add.py
     participant JF as Jellyfin
     participant SR as Seerr
     participant SG as SFTPGo
@@ -24,7 +24,7 @@ sequenceDiagram
     TS-->>Viewer: invitation
     Viewer->>TS: sign up, join as a Member
     Owner->>TS: add their email to group:viewers, save the policy
-    Owner->>AV: add-viewer.py their-email, flags
+    Owner->>AV: viewer-add.py their-email, flags
     AV->>JF: user with viewer permissions
     AV->>SR: import from Jellyfin, may request
     AV->>SG: read-only games login, games module only
@@ -98,7 +98,7 @@ everyone a password guests can't guess.
 On the server, from the repository:
 
 ```bash
-scripts/add-viewer.py their@example.com --auto-approve --music-requests
+scripts/viewer-add.py their@example.com --auto-approve --music-requests
 ```
 
 It asks for a password (or reads one line from stdin) and uses that one password everywhere:
@@ -118,7 +118,7 @@ Management* in the Spotify developer dashboard ([Music](music.md)).
 
 Games accounts are managed only through
 [`scripts/games_accounts.py`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/games_accounts.py),
-which `add-viewer.py` calls. SFTPGo's admin API answers only the server and Docker
+which `viewer-add.py` calls. SFTPGo's admin API answers only the server and Docker
 (`127.0.0.0/8` and `172.16.0.0/12`), which is why the script runs on the server.
 
 **Questarr** has one shared login (`admin` and `QUESTARR_PASSWORD`) and no approval step. Tell
@@ -148,10 +148,10 @@ Navidrome if you want them gone.
 
 | Name | Role | Reference |
 |---|---|---|
-| `add-viewer.py` | Jellyfin, Seerr, games and music accounts with one password | [scripts](../reference/scripts.md#add-viewerpy) |
+| `viewer-add.py` | Jellyfin, Seerr, games and music accounts with one password | [scripts](../reference/scripts.md#viewer-addpy) |
 | `games_accounts.py` | The only way games accounts are created; keeps them read-only | [scripts](../reference/scripts.md#games_accountspy) |
 | `host/tailscale-policy.hujson` | Reference copy of the access policy | [Host changes](../operations/host.md) |
-| `firewall` | Keeps the home network to Jellyfin, Seerr and the games page | [scripts](../reference/scripts.md#firewall) |
+| `host-firewall` | Keeps the home network to Jellyfin, Seerr and the games page | [scripts](../reference/scripts.md#host-firewall) |
 
 ## When it goes wrong
 

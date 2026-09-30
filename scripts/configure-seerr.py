@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
-"""Point Seerr at Jellyfin and connect it to Radarr and Sonarr. Safe to re-run."""
+"""Point Seerr at Jellyfin and connect it to Radarr and Sonarr.
+
+Runs: by hand, after Jellyfin and the arr apps are configured. Then copy Seerr's API key (Settings,
+  General) into SEERR_API_KEY for the scripts after it.
+Changes: Seerr API.
+Idempotent: yes.
+"""
 import sys
 import time
 import urllib.request
 from http.cookiejar import CookieJar
 
-from stack_env import ENV, arr_key, http
+from stack_env import ENV, NTFY_SERVER, arr_key, http
 
 BASE = "http://127.0.0.1:5055/api/v1"
 op = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(CookieJar()))
@@ -75,7 +81,7 @@ for app, port, ep, prof, root in (
 NTFY_TYPES = 8 | 16
 if ENV.get("NTFY_TOPIC"):
     ntfy = call("/settings/notifications/ntfy", method="GET") or {}
-    opts = {**ntfy.get("options", {}), "url": ENV.get("NTFY_SERVER", "https://ntfy.sh"), "topic": ENV["NTFY_TOPIC"]}
+    opts = {**ntfy.get("options", {}), "url": NTFY_SERVER, "topic": ENV["NTFY_TOPIC"]}
     if ntfy.get("enabled") and ntfy.get("types") == NTFY_TYPES and ntfy.get("options") == opts:
         print("  = ntfy: available and failed requests")
     else:

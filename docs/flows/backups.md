@@ -26,7 +26,7 @@ flowchart TD
 
 ## What is backed up
 
-`scripts/backup-config` runs as root (the app folders belong to several container users) and stages
+`scripts/stack-backup` runs as root (the app folders belong to several container users) and stages
 these into `/var/tmp/arr-backup`, a private folder deleted after every run:
 
 | What | From | Why |
@@ -48,7 +48,7 @@ these into `/var/tmp/arr-backup`, a private folder deleted after every run:
   history database, gluetun's server list, Jellyfin's extracted subtitles, and Jellystat's raw
   Postgres files (the dump covers them).
 - **What the repository reinstalls:** systemd units, the firewall and SSH hardening
-  (`scripts/install-host`), the Docker images, and Tailscale's login.
+  (`scripts/host-install`), the Docker images, and Tailscale's login.
 - **The rest of the home folder.**
 
 ## Why the databases are copied carefully
@@ -89,31 +89,31 @@ is copied as a plain file.
 10. **Record success** in `/var/lib/arr-backup/last-success` and as the metric
     `arr_backup_last_success_timestamp_seconds` in `$STATE_ROOT/metrics/backup.prom` (written
     whole and renamed into place). The last lines printed are the number of databases and the
-    snapshot id, which `update` reads.
+    snapshot id, which `stack-update` reads.
 
-A "nightly run" means one without an extra tag. A `pre-update` snapshot from `update` is copied to
+A "nightly run" means one without an extra tag. A `pre-update` snapshot from `stack-update` is copied to
 the system disk but skips the weekly check and the offsite copy.
 
 ## When it runs
 
 ```mermaid
 flowchart LR
-    TIMER["arr-backup.timer, daily 04:30"] -->|"only while the drive is mounted"| RUN["backup-config"]
+    TIMER["arr-backup.timer, daily 04:30"] -->|"only while the drive is mounted"| RUN["stack-backup"]
     UPD["update"] -->|"tag pre-update"| RUN
-    HAND["sudo scripts/backup-config tag"] --> RUN
-    RUN -->|"the unit failed"| NF["notify-failure: last log lines to ntfy"]
+    HAND["sudo scripts/stack-backup tag"] --> RUN
+    RUN -->|"the unit failed"| NF["stack-failure-notify: last log lines to ntfy"]
     RUN --> OK["last-success and metric"]
-    OK --> HC["health-check fails after 48 hours without one"]
+    OK --> HC["stack-health fails after 48 hours without one"]
 ```
 
 | When | How |
 |---|---|
 | Daily at 04:30 | [`arr-backup.timer`](../reference/systemd.md#arr-backuptimer), up to 15 minutes of random delay. `Persistent=true`: if the server or drive was off at 04:30, it runs at the next chance. The service runs at low CPU and idle I/O priority and is skipped, not failed, while the drive is unmounted. |
-| Before every `update` | The same run, tagged `pre-update`. `update` stops if it fails, and `update --rollback` restores from it ([Updates](updates.md)). |
-| By hand | `sudo scripts/backup-config` (about a minute). Add a tag to mark it: `sudo scripts/backup-config pre-change`. It prints `snapshot <id>` at the end. |
+| Before every `stack-update` | The same run, tagged `pre-update`. `stack-update` stops if it fails, and `stack-update --rollback` restores from it ([Updates](updates.md)). |
+| By hand | `sudo scripts/stack-backup` (about a minute). Add a tag to mark it: `sudo scripts/stack-backup pre-change`. It prints `snapshot <id>` at the end. |
 
 A failed nightly run pushes its last log lines to ntfy through `arr-notify-failure@`.
-`health-check` fails once the last good backup is more than 48 hours old (checked only while the
+`stack-health` fails once the last good backup is more than 48 hours old (checked only while the
 drive is mounted), and also checks that the key file is on the drive and the system disk copy
 exists. Prometheus keeps the last-success metric, so Glance and Grafana show its age.
 
@@ -190,7 +190,7 @@ restic would reject the password.
 
 ### One app's settings
 
-If an `update` broke it, use `scripts/update --rollback <service>`: it restores exactly that app's
+If an `stack-update` broke it, use `scripts/stack-update --rollback <service>`: it restores exactly that app's
 folders from the snapshot taken just before the update ([Updates](updates.md#step-3-rolling-back)).
 Otherwise:
 
@@ -210,7 +210,7 @@ Otherwise:
    caches and artwork were never backed up.
 6. Give the folder back to its owner:
    `sudo chown -R "$(stat -c %u:%g "$CONFIG_ROOT/<app>")" "$CONFIG_ROOT/<app>"`.
-7. Start the app (`docker compose up -d <app>`) and run `scripts/health-check`.
+7. Start the app (`docker compose up -d <app>`) and run `scripts/stack-health`.
 
 ### A dead system disk
 
@@ -229,13 +229,13 @@ Otherwise:
 4. Compare the host files under `/tmp/r/var/tmp/arr-backup/host/` with the new system and carry
    over your changes by hand. Don't copy `/etc/fstab` or `cmdline.txt` wholesale: they name the
    old disk's partitions. `authorized_keys` can go back as it is.
-5. Run `scripts/install-host` and let the stack start once, so every app creates its folders with
+5. Run `scripts/host-install` and let the stack start once, so every app creates its folders with
    the right owners. Then stop it: `docker compose stop`.
 6. For each app, restore its folder as in [One app's settings](#one-apps-settings), steps 4 to 6,
    from `/tmp/r/var/tmp/arr-backup/config/<app>/`. Copy `home/state/` back to `$STATE_ROOT` and
    the terminal tool configs to `~/.config/`.
 7. Start the stack, [restore Jellystat's history](#jellystats-history) if you use it, and run
-   `scripts/health-check`. The next nightly run recreates the system disk copy.
+   `scripts/stack-health`. The next nightly run recreates the system disk copy.
 
 ### A dead media drive
 
@@ -280,16 +280,16 @@ is pushed to ntfy.
 
 | Name | Role | Reference |
 |---|---|---|
-| `backup-config` | Stages, backs up, copies, checks, records success | [scripts](../reference/scripts.md#backup-config) |
+| `stack-backup` | Stages, backs up, copies, checks, records success | [scripts](../reference/scripts.md#stack-backup) |
 | `arr-backup.timer` / `.service` | Daily at 04:30, only with the drive mounted | [systemd](../reference/systemd.md#arr-backuptimer) |
 | `arr-notify-failure@.service` | Pushes a failed run's log lines to ntfy | [systemd](../reference/systemd.md#arr-notify-failureservice) |
-| `update` | Takes the `pre-update` snapshot, restores from it on rollback | [scripts](../reference/scripts.md#update) |
-| `health-check` | Backup age, key file, system disk copy | [scripts](../reference/scripts.md#health-check) |
+| `stack-update` | Takes the `pre-update` snapshot, restores from it on rollback | [scripts](../reference/scripts.md#stack-update) |
+| `stack-health` | Backup age, key file, system disk copy | [scripts](../reference/scripts.md#stack-health) |
 | `stack-backup` skill | Status, backup now, restore (restore asks first) | [AI agent](ai-agent.md#the-skills) |
 
 ## When it goes wrong
 
-- **`health-check` fails "last backup under 48h old".** The nightly run was skipped, usually
+- **`stack-health` fails "last backup under 48h old".** The nightly run was skipped, usually
   because the drive was off at 04:30; it catches up once the drive is back. Otherwise read
   `journalctl -u arr-backup`.
 - **A backup failed on a database.** An app held its database through five retries. Run it again;

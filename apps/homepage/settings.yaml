@@ -1,0 +1,23 @@
+# Homepage's title, layout and theme.
+# Read by: homepage, from apps/homepage mounted at /app/config.
+# Applies: Homepage reloads it on save.
+title: "{{HOMEPAGE_VAR_HOST_NAME}}"
+description: Media stack
+startUrl: "http://{{HOMEPAGE_VAR_HOST_NAME}}:3000"
+
+theme: dark
+color: slate
+headerStyle: boxed
+statusStyle: dot
+hideVersion: true
+
+layout:
+  Watch:
+    style: row
+    columns: 3
+  Manage:
+    style: row
+    columns: 4
+  Infrastructure:
+    style: row
+    columns: 3

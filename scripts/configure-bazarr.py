@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Idempotently connect Bazarr to Radarr/Sonarr and enable subtitle providers.
+"""Connect Bazarr to Radarr/Sonarr and enable subtitle providers.
+
+Runs: by hand, after configure-arr.py; again after setting OPENSUBTITLES_* or SUBSOURCE_API_KEY.
+Changes: Bazarr settings and language profiles through its API.
+Idempotent: yes.
 
 Providers needing no account are enabled automatically. Those in ACCOUNTS
 are enabled only when their .env keys are filled.
@@ -9,7 +13,7 @@ import re
 import urllib.parse
 import urllib.request
 
-from stack_env import CONFIG as CFG, ENV, arr_key
+from stack_env import CONFIG as CFG, ENV, arr_key, http
 
 BAZARR = "http://127.0.0.1:6767"
 # name: (languages by preference, Sonarr tag that selects it). French shows get the tag from
@@ -27,10 +31,7 @@ KEY = bazarr_key()
 
 
 def get(path):
-    req = urllib.request.Request(BAZARR + path, headers={"X-API-KEY": KEY})
-    with urllib.request.urlopen(req, timeout=30) as r:
-        raw = r.read()
-        return json.loads(raw) if raw else None
+    return http(BAZARR + path, headers={"X-API-KEY": KEY}, timeout=30)
 
 
 def post_settings(pairs):

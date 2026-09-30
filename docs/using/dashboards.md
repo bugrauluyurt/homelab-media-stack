@@ -56,7 +56,7 @@ Each tile's dot shows whether its container is running.
 - **Homepage refuses an address you typed:** it answers only the host names and ports listed in
   `HOMEPAGE_ALLOWED_HOSTS` in `.env`. Add the one you use.
 
-Its configuration is YAML in `homepage/` in the repository; edit it and Homepage reloads itself.
+Its configuration is YAML in `apps/homepage/` in the repository; edit it and Homepage reloads itself.
 
 ## Glance
 
@@ -76,7 +76,7 @@ browser.
 
 How it works, and what to know when you change it:
 
-- **Configuration** is `glance/glance.yml` in the repository. Edit it and Glance reloads itself.
+- **Configuration** is `apps/glance/glance.yml` in the repository. Edit it and Glance reloads itself.
   API keys come from `.env` as `${VAR}`; a missing variable stops the reload, and
   `docker logs glance` says why. `configure-glance.py` puts Jellystat's and ChangeDetection's keys
   there.
@@ -84,16 +84,16 @@ How it works, and what to know when you change it:
   `'Amsterdam, Netherlands'`.
 - **Posters** come straight from Jellyfin (its image addresses need no key) and from the public
   TVDB and TMDB links Sonarr, Radarr and Seerr return, so no API key reaches the browser. Their
-  styling is `glance/assets/media.css`.
+  styling is `apps/glance/assets/media.css`.
 - **Reddit** refuses its JSON API from the server's address and rate-limits RSS to about one
   request at a time, so every subreddit shares one combined feed (`r/a+b+c/.rss`), refreshed
   every two hours. Add a subreddit by extending the `+` list, never with a second Reddit feed.
-- **Samples to edit:** the subreddits, the stock list (`&stocks` in `glance/glance.yml`) and the
+- **Samples to edit:** the subreddits, the stock list (`&stocks` in `apps/glance/glance.yml`) and the
   pinned YouTube channels ship as generic examples; replace them with your own. Keep your pins out
-  of the repository by copying `glance/youtube-channels.json` to `$CONFIG_ROOT/glance/`: when that
+  of the repository by copying `apps/glance/youtube-channels.json` to `$CONFIG_ROOT/glance/`: when that
   copy exists, the sync reads it instead.
-- **Pending updates and the last backup** reach Glance through Prometheus: `check-updates`,
-  `update` and `backup-config` write them as metrics, which node-exporter exports, so Grafana has
+- **Pending updates and the last backup** reach Glance through Prometheus: `stack-update-check`,
+  `stack-update` and `stack-backup` write them as metrics, which node-exporter exports, so Grafana has
   their history too.
 - **Container states** come through the read-only socket proxy. Glance has no login, so it stays
   tailnet-only like everything here.
@@ -104,11 +104,11 @@ To open Glance's Lab page in every new Chrome tab, with the cursor in its search
 ### YouTube rows follow your subscriptions
 
 The Tech, Gaming and Markets video rows show the latest uploads of a list of channels per tab.
-Every hour (`arr-youtube.timer`) `sync-youtube.py` writes the lists to
+Every hour (`arr-youtube.timer`) `youtube-sync.py` writes the lists to
 `$CONFIG_ROOT/glance/youtube-*.yml` and each tab's newest 25 videos to
 `$CONFIG_ROOT/glance/youtube/<tab>.json`, which Glance reads from `/assets/youtube/` and draws like
 its own videos widget. The sync reads your subscriptions, most relevant first, keeps the **pinned** channels in
-`glance/youtube-channels.json` (or your copy in `$CONFIG_ROOT/glance/`) that you still follow, and fills the remaining slots (the limits are
+`apps/glance/youtube-channels.json` (or your copy in `$CONFIG_ROOT/glance/`) that you still follow, and fills the remaining slots (the limits are
 in the same file) with channels whose YouTube topic tags say gaming, technology or business.
 Unsubscribe and a channel disappears; subscribe and it shows up if it fits a row. Put a channel
 under `skip` to keep it out, or pin it to force its row. Until you sign in, the pinned lists are
@@ -126,12 +126,12 @@ One-time setup:
    which is fine for your own account.
 3. **Clients → Create client → TVs and Limited Input devices.** Put its ID and secret in `.env` as
    `YOUTUBE_CLIENT_ID` / `YOUTUBE_CLIENT_SECRET`.
-4. Run `scripts/sync-youtube.py --login`, open the address it prints on any device and enter the
+4. Run `scripts/youtube-sync.py --login`, open the address it prints on any device and enter the
    code. Google warns that the app is unverified: **Advanced → continue**. Access is read-only,
    and the script stores the refresh token in `.env` itself.
-5. Run `scripts/sync-youtube.py` to sync at once; the timer does it hourly after that.
+5. Run `scripts/youtube-sync.py` to sync at once; the timer does it hourly after that.
 
-`health-check` fails if the rows haven't synced in a day.
+`stack-health` fails if the rows haven't synced in a day.
 
 ## Grafana
 
@@ -146,7 +146,7 @@ One-time setup:
 | **Scraping** | Everything Scraparr collects from the arr apps |
 
 The two overview dashboards link to each other and to Node Exporter Full; use the time picker for
-other ranges. They are provisioned from `grafana/dashboards/` and picked up within about a minute.
+other ranges. They are provisioned from `apps/grafana/dashboards/` and picked up within about a minute.
 Edits made in the UI survive, but for anything permanent, export the JSON into that folder. The
 Watching dashboard reads Jellystat's history through a read-only database user; how it is set up
 is in [Monitoring](../flows/monitoring.md).
@@ -156,7 +156,7 @@ is in [Monitoring](../flows/monitoring.md).
 The status page, `http://<tailscale-ip>:3003/status/stack`, shows every service's recent checks;
 it is also the Uptime Kuma tile on Homepage. Kuma checks every service once a minute and pushes
 **DOWN** and **UP** alerts to your phone through ntfy. It is the always-on watcher that tells you
-*when* something broke; `health-check` is the deep check you run on demand. What it watches and
+*when* something broke; `stack-health` is the deep check you run on demand. What it watches and
 how the alerts flow: [Monitoring](../flows/monitoring.md).
 
 ## Dozzle
@@ -172,7 +172,7 @@ proxy refuses writes anyway. `configure-dozzle.py` applies the login from `.env`
 `http://<tailscale-ip>:3006` keeps the media drive's SMART attributes, temperature and health over
 time, collected every six hours. `STORAGE_DEVICE` in `.env` names the drive (default `/dev/sda`);
 behind a USB enclosure it reads through the bridge with the `sat` device type
-(`scrutiny/collector.yaml`). Alerts still come from `health-check`, which checks SMART every 6
+(`apps/scrutiny/collector.yaml`). Alerts still come from `stack-health`, which checks SMART every 6
 hours; Scrutiny is for the history. Its metrics database is left out of backups.
 
 ## ChangeDetection.io
@@ -217,5 +217,5 @@ while and keep the one you prefer.
 - `configure-jellydash.py` creates its own Jellyfin API key (stored in `.env`), sets the admin
   login and adds both download clients. JellyDash normally insists on 8-character passwords; the
   script writes the `.env` password as a hash, so a shorter one works.
-- The project is young and releases often. If an update misbehaves, `update --rollback jellydash`
+- The project is young and releases often. If an update misbehaves, `stack-update --rollback jellydash`
   ([Updates](../flows/updates.md)).

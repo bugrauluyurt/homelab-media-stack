@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # Bring the stack up (arr-stack.service's ExecStart). A VPN-only failure must not fail
 # the unit, or systemd's BindsTo drive-lifecycle binding stops working.
+# Runs: arr-stack.service, at boot and whenever the media drive mounts. Start it with sudo systemctl
+#   start arr-stack.service rather than directly.
+# Changes: creates and starts containers; may recreate qBittorrent and slskd and restart Dozzle;
+#   qBittorrent settings through vpn-port-sync.
+# Idempotent: yes.
 
 set -uo pipefail
 . "$(dirname "$0")/stack-env.sh"
@@ -19,7 +24,7 @@ for service in json.load(sys.stdin)["services"].values():
             print(volume["source"])' | xargs -r mkdir -p
 
 # Seed any missing YouTube list from the pinned channels, and an empty video row until the first sync.
-"$REPO/scripts/sync-youtube.py" --offline
+"$REPO/scripts/youtube-sync.py" --offline
 
 docker compose up -d --remove-orphans
 rc=$?
@@ -40,7 +45,7 @@ fi
 # After a boot qBittorrent starts on a stale forwarded port; sync now rather than wait for the timer.
 if docker compose ps --status running --format '{{.Service}}' | grep -qx gluetun; then
   if wait_gluetun_healthy 120; then
-    "$REPO/scripts/sync-port" || echo "WARN: port sync failed; the timer will retry."
+    "$REPO/scripts/vpn-port-sync" || echo "WARN: port sync failed; the timer will retry."
   else
     echo "WARN: VPN is not healthy; the port-sync timer will restore downloaders after recovery."
   fi

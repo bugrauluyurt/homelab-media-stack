@@ -35,7 +35,7 @@ Thumbs.db
 .vscode/
 
 # scraparr config is rendered with live API keys
-scraparr/config.yaml
+**/scraparr/config.yaml
 
 # ---- Python bytecode ----
 __pycache__/

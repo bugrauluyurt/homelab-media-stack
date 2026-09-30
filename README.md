@@ -102,7 +102,7 @@ flowchart LR
 | **arm64** (Raspberry Pi 5) | Tested (Raspberry Pi OS) | Supported | Supported |
 | **amd64** (x86-64) | Supported | Supported | Supported |
 
-"Tested" is the setup this stack runs on every day. "Supported" means `scripts/install-host`
+"Tested" is the setup this stack runs on every day. "Supported" means `scripts/host-install`
 knows the distribution's package names and the scripts avoid distribution-specific tools,
 but nobody runs that combination day to day. Reports are welcome.
 
@@ -135,10 +135,10 @@ Every service, its port and who can reach it are in the
 3. **Prepare storage and the VPN:** mount the media disk at `STORAGE_MOUNT`, create the data
    folders, and install a Proton WireGuard configuration.
    ([Storage](docs/getting-started.md#prepare-the-media-disk), [VPN](docs/getting-started.md#set-up-the-vpn))
-4. **Install the host side:** run `scripts/install-host`, then enable the systemd units.
+4. **Install the host side:** run `scripts/host-install`, then enable the systemd units.
    ([Install the host side](docs/getting-started.md#install-the-host-side))
 5. **Configure the apps and check:** run the configure scripts in order, then
-   `scripts/health-check`. ([Configure the apps](docs/getting-started.md#configure-the-apps))
+   `scripts/stack-health`. ([Configure the apps](docs/getting-started.md#configure-the-apps))
 
 The full walkthrough is [Getting started](docs/getting-started.md).
 
@@ -160,8 +160,8 @@ logins are in `.env` as well.
 | Know when something is down | Uptime Kuma, `http://<tailscale-ip>:3003/status/stack` |
 | Read a container's logs | Dozzle, `http://<tailscale-ip>:8888` |
 | Watch a web page for changes | ChangeDetection.io, `http://<tailscale-ip>:3007` |
-| Check that everything is healthy | `~/homelab-media-stack/scripts/health-check` |
-| Power the media drive off safely | `~/homelab-media-stack/scripts/storage-off` |
+| Check that everything is healthy | `~/homelab-media-stack/scripts/stack-health` |
+| Power the media drive off safely | `~/homelab-media-stack/scripts/drive-off` |
 | Give family or a friend access | [Viewers](docs/flows/viewers.md) |
 
 From the home network without Tailscale, only Jellyfin (`http://<lan-ip>:8096`), Seerr
@@ -172,7 +172,7 @@ From the home network without Tailscale, only Jellyfin (`http://<lan-ip>:8096`),
 | Page | What it covers |
 |---|---|
 | [Docs home](docs/index.md) | Where to start |
-| [Getting started](docs/getting-started.md) | Install on Debian, Ubuntu or Arch, arm64 or amd64: `.env`, modules, VPN, `install-host`, configure order |
+| [Getting started](docs/getting-started.md) | Install on Debian, Ubuntu or Arch, arm64 or amd64: `.env`, modules, VPN, `host-install`, configure order |
 | [Architecture](docs/architecture.md) | System context, containers and networks, the VPN boundary, storage layout, services table, design decisions |
 | [Security](docs/security.md) | Threat model, access matrix, firewall, SSH, secrets, supply chain |
 | **How it works** | |
@@ -248,7 +248,7 @@ For an agent you can message from your phone without a terminal open, see
   pre-commit hook blocks common key formats.
 
 The threat model and every control are in [Security](docs/security.md). To report a
-vulnerability, see [SECURITY.md](SECURITY.md).
+vulnerability, see [SECURITY.md](.github/SECURITY.md).
 
 ## License
 

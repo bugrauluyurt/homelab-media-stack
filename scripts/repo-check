@@ -1,0 +1,238 @@
+#!/usr/bin/env bash
+# Every check CI and releases run: syntax, lint, tests, compose, secrets, diagrams, docs, style.
+# Needs only Docker and Python 3; each tool runs from a pinned container.
+#   scripts/repo-check           everything
+#   scripts/repo-check --fast    skip rendering the diagrams and building the docs site
+# Runs: the CI workflow on pull requests and pushes to main, and before releases; by hand before you
+#   push.
+# Changes: nothing in the repository.
+
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 1
+
+SHELLCHECK=koalaman/shellcheck:v0.11.0
+RUFF=ghcr.io/astral-sh/ruff:0.16.9
+GITLEAKS=zricethezav/gitleaks:v8.30.1
+MERMAID=minlag/mermaid-cli:12.0.0
+PYTHON=python:3.13-slim
+
+fast=false
+[ "${1:-}" = --fast ] && fast=true
+
+failures=()
+step() {
+  local name=$1
+  shift
+
+  echo "== $name"
+  "$@" || failures+=("$name")
+}
+
+in_docker() { docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/repo -w /repo "$@"; }
+
+# Exits 0 even when the last entry is a symlinked folder, so pipefail steps see only their own result.
+tracked_files() {
+  local file
+
+  git ls-files -z --cached --others --exclude-standard | while IFS= read -r -d '' file; do
+    if [ -f "$file" ]; then echo "$file"; fi
+  done
+}
+
+mapfile -t python_files < <(tracked_files | while read -r file; do
+  case "$file" in
+    *.py) echo "$file" ;;
+    scripts/* | ai/*) head -1 "$file" | grep -q '^#!.*python' && echo "$file" ;;
+  esac
+done)
+
+mapfile -t shell_files < <(tracked_files | while read -r file; do
+  case "$file" in
+    *.sh | .githooks/*) echo "$file" ;;
+    scripts/*) head -1 "$file" | grep -q '^#!.*bash' && echo "$file" ;;
+  esac
+done)
+
+python_syntax() { python3 -m py_compile "${python_files[@]}"; }
+shell_syntax() { for file in "${shell_files[@]}"; do bash -n "$file" || return 1; done; }
+shellcheck() { in_docker "$SHELLCHECK" -S warning -x -P scripts "${shell_files[@]}"; }
+# ruff's arm64 build allocates for 4 KiB pages and crashes on 16 KiB-page kernels such as the Raspberry Pi 5's.
+ruff() {
+  local page_size
+  page_size=$(getconf PAGESIZE)
+
+  if [ "$page_size" != 4096 ]; then
+    echo "  ~ skipped: ruff can't start on this kernel's $page_size-byte pages; CI runs it"
+    return 0
+  fi
+
+  in_docker "$RUFF" check --no-cache --select E4,E7,E9,F "${python_files[@]}"
+}
+
+unit_tests() {
+  python3 -m unittest discover -s tests -q &&
+    (cd ai/agent && python3 -m unittest -q test_gateway)
+}
+
+compose_configs() {
+  local profiles
+
+  for profiles in '*' ''; do
+    COMPOSE_PROFILES=$profiles docker compose --env-file .env.example config -q || return 1
+  done
+
+  docker compose --env-file .env.example -f docker-compose.yml -f compose.gpu.yml config -q
+}
+
+secrets() { in_docker "$GITLEAKS" dir /repo --no-banner --redact; }
+
+diagrams() {
+  local file status=0
+
+  while read -r file; do
+    in_docker "$MERMAID" -q -i "/repo/$file" -o "/tmp/$(basename "$file")" >/dev/null 2>&1 || { echo "  diagram fails to render: $file"; status=1; }
+  done < <(git grep -l '^```mermaid' -- '*.md')
+
+  return $status
+}
+
+docs_site() { in_docker -e HOME=/tmp "$PYTHON" sh -c 'pip install -q --user --require-hashes -r docs/requirements.txt 2>/dev/null && ~/.local/bin/zensical build --strict --clean'; }
+
+# Every script and systemd file needs its own heading in the reference pages.
+docs_cover_every_file() {
+  local file missing=()
+
+  for file in $(git ls-files scripts host/systemd); do
+    grep -qE "^#{2,4} .*\b$(basename "$file" | sed 's/\./\\./g')\b" docs/reference/scripts.md docs/reference/systemd.md || missing+=("$file")
+  done
+
+  [ ${#missing[@]} -eq 0 ] || { printf '  not in docs/reference: %s\n' "${missing[@]}"; return 1; }
+}
+
+# The project's writing style has no em or en dashes; the vendored Grafana dashboard is exempt.
+# In Python: grep -P rejects \x{2013} outside a UTF-8 locale, and the negation turned that error into a pass.
+no_dashes() {
+  tracked_files | grep -v '^apps/grafana/dashboards/node-exporter-full.json$' | python3 -c '
+import sys
+
+found = False
+for file_name in sys.stdin.read().splitlines():
+    try:
+        lines = open(file_name, encoding="utf-8").read().splitlines()
+    except (UnicodeDecodeError, OSError):
+        continue
+
+    for line_number, line in enumerate(lines, start=1):
+        if "\u2013" in line or "\u2014" in line:
+            print(f"  {file_name}:{line_number}: {line.strip()[:120]}")
+            found = True
+
+sys.exit(found)'
+}
+
+# A script run as ./scripts/NAME needs its executable bit in git.
+scripts_executable() {
+  local mode file status=0
+
+  while read -r mode file; do
+    head -1 "$file" | grep -q '^#!' && [ "$mode" != 100755 ] && { echo "  not executable in git: $file"; status=1; }
+  done < <(git ls-files -s scripts | awk '{print $1, $4}')
+
+  return $status
+}
+
+# Every script opens with who runs it and what it changes; helpers say who uses them.
+script_headers() {
+  local file missing=()
+
+  for file in $(git ls-files scripts); do
+    head -30 "$file" | grep -qE '^(# )?(Runs|Used by): ' && head -30 "$file" | grep -qE '^(# )?Changes: ' || missing+=("$file")
+  done
+
+  [ ${#missing[@]} -eq 0 ] || { printf '  no Runs (or Used by) and Changes header: %s\n' "${missing[@]}"; return 1; }
+}
+
+# A missing or untracked ./ bind source makes Docker create an empty root-owned folder in its place.
+bind_sources_tracked() {
+  local source missing=()
+
+  while read -r source; do
+    [ -n "$(git ls-files --cached --others --exclude-standard -- "$source")" ] || missing+=("$source")
+  done < <(COMPOSE_PROFILES='*' docker compose --env-file .env.example -f docker-compose.yml -f compose.gpu.yml config --format json |
+    python3 -c 'import json, os, sys
+repo = os.getcwd() + "/"
+for service in json.load(sys.stdin)["services"].values():
+    for volume in service.get("volumes", []):
+        if volume.get("type") == "bind" and volume["source"].startswith(repo):
+            print(volume["source"][len(repo):])')
+
+  [ ${#missing[@]} -eq 0 ] || { printf '  bind source not in git: %s\n' "${missing[@]}"; return 1; }
+}
+
+# Links to this repo's files break silently when a file moves; the strict docs build covers only docs/.
+repo_links_resolve() {
+  python3 - <<'PYTHON'
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+files = subprocess.run(["git", "ls-files", "--cached", "--others", "--exclude-standard"],
+                       capture_output=True, text=True, check=True).stdout.splitlines()
+existing = set(files) | {str(parent) for file_name in files for parent in Path(file_name).parents}
+broken = []
+
+for file_name in files:
+    path = Path(file_name)
+    if file_name == "CHANGELOG.md" or path.is_symlink() or not path.is_file():
+        continue
+
+    try:
+        text = path.read_text()
+    except UnicodeDecodeError:
+        continue
+
+    for match in re.finditer(r"github\.com/bugrauluyurt/homelab-media-stack/(?:blob|tree)/main/([^)\s#?\"'`>]+)", text):
+        if match.group(1).rstrip("/.") not in existing:
+            broken.append(f"{file_name}: {match.group(0)}")
+
+    if file_name.endswith(".md") and not file_name.startswith("docs/"):
+        for match in re.finditer(r"\]\(([^)#\s]+)(?:#[^)]*)?\)", text):
+            target = match.group(1)
+            if re.match(r"^[a-z]+:", target):
+                continue
+            if str(Path(path.parent, target).resolve().relative_to(Path.cwd())) not in existing:
+                broken.append(f"{file_name}: {target}")
+
+print("\n".join(f"  broken link: {link}" for link in broken))
+sys.exit(1 if broken else 0)
+PYTHON
+}
+
+step "Python syntax" python_syntax
+step "shell syntax" shell_syntax
+step "shellcheck" shellcheck
+step "ruff" ruff
+step "unit tests" unit_tests
+step "changelog entries" python3 scripts/changelog.py next ai/homelab-plugin/plugin.json
+step "compose configs (every profile, none, GPU overlay)" compose_configs
+step "secrets (gitleaks)" secrets
+step "reference covers every script and unit" docs_cover_every_file
+step "no em or en dashes" no_dashes
+step "scripts are executable" scripts_executable
+step "every script has a header" script_headers
+step "compose bind sources are in git" bind_sources_tracked
+step "repo links resolve" repo_links_resolve
+
+if ! $fast; then
+  step "diagrams render" diagrams
+  step "docs site builds (strict)" docs_site
+fi
+
+if [ ${#failures[@]} -gt 0 ]; then
+  printf '\nFAILED: %s\n' "${failures[@]}"
+  exit 1
+fi
+
+echo
+echo "All checks passed."

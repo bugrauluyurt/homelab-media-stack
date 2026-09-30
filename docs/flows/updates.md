@@ -2,7 +2,7 @@
 
 This page follows a container image update from the moment a new version is published to the
 moment it runs on the server, and back again if it misbehaves. It is for whoever looks after the
-server: what checks for updates, what `update` does step by step, and how to roll back.
+server: what checks for updates, what `stack-update` does step by step, and how to roll back.
 
 Nothing updates itself. A daily check tells you what is new; you decide when to apply it, with one
 command that takes a settings snapshot first and runs the health check afterwards.
@@ -15,14 +15,14 @@ December 2025.)
 ```mermaid
 sequenceDiagram
     participant T as arr-updates.timer
-    participant C as check-updates
+    participant C as stack-update-check
     participant R as Image registry
     participant N as ntfy
     actor You
     participant U as update
-    participant B as backup-config
+    participant B as stack-backup
     participant D as Docker Compose
-    participant H as health-check
+    participant H as stack-health
 
     T->>C: daily at 06:00
     C->>R: this architecture's manifest, local vs upstream
@@ -30,7 +30,7 @@ sequenceDiagram
     C->>N: each new update once, MAJOR flagged
     N-->>You: push notification
     You->>U: update, all or named services
-    U->>B: sudo backup-config pre-update
+    U->>B: sudo stack-backup pre-update
     B-->>U: snapshot id, or stop here
     U->>D: pull the new images
     U->>U: keep the old image as rollback-stamp
@@ -43,7 +43,7 @@ sequenceDiagram
 
 ## Step 1: the daily check
 
-`scripts/check-updates` runs every day at 06:00 from
+`scripts/stack-update-check` runs every day at 06:00 from
 [`arr-updates.timer`](../reference/systemd.md#arr-updatestimer) (with up to 30 minutes of random
 delay, and at the next boot if the server was off). It only reports: it never pulls or restarts
 anything. It does not need the media drive, so it runs while the stack is powered down too.
@@ -77,7 +77,7 @@ anything. It does not need the media drive, so it runs while the stack is powere
    things, so read their release notes first. The list of what was already reported lives in
    `$STATE_ROOT/updates.notified`, so each update notifies once.
 
-`scripts/health-check` reads the same state file and prints a yellow `UPDATES` line. It is
+`scripts/stack-health` reads the same state file and prints a yellow `UPDATES` line. It is
 information, not a failure:
 
 ```
@@ -85,16 +85,16 @@ information, not a failure:
            lscr.io/linuxserver/jellyfin:latest
 ```
 
-To check right now, run `scripts/check-updates` (about one to two minutes). It prints each
+To check right now, run `scripts/stack-update-check` (about one to two minutes). It prints each
 `update available:` line and any image it `could not check`.
 
 ## Step 2: applying updates
 
-Run `update` (the alias for `scripts/update` from `scripts/aliases.zsh`) from the repository:
+Run `update` (the alias for `scripts/stack-update` from `scripts/aliases.zsh`) from the repository:
 
 ```bash
-scripts/update                   # every service the last check found an update for
-scripts/update jellyfin sonarr   # or just these
+scripts/stack-update                   # every service the last check found an update for
+scripts/stack-update jellyfin sonarr   # or just these
 ```
 
 Before you run it:
@@ -102,12 +102,12 @@ Before you run it:
 - **Read the release notes of anything marked MAJOR.**
 - **Check that nothing is playing in Jellyfin** before updating it; recreating Jellyfin stops every
   stream. The `stack-update` skill has a one-line check that reads the API key into a variable.
-- After a qBittorrent update, expect `scripts/leak-test` to be inconclusive for about a minute:
+- After a qBittorrent update, expect `scripts/vpn-leak-test` to be inconclusive for about a minute:
   dozens of torrents re-announcing at once briefly swamp the VPN's DNS. It recovers by itself.
 
 What it does, in order:
 
-1. **Settings snapshot.** It runs `sudo scripts/backup-config pre-update`, a normal
+1. **Settings snapshot.** It runs `sudo scripts/stack-backup pre-update`, a normal
    [backup](backups.md) tagged `pre-update`. If the backup fails, or prints no snapshot id (the
    media drive is not mounted), it stops and updates nothing.
 2. **Notes the current images.** It records the image ID each service runs now.
@@ -117,26 +117,26 @@ What it does, in order:
      `<repository>:rollback-<YYYYmmdd-HHMM>`, older rollback tags of that repository are removed
      (one rollback image per app is enough), and a rollback record goes to
      `$STATE_ROOT/rollback/<service>`: image, old image ID, time stamp and snapshot id. Only a
-     changed image replaces the record, so running `update` twice never leaves the new image as
+     changed image replaces the record, so running `stack-update` twice never leaves the new image as
      the one to roll back to.
    - `docker compose up -d` recreates the services. qBittorrent and slskd share gluetun's network
      namespace and lose it when gluetun is recreated, so when gluetun is in the list they follow
      it (slskd only when the music module is on). The script then force-recreates them, waits up
-     to three minutes for gluetun to be healthy and runs `scripts/sync-port`, because the new
+     to three minutes for gluetun to be healthy and runs `scripts/vpn-port-sync`, because the new
      tunnel usually brings a new forwarded port (see [VPN and ports](vpn-and-ports.md)).
    - If recreating fails, ntfy gets **"media stack: update failed"** and the script exits.
    - The updated images are marked `current` in the state file and the metrics are rewritten.
 4. **Health check.** Freshly recreated apps can take a minute to answer, so the first
-   `health-check` runs quietly. If it fails, the script gives the updated containers up to two
+   `stack-health` runs quietly. If it fails, the script gives the updated containers up to two
    minutes to finish starting, waits 30 seconds more, and runs it again with output. If it
    still fails, ntfy gets **"media stack: health check failed after update"** with the rollback
-   command, and `update` exits non-zero.
+   command, and `stack-update` exits non-zero.
 
 After a Jellyfin update, the health check also confirms every Jellyfin plugin is still
 `Active`: a Jellyfin release can disable plugins built for an older one ("NotSupported",
 "Malfunctioned") without anything else failing.
 
-`update` needs passwordless `sudo` for the snapshot and for restoring settings during a rollback.
+`stack-update` needs passwordless `sudo` for the snapshot and for restoring settings during a rollback.
 
 ## Step 3: rolling back
 
@@ -154,14 +154,14 @@ flowchart TD
     I --> K["Recreate the container"]
     J --> K
     K --> L{"Was it gluetun?"}
-    L -->|Yes| M["Recreate qBittorrent and slskd, run sync-port"]
-    L -->|No| N["Run health-check"]
+    L -->|Yes| M["Recreate qBittorrent and slskd, run vpn-port-sync"]
+    L -->|No| N["Run stack-health"]
     M --> N
 ```
 
 ```bash
-scripts/update --rollback jellyfin               # previous image and its settings
-scripts/update --rollback jellyfin --image-only  # previous image, keep current settings
+scripts/stack-update --rollback jellyfin               # previous image and its settings
+scripts/stack-update --rollback jellyfin --image-only  # previous image, keep current settings
 ```
 
 **The default restores settings as well as the image.** Updates often migrate an app's database,
@@ -191,13 +191,13 @@ A settings rollback needs the media drive mounted (the snapshots live there). On
 restore then fails safely and `--image-only` is the remaining option.
 
 After a rollback the next daily check reports the same update again. Until a fixed release
-arrives, name the services you want when you run `update`, so the bad version is not applied again.
+arrives, name the services you want when you run `stack-update`, so the bad version is not applied again.
 
 ## Needle's image
 
 Needle's default image, `ghcr.io/bugrauluyurt/needle:1` (`NEEDLE_IMAGE` in `.env` overrides it),
 follows every 1.x release. Minor and patch releases move the `:1` tag, so they arrive through the
-same daily check and `update` with no change to the repository. A new major version needs a new
+same daily check and `stack-update` with no change to the repository. A new major version needs a new
 tag in `docker-compose.yml`, and arrives as a Dependabot pull request. If you set
 `NEEDLE_IMAGE=needle:local` to run your own build, the check cannot compare it with a registry and
 lists it under "could not check".
@@ -206,24 +206,24 @@ lists it under "could not check".
 
 | Name | Role | Reference |
 |---|---|---|
-| `check-updates` | Daily comparison, state file, metrics, ntfy | [scripts](../reference/scripts.md#check-updates) |
-| `arr-updates.timer` / `.service` | Runs `check-updates` daily at 06:00; a failure goes to `notify-failure` | [systemd](../reference/systemd.md#arr-updatestimer) |
-| `update` | Snapshot, pull, rollback tags, recreate, health check, rollback | [scripts](../reference/scripts.md#update) |
-| `backup-config` | The `pre-update` snapshot | [scripts](../reference/scripts.md#backup-config) |
-| `health-check` | Verifies the result | [scripts](../reference/scripts.md#health-check) |
-| `sync-port` | Re-syncs the forwarded port after gluetun is recreated | [scripts](../reference/scripts.md#sync-port) |
+| `stack-update-check` | Daily comparison, state file, metrics, ntfy | [scripts](../reference/scripts.md#stack-update-check) |
+| `arr-updates.timer` / `.service` | Runs `stack-update-check` daily at 06:00; a failure goes to `stack-failure-notify` | [systemd](../reference/systemd.md#arr-updatestimer) |
+| `stack-update` | Snapshot, pull, rollback tags, recreate, health check, rollback | [scripts](../reference/scripts.md#stack-update) |
+| `stack-backup` | The `pre-update` snapshot | [scripts](../reference/scripts.md#stack-backup) |
+| `stack-health` | Verifies the result | [scripts](../reference/scripts.md#stack-health) |
+| `vpn-port-sync` | Re-syncs the forwarded port after gluetun is recreated | [scripts](../reference/scripts.md#vpn-port-sync) |
 | `stack-env.sh` | `notify`, `write_update_metrics`, `reattach_vpn_apps` | [scripts](../reference/scripts.md#stack-envsh) |
 | `stack-update` skill | Lets an AI agent check, apply and roll back, with your yes each time | [AI agent](ai-agent.md#the-skills) |
 
 ## When it goes wrong
 
-- **`update` stops at step 1, saying the backup failed or no snapshot was taken.** The media
+- **`stack-update` stops at step 1, saying the backup failed or no snapshot was taken.** The media
   drive is not mounted, or the backup itself failed. Nothing was changed. See
   [Backups](backups.md#when-it-goes-wrong).
 - **Radarr, Sonarr or Lidarr say "connection refused" to `gluetun:8080` after an update or a
-  rollback of gluetun.** qBittorrent and slskd lost gluetun's network. `update` re-attaches them,
-  but `update --rollback gluetun` does not: run
-  `docker compose up -d --force-recreate qbittorrent slskd` and `scripts/sync-port`. See
+  rollback of gluetun.** qBittorrent and slskd lost gluetun's network. `stack-update` re-attaches them,
+  but `stack-update --rollback gluetun` does not: run
+  `docker compose up -d --force-recreate qbittorrent slskd` and `scripts/vpn-port-sync`. See
   [qBittorrent stops answering after gluetun restarts](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/ai/homelab-plugin/skills/stack-logs/references/known-issues.md#qbittorrent-stops-answering-after-gluetun-restarts).
 - **A Jellyfin plugin shows as not Active.** The new Jellyfin disabled a plugin built for the
   old one. Wait for the plugin's update, or roll Jellyfin back.

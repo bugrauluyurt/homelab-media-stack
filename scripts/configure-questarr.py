@@ -1,14 +1,20 @@
 #!/usr/bin/env python3
 """Configure Questarr: admin account, qBittorrent, indexers from Prowlarr, IGDB, ntfy.
 
-Idempotent. IGDB is set only once IGDB_CLIENT_ID and IGDB_CLIENT_SECRET are in
+Runs: by hand, after configure-sabnzbd.py and configure-indexers.py; again after setting the IGDB
+  keys.
+Changes: Questarr API; when the login fails, writes the password's bcrypt hash straight into
+  Questarr's database through docker exec.
+Idempotent: yes.
+
+IGDB is set only once IGDB_CLIENT_ID and IGDB_CLIENT_SECRET are in
 .env; they come from your own Twitch developer app.
 """
 import secrets
 import subprocess
 import urllib.parse
 
-from stack_env import ENV, arr_key, http, require_service
+from stack_env import ENV, NTFY_SERVER, arr_key, http, require_service
 
 require_service("questarr")
 
@@ -90,7 +96,7 @@ else:
 # Questarr has one shared login and no approval step, so "Download Started" is how you learn
 # a viewer picked a release.
 if ENV.get("NTFY_TOPIC"):
-    host = urllib.parse.urlparse(ENV.get("NTFY_SERVER", "https://ntfy.sh")).netloc
+    host = urllib.parse.urlparse(NTFY_SERVER).netloc
     urls = f"ntfys://{host}/{ENV['NTFY_TOPIC']}"
 
     if call("/settings/apprise").get("urls") == urls:

@@ -1,0 +1,12 @@
+[Unit]
+Description=Sync Proton forwarded port into qBittorrent
+# The VPN only runs with the stack, which only runs with the media drive.
+ConditionPathIsMountPoint=@STORAGE_MOUNT@
+After=arr-stack.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=@REPO@/scripts/vpn-port-sync
+User=@STACK_USER@
+Group=@STACK_GROUP@

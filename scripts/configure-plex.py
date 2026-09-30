@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Apply Plex preferences that keep this Pi on Direct Play. Safe to re-run.
+"""Apply Plex preferences that keep this Pi on Direct Play.
+
+Runs: by hand, once Plex has created its Preferences.xml.
+Changes: stops plex, writes Preferences.xml, starts plex; only when a value differs.
+Idempotent: yes.
 
 Plex rewrites Preferences.xml when it exits, so the container is stopped while the
 file is written, and only when something needs changing.

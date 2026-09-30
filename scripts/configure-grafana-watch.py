@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Connect Grafana to narrowly scoped, read-only Jellystat viewing history."""
+"""Connect Grafana to narrowly scoped, read-only Jellystat viewing history.
+
+Runs: by hand, after Jellystat's first visit, since it needs Jellystat's tables.
+Changes: role and grants in jellystat-db; Grafana API.
+Idempotent: yes; the password is set only when the datasource is created.
+"""
 import base64
 import json
 import secrets
@@ -112,14 +117,14 @@ def main():
                          "connMaxLifetime": 14400},
             "secureJsonData": {"password": password},
         })
-        print("+ Jellystat read-only Grafana datasource created")
+        print("  + Jellystat read-only Grafana datasource created")
     else:
-        print("= Jellystat read-only Grafana datasource already configured")
+        print("  = Jellystat read-only Grafana datasource already configured")
 
     health = api(f"/api/datasources/uid/{UID}/health")
     if not health or health.get("status") != "OK":
         sys.exit("Grafana datasource health check failed")
-    print("= Connection healthy; viewing columns readable, writes and client IP column denied")
+    print("  = Connection healthy; viewing columns readable, writes and client IP column denied")
 
 
 if __name__ == "__main__":

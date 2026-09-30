@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Give Navidrome a second library, "Singles", for the songs Needle fetches one by one.
 
+Runs: by hand, after configure-lidarr.py has created the Navidrome admin.
+Changes: the folder; Navidrome API.
+Idempotent: yes.
+
 Makes sure $DATA_ROOT/media/singles (outside Lidarr's reach) exists, Navidrome has a library
 on /singles and every non-admin user can see it. Signs in with NAVIDROME_USER / NAVIDROME_PASS.
 Idempotent: a second run prints only "=" lines.

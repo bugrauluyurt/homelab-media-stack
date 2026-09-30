@@ -171,7 +171,7 @@ sequenceDiagram
 it by default) and gives every existing non-admin user access; admins see all libraries.
 
 Navidrome admins can always request albums and songs. Anyone else can when it's switched on in
-Needle's **Settings, People**; `add-viewer.py --music-requests` does it for a viewer (see
+Needle's **Settings, People**; `viewer-add.py --music-requests` does it for a viewer (see
 [Viewers](viewers.md)). Soulseek copies vary: if a song comes out wrong, delete the file from
 `media/singles` and ask again.
 
@@ -186,7 +186,7 @@ never asked for, for Lidarr to manage. So each side has one folder:
   finished song from slskd's download list so Lidarr's Soulseek client never picks it up.
 - Navidrome mounts both folders read-only, as two libraries.
 
-`health-check` confirms that Needle can reach slskd and write to `media/singles`.
+`stack-health` confirms that Needle can reach slskd and write to `media/singles`.
 
 ## Covers
 
@@ -302,9 +302,9 @@ music itself, including `media/singles`, isn't backed up; it can be fetched agai
 | `configure-lidarr.py` | Tubifarry, slskd as indexer and download client, search settings, track renaming, covers, qBittorrent's `music` category, Navidrome's admin | [scripts](../reference/scripts.md#configure-lidarrpy) |
 | `configure-navidrome.py` | `media/singles` and the Singles library | [scripts](../reference/scripts.md#configure-navidromepy) |
 | `configure-sabnzbd.py` | SABnzbd's `music` category | [scripts](../reference/scripts.md#configure-sabnzbdpy) |
-| `add-viewer.py` | A viewer's Navidrome account and music permissions | [scripts](../reference/scripts.md#add-viewerpy) |
+| `viewer-add.py` | A viewer's Navidrome account and music permissions | [scripts](../reference/scripts.md#viewer-addpy) |
 | `stack-env.sh` | Re-attaches slskd to gluetun's network after a VPN restart | [scripts](../reference/scripts.md#stack-envsh) |
-| `health-check` | Lidarr and Needle reach slskd, slskd is logged in, Needle can write singles | [scripts](../reference/scripts.md#health-check) |
+| `stack-health` | Lidarr and Needle reach slskd, slskd is logged in, Needle can write singles | [scripts](../reference/scripts.md#stack-health) |
 
 ## When it goes wrong
 

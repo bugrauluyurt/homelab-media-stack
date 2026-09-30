@@ -19,7 +19,7 @@ the tailnet only ([how it is set up](../operations/host.md#https-for-needle-tail
 Offline downloads, the phone home-screen app and Spotify all need HTTPS anyway.
 
 Sign in with a Navidrome account. The owner uses `NAVIDROME_USER` / `NAVIDROME_PASS` from `.env`.
-Viewers get an account from `add-viewer.py`, with the same password as their Jellyfin one; the
+Viewers get an account from `viewer-add.py`, with the same password as their Jellyfin one; the
 username is their name up to any "@", so `you@example.com` signs in as `you`.
 
 What you get:
@@ -60,7 +60,7 @@ refreshes every few seconds while something downloads. Navidrome rescans every 1
 finished album or song appears within that time.
 
 Who may ask: Navidrome admins always can. Anyone else can once the owner switches on **Request
-music** for them in **Settings → People**, or adds them with `add-viewer.py --music-requests`.
+music** for them in **Settings → People**, or adds them with `viewer-add.py --music-requests`.
 People appear in Settings → People after their first sign-in.
 
 ### For the owner
@@ -135,7 +135,7 @@ song** on a Spotify track goes through Soulseek like any other.
   wait) and hides Spotify meanwhile; it comes back by itself.
 
 Each person connects their own Spotify, and only if the owner allows **Spotify** for them in
-Settings → People (or adds them with `add-viewer.py --spotify`).
+Settings → People (or adds them with `viewer-add.py --spotify`).
 
 To set it up (the owner, once; it needs Spotify Premium):
 

@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Print Cleanuparr's safety-relevant state: `live|dryrun downloadcleaner=on|off ignored=a,b`."""
-import json
-import urllib.request
+"""Print Cleanuparr's safety-relevant state: `live|dryrun downloadcleaner=on|off ignored=a,b`.
 
-from stack_env import ENV
+Runs: stack-health (live, download cleaner off, games ignored); by hand.
+Changes: nothing.
+"""
+
+from stack_env import ENV, http
 
 B = "http://127.0.0.1:11011/api"
 
@@ -11,9 +13,7 @@ pw = ENV["CLEANUPARR_PASSWORD"]
 
 
 def req(p, body=None, tok=None):
-    h = {"Content-Type": "application/json", **({"Authorization": f"Bearer {tok}"} if tok else {})}
-    d = json.dumps(body).encode() if body is not None else None
-    return json.loads(urllib.request.urlopen(urllib.request.Request(B + p, data=d, headers=h), timeout=15).read())
+    return http(B + p, body, headers={"Authorization": f"Bearer {tok}"} if tok else None, timeout=15)
 
 
 tok = req("/auth/login", {"username": "admin", "password": pw})["tokens"]["accessToken"]

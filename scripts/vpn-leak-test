@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# Verify qBittorrent's traffic exits via Proton and that it listens on Proton's forwarded port.
+# Exits 1 on a leak, 2 when inconclusive.
+# Runs: by hand (the leaktest alias); the vpn-check skill.
+# Changes: nothing.
+
+set -uo pipefail
+. "$(dirname "$0")/stack-env.sh"
+
+# Plain text for every client: ifconfig.me serves HTML to wget, which silently breaks comparisons.
+IPSVC="https://api.ipify.org"
+
+host_ip=$(curl -4 -s --max-time 10 "$IPSVC" || echo "")
+gluetun_ip=$(docker exec gluetun wget -qO- --timeout=10 "$IPSVC" 2>/dev/null || echo "")
+qbit_ip=$(docker exec qbittorrent curl -4 -s --max-time 10 "$IPSVC" 2>/dev/null || echo "")
+
+printf "  host (your real IPv4)   : %s\n" "${host_ip:-unavailable}"
+printf "  gluetun (should be VPN) : %s\n" "${gluetun_ip:-unavailable}"
+printf "  qbittorrent (must match): %s\n" "${qbit_ip:-unavailable}"
+echo
+
+if [ -z "$host_ip" ] || [ -z "$gluetun_ip" ] || [ -z "$qbit_ip" ]; then
+  echo "RESULT: INCONCLUSIVE - could not reach $IPSVC from one of them."
+  exit 2
+fi
+
+if [ "$gluetun_ip" = "$host_ip" ]; then
+  echo "RESULT: *** LEAK *** VPN IP equals host IP; traffic is not tunnelled."
+  exit 1
+fi
+
+if [ "$qbit_ip" != "$gluetun_ip" ]; then
+  echo "RESULT: *** LEAK *** qBittorrent is not sharing gluetun's namespace."
+  exit 1
+fi
+
+echo "RESULT: PASS - qBittorrent exits via $gluetun_ip, not $host_ip."
+
+echo
+# gluetun v4's control-server API needs auth, so read the port file it maintains instead.
+port=$(forwarded_port)
+listen=$(qbit_prefs | json_get listen_port)
+
+echo "  Proton forwarded port  : ${port:-unknown}"
+echo "  qBittorrent listen_port: ${listen:-unknown}"
+
+if [ -n "${port:-}" ] && [ "${port:-x}" = "${listen:-y}" ]; then
+  echo "  PASS - forwarded port is wired into qBittorrent."
+else
+  echo "  MISMATCH - run scripts/vpn-port-sync to push the forwarded port in."
+fi

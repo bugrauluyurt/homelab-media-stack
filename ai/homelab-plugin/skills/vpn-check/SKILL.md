@@ -11,8 +11,8 @@ say so plainly.
 ## 1. Exit IP and forwarded port
 
 ```bash
-STACK=${MEDIA_STACK_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}; [ -x "$STACK/scripts/health-check" ] || STACK=~/homelab-media-stack
-"$STACK/scripts/leak-test"
+STACK=${MEDIA_STACK_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}; [ -x "$STACK/scripts/stack-health" ] || STACK=~/homelab-media-stack
+"$STACK/scripts/vpn-leak-test"
 ```
 
 PASS means qBittorrent's public IP differs from the host's and matches gluetun's,

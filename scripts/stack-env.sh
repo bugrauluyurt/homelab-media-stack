@@ -1,5 +1,7 @@
 # shellcheck shell=bash
 # Sourced by the bash scripts: repo path and every .env value, exported.
+# Used by: every bash script in scripts/.
+# Changes: nothing itself.
 REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 set -a; . "$REPO/.env"; set +a
 export STORAGE_MOUNT=${STORAGE_MOUNT:-/mnt/storage}

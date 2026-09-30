@@ -14,7 +14,7 @@ Open **Seerr**:
 | At home, on the home network | `http://<lan-ip>:5055` |
 
 Sign in with your Jellyfin account. The owner uses `JELLYFIN_USER` / `JELLYFIN_PASSWORD` from
-`.env`; everyone else gets an account from `add-viewer.py` (see [Giving someone access](../flows/viewers.md)).
+`.env`; everyone else gets an account from `viewer-add.py` (see [Giving someone access](../flows/viewers.md)).
 Seerr works the same in a phone's browser, which is handy for requesting from the sofa.
 
 You can also request without leaving Jellyfin: its search shows Seerr results with a request
@@ -65,7 +65,7 @@ stateDiagram-v2
 ```
 
 - **Approval.** The owner's requests go straight through. A viewer's request waits for the
-  owner's approval, unless the viewer was added with `add-viewer.py --auto-approve` or given
+  owner's approval, unless the viewer was added with `viewer-add.py --auto-approve` or given
   Auto-Approve in Seerr → Users.
 - **Search and download.** Seerr hands the request to Radarr (movies) or Sonarr (series). They ask
   Prowlarr to search every indexer, pick the best release that fits the quality rules, and send
@@ -103,7 +103,7 @@ nothing two days after approval.
 ## Why everything is 1080p
 
 Radarr's quality profile is **HD Bluray + WEB** and Sonarr's is **WEB-1080p**, both from the
-TRaSH Guides and kept in sync by Recyclarr (`recyclarr/recyclarr.yml`). Two limits point the same
+TRaSH Guides and kept in sync by Recyclarr (`apps/recyclarr/recyclarr.yml`). Two limits point the same
 way:
 
 - **The server should never have to convert video.** A Raspberry Pi 5 has no hardware video
@@ -121,7 +121,7 @@ A few details of the rules:
   10-bit included, so it plays directly. It is not preferred, so existing files are never
   re-downloaded just to change codec, and a re-encode (WEBRip) still loses to a WEB-DL taken
   straight from a streaming service. Some desktop browsers can't decode HEVC; if that ever
-  matters, set the x265 score back to -10000 in `recyclarr/recyclarr.yml`.
+  matters, set the x265 score back to -10000 in `apps/recyclarr/recyclarr.yml`.
 - **Audio-description releases are rejected.** A release named "Audio Description" can carry a
   narrator describing the scenes as its only audio track, with no way to switch it off.
   `configure-arr.py` adds a custom format scoring those at -10000 in both apps. It doesn't match
@@ -141,7 +141,7 @@ A few details of the rules:
 
 In qBittorrent, the turtle icon means the automatic 20 MB/s download cap is on: someone is
 watching, or the server is busy. It lifts by itself once nobody watches and the load drops
-(`throttle-downloads`, every minute). Uploads are always capped at 10 Mbps, turtle or not.
+(`downloads-throttle`, every minute). Uploads are always capped at 10 Mbps, turtle or not.
 
 ## For the owner: asking Radarr or Sonarr directly
 

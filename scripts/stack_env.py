@@ -1,4 +1,8 @@
-"""Paths, settings and HTTP helpers shared by the Python scripts, read from the repo's .env."""
+"""Paths, settings and HTTP helpers shared by the Python scripts, read from the repo's .env.
+
+Used by: every Python script in scripts/.
+Changes: .env, only through set_env.
+"""
 import functools
 import json
 import os
@@ -26,6 +30,8 @@ ENV = {k: _value(v) for k, v in (line.split("=", 1) for line in (REPO / ".env").
 CONFIG = Path(ENV["CONFIG_ROOT"])
 STATE = CONFIG.parent / "state"
 STORAGE = Path(ENV.get("STORAGE_MOUNT") or "/mnt/storage")
+# An empty NTFY_SERVER falls back too, as ${NTFY_SERVER:-...} does in bash.
+NTFY_SERVER = ENV.get("NTFY_SERVER") or "https://ntfy.sh"
 
 # Every module runs unless .env lists the wanted profiles.
 os.environ.setdefault("COMPOSE_PROFILES", ENV.get("COMPOSE_PROFILES") or "*")
@@ -82,6 +88,18 @@ def arr_key(app):
     return key
 
 
+def jellyfin_headers():
+    """The Authorization header for Jellyfin's API, from JELLYFIN_API_KEY."""
+    return {"Authorization": f'MediaBrowser Token="{ENV["JELLYFIN_API_KEY"]}"'}
+
+
+@functools.cache
+def sabnzbd_key():
+    """SABnzbd's API key, from its root-owned sabnzbd.ini."""
+    return subprocess.run(["sudo", "grep", "-oP", r"^api_key = \K\S+", f"{CONFIG}/sabnzbd/sabnzbd.ini"],
+                          capture_output=True, text=True).stdout.strip()
+
+
 def wait_ready(url, what, tries=60, delay=2, headers=None):
     for _ in range(tries):
         try:
@@ -100,7 +118,7 @@ def notify(title, tags, body):
     if not ENV.get("NTFY_TOPIC"):
         return
 
-    http(ENV.get("NTFY_SERVER", "https://ntfy.sh"), {"topic": ENV["NTFY_TOPIC"], "title": title,
+    http(NTFY_SERVER, {"topic": ENV["NTFY_TOPIC"], "title": title,
          "tags": tags.split(","), "message": body}, timeout=15, fatal=False)
 
 

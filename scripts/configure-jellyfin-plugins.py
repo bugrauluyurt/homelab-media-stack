@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Set up Jellyfin's plugins and look: the Abyss theme, Home Screen Sections and
-Jellyfin Enhanced. Abyss's Spotlight banner comes from jellyfin/custom-cont-init.d.
+Jellyfin Enhanced. Abyss's Spotlight banner comes from apps/jellyfin/custom-cont-init.d.
 With HWACCEL in .env (and compose.gpu.yml), also hardware transcoding.
 
-Idempotent. The container restarts only when a plugin was added or removed.
+Runs: by hand, after configure-seerr.py; again after changing TMDB_API_KEY, MDBLIST_API_KEY or
+  HWACCEL.
+Changes: Jellyfin API; docker restart jellyfin only when a plugin was added or removed or is not yet
+  active.
+Idempotent: yes.
 """
-import json
 import subprocess
 import sys
 import time
@@ -13,10 +16,10 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from stack_env import ENV
+from stack_env import ENV, http, jellyfin_headers
 
 BASE = "http://127.0.0.1:8096"
-AUTH = {"Authorization": f'MediaBrowser Token="{ENV["JELLYFIN_API_KEY"]}"'}
+AUTH = jellyfin_headers()
 
 REPOS = {"IAmParadox27": "https://www.iamparadox.dev/jellyfin/plugins/manifest.json",
          "n00bcodr": "https://raw.githubusercontent.com/n00bcodr/jellyfin-plugins/main/manifest.json",
@@ -59,16 +62,7 @@ ARR = {name: {"url": f"http://{name.lower()}:{port}", "key": ENV.get(f"{name.upp
 
 
 def req(path, body=None, method=None):
-    data = json.dumps(body).encode() if body is not None else None
-    r = urllib.request.Request(BASE + path, data=data, method=method or ("POST" if data else "GET"),
-                               headers={**AUTH, "Content-Type": "application/json"})
-
-    try:
-        with urllib.request.urlopen(r, timeout=60) as resp:
-            raw = resp.read()
-            return json.loads(raw) if raw else None
-    except urllib.error.HTTPError as e:
-        sys.exit(f"{r.method} {path} -> {e.code}: {e.read().decode()[:300]}")
+    return http(BASE + path, body, method, AUTH)
 
 
 def wait_for_server():

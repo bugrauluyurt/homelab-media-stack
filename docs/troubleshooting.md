@@ -10,16 +10,16 @@ which ships with the `stack-logs` skill so an AI agent reads the same list.
 
 ```mermaid
 flowchart TD
-    start["Something is wrong"] --> hc["health-check: what is failing?"]
+    start["Something is wrong"] --> hc["stack-health: what is failing?"]
     hc --> kuma["Uptime Kuma: since when?"]
     kuma --> logs["Dozzle or the stack-logs skill: why?"]
     logs --> known{"In the known issues?"}
-    known -->|yes| fix["Apply its fix, then health-check again"]
+    known -->|yes| fix["Apply its fix, then stack-health again"]
     known -->|no| deeper["vpn-check, drive-health, or the app's own logs"]
     deeper --> fix
 ```
 
-1. **Run `health-check` first** (`health` in the [terminal](operations/terminal.md)). It checks
+1. **Run `stack-health` first** (`health` in the [terminal](operations/terminal.md)). It checks
    storage, systemd units, security, backups, every service, monitoring, Cleanuparr, the indexers
    and the VPN, and prints `OK` or `FAIL` per line with a summary `N passed, M failed`. A yellow
    `UPDATES` line is information, not a failure. It exits non-zero when anything failed.
@@ -39,7 +39,7 @@ flowchart TD
 
     Every container is named after its compose service. Or ask an AI agent with the `stack-logs`
     skill: it reads the logs and matches them against the known issues ([AI agent](flows/ai-agent.md)).
-4. **For the VPN**, run `leak-test` (`leaktest`) or the `vpn-check` skill, which also proves
+4. **For the VPN**, run `vpn-leak-test` (`leaktest`) or the `vpn-check` skill, which also proves
    qBittorrent and slskd sit inside gluetun's network and that traffic can't bypass the tunnel
    ([VPN and ports](flows/vpn-and-ports.md)).
 5. **For the media drive**, the `drive-health` skill reads its SMART data, temperature and USB
@@ -52,7 +52,7 @@ are listed at the end of the known issues.
 
 ## Where a failing check points
 
-| `health-check` section | Look at |
+| `stack-health` section | Look at |
 |---|---|
 | STORAGE | [Storage and boot](flows/storage-and-boot.md), [disk space](operations/maintenance.md#disk-space), [drive health](operations/maintenance.md#drive-health) |
 | SYSTEMD | [systemd reference](reference/systemd.md), [Host setup](operations/host.md) |

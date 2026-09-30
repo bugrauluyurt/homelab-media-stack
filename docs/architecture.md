@@ -156,7 +156,7 @@ flowchart LR
   off in the namespace, so nothing leaks over it either. qBittorrent is also bound to the
   tunnel interface itself.
 - **One forwarded port.** Proton forwards a single port. gluetun pushes it into qBittorrent
-  whenever it changes, and `sync-port` reconciles it every 15 minutes.
+  whenever it changes, and `vpn-port-sync` reconciles it every 15 minutes.
 - **Outside the boundary:** the host, Tailscale, SABnzbd, the arr apps, Prowlarr (so indexer
   searches go out directly), Jellyfin and Plex. Your own streams stay direct and fast.
 
@@ -312,7 +312,7 @@ would have routed everything, including Jellyfin streams and Tailscale, through 
 The cost is a coupling: when gluetun is restarted or recreated, qBittorrent and slskd keep
 "running" with a dead network until they are recreated too. Compose's
 `depends_on: {condition: service_healthy, restart: true}` covers restarts, and
-`scripts/stack-up` and `scripts/sync-port` re-attach them whenever their web UIs stop
+`scripts/stack-up` and `scripts/vpn-port-sync` re-attach them whenever their web UIs stop
 answering.
 
 ### Usenet outside the VPN
@@ -327,7 +327,7 @@ delay profile prefers Usenet and waits before falling back to torrents.
 
 Docker publishes a port by rewriting packets before they reach the host's `INPUT` chain, so a
 rule in `INPUT` (and a tool like ufw that writes there) never sees traffic to a published
-container port. `scripts/firewall` therefore installs the same policy twice: in `INPUT` for
+container port. `scripts/host-firewall` therefore installs the same policy twice: in `INPUT` for
 the host's own services and in `DOCKER-USER` for containers, for IPv4 and IPv6. One script
 owning the rules is also why ufw and firewalld must be off. Details are in
 [Security: the firewall](security.md#the-firewall).
@@ -367,7 +367,7 @@ nothing needs it:
 - Quality profiles target 1080p. x265 is allowed (scored 0) because the Apple TV and iPhone
   decode HEVC, 10-bit included, in hardware, so it plays directly. Desktop browsers may not,
   and then Jellyfin would have to transcode. If HEVC causes trouble, set the x265 score back
-  to `-10000` in `recyclarr/recyclarr.yml`.
+  to `-10000` in `apps/recyclarr/recyclarr.yml`.
 - Bazarr fetches sidecar `.srt` subtitles even when a file has embedded ones: a browser can
   show embedded subtitles only after Jellyfin reads the whole file to extract them, and
   burned-in subtitles force a full re-encode.
@@ -375,12 +375,12 @@ nothing needs it:
   it caps tailnet clients' bitrate and forces a transcode.
 - Real-time folder watching is off in Jellyfin and Plex so the drive can sleep; the arr apps
   tell Jellyfin to rescan on every import instead.
-- `watch-activity` sends an alert when a stream is being transcoded anyway.
+- `activity-watch` sends an alert when a stream is being transcoded anyway.
 
 A typical home upload also limits streaming away from home to about 1080p, so both limits
 point the same way. With Intel or AMD graphics on an x86-64 machine, `compose.gpu.yml` and
 `HWACCEL` give Jellyfin and Plex hardware transcoding, and browsers and odd formats stop being
-a problem. The profiles still aim at 1080p unless you change `recyclarr/recyclarr.yml`
+a problem. The profiles still aim at 1080p unless you change `apps/recyclarr/recyclarr.yml`
 ([Getting started](getting-started.md#optional-hardware-transcoding)).
 
 ### socket-proxy instead of the Docker socket
@@ -393,6 +393,27 @@ logs, plus read-only system information for Dozzle; every write (`POST=0`) is re
 publishes no port, so only containers on the `arr` network can ask it. The health check
 confirms that a write is refused, that log reads work, and that Homepage and Glance hold no
 socket.
+
+### Repository layout
+
+The repository is the stack's source; runtime data never lives in it ([Config outside the repo](#config-outside-the-repo)).
+
+| Path | Holds |
+|---|---|
+| `docker-compose.yml`, `compose.gpu.yml`, `.env.example` | Every service, grouped by module; the GPU overlay; every setting |
+| `apps/` | The config the repo ships per app, bind-mounted or copied in as a seed |
+| `scripts/` | One file per job, named area first (`stack-*`, `vpn-*`, `host-*`, `configure-*`) |
+| `host/` | What `host-install` puts on the machine: `systemd/` templates, SSH and Docker defaults |
+| `docs/`, `ai/`, `tests/`, `changelog.d/` | This site, the agent and its skills, the test suite, release notes |
+
+- **One compose file, not one per app.** The services share YAML anchors (`*common`, `*hc`, `*nnp`),
+  which don't cross files, so a split would repeat them in every file. Each module has its own
+  section in the file instead.
+- **`scripts/` stays flat.** The units run `@REPO@/scripts/<name>`, the Python scripts import
+  `stack_env` from their own folder, and the skills find the repository through
+  `scripts/stack-health`; names that start with their area keep related scripts together.
+- **`apps/`, not `config/`.** `config/` is ignored anywhere in the tree and would read as
+  `$CONFIG_ROOT`, the runtime data.
 
 ### Idempotent configure scripts
 

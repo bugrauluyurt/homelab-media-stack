@@ -25,7 +25,7 @@ The first time, an app asks for the **server address**, because Jellyfin has no 
 | At home, on the home network | `http://<lan-ip>:8096` |
 
 Sign in with your own account. The owner uses `JELLYFIN_USER` / `JELLYFIN_PASSWORD` from `.env`;
-everyone else gets one from `add-viewer.py` ([Giving someone access](../flows/viewers.md)). The
+everyone else gets one from `viewer-add.py` ([Giving someone access](../flows/viewers.md)). The
 app remembers the server after that.
 
 ## Settings that keep playback smooth
@@ -79,14 +79,14 @@ Things worth knowing:
   first row is 0 and the next one isn't 1; the script numbers them 0, 1, 2 and so on. If the home
   screen ever says "Nothing here", see the
   [known issue](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/ai/homelab-plugin/skills/stack-logs/references/known-issues.md#jellyfin-home-screen-shows-nothing-here).
-- **Spotlight isn't a plugin.** `jellyfin/custom-cont-init.d/abyss-spotlight.sh` (vendored from
+- **Spotlight isn't a plugin.** `apps/jellyfin/custom-cont-init.d/abyss-spotlight.sh` (vendored from
   Abyss, MIT) adds its loader to Jellyfin's `index.html` on every container start, so it survives
   image updates.
 - **Links follow the address you used.** The plugins reach Seerr and the arr apps over the
   Docker network with the API keys from `.env`, and links shown to your browser are mapped to the
   address you opened Jellyfin on (Tailscale, home network, `.local` or localhost).
 - **Requests need a Seerr account.** Each Jellyfin user needs a linked Seerr account with request
-  permission; `add-viewer.py` creates it.
+  permission; `viewer-add.py` creates it.
 - **Optional extras.** `TMDB_API_KEY` adds reviews and "where to stream"; `MDBLIST_API_KEY` adds
   IMDb and Rotten Tomatoes ratings on posters. Fill them in `.env`, then re-run the script.
 - **The server's name** in apps is `JELLYFIN_SERVER_NAME` (default "Home Media").

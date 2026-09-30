@@ -1,0 +1,15 @@
+# Grafana's dashboard provider: the JSON files in apps/grafana/dashboards.
+# Read by: grafana, mounted read-only.
+# Applies: at grafana's start; the dashboards themselves are re-read every 60 seconds.
+apiVersion: 1
+providers:
+  - name: default
+    orgId: 1
+    folder: Media Stack
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 60
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

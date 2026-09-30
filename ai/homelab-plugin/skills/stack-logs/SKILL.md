@@ -8,7 +8,7 @@ description: Troubleshoot a misbehaving media-stack service (Jellyfin, Seerr, Ra
 Read-only diagnosis. Propose fixes; don't apply them without asking.
 
 ```bash
-STACK=${MEDIA_STACK_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}; [ -x "$STACK/scripts/health-check" ] || STACK=~/homelab-media-stack
+STACK=${MEDIA_STACK_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}; [ -x "$STACK/scripts/stack-health" ] || STACK=~/homelab-media-stack
 cd "$STACK"
 docker compose ps --format '{{.Name}} {{.Status}}'            # what's running
 docker logs --since 30m <service> 2>&1 | grep -iE 'error|warn|fatal|exception' | tail -30
@@ -26,4 +26,4 @@ are already listed there with their cause and fix.
 - Never print values from `.env` (API keys, passwords, the WireGuard key). Read
   them into variables and use them.
 - The arr apps' API keys can be read with `sudo grep -oPm1 '(?<=<ApiKey>)[^<]+' $CONFIG_ROOT/<app>/config.xml`.
-- `health-check` confirms a fix; run it after any change the user approves.
+- `stack-health` confirms a fix; run it after any change the user approves.

@@ -18,9 +18,9 @@ viewers.
   `AGENTS.md` tells agents to read it first when it exists. Keep personal details there, never in
   `AGENTS.md`.
 
-Only two things may act without asking, both approved in `AGENTS.md`: `sync-port` restarting gluetun
+Only two things may act without asking, both approved in `AGENTS.md`: `vpn-port-sync` restarting gluetun
 after 15 minutes without a forwarded port ([VPN and ports](vpn-and-ports.md)), and
-`throttle-downloads` capping downloads while someone watches ([Monitoring](monitoring.md#throttle-downloads-keeping-playback-smooth)).
+`downloads-throttle` capping downloads while someone watches ([Monitoring](monitoring.md#downloads-throttle-keeping-playback-smooth)).
 
 ## The skills
 
@@ -30,7 +30,7 @@ them on the server.
 
 | Skill | Use | Approval |
 |---|---|---|
-| `stack-health` | Is everything OK? Runs `health-check` and explains each FAIL | Safe, but says so first when you asked for a look only (the check writes a test file and starts throwaway containers) |
+| `stack-health` | Is everything OK? Runs `stack-health` and explains each FAIL | Safe, but says so first when you asked for a look only (the check writes a test file and starts throwaway containers) |
 | `vpn-check` | Is P2P traffic confined to the VPN, with a working kill switch? | Read-only |
 | `drive-health` | SMART status, temperature and USB link of the media drive | Read-only |
 | `stack-logs` | Diagnose a service from its logs and the known issues | Read-only; proposes fixes, applies none |
@@ -134,7 +134,7 @@ sequenceDiagram
     TG->>EXT: approval
     EXT->>PI: prompt
     PI->>SV: apply the approved change only
-    PI->>SV: verify with a targeted check or health-check
+    PI->>SV: verify with a targeted check or stack-health
     PI-->>You: what changed, what was checked, what remains
 ```
 
@@ -190,13 +190,13 @@ profile **already paired** in an interactive Pi session. The installer expects P
 Run as your regular account, not root, from the repository:
 
 ```bash
-scripts/install-agent --enable
+scripts/agent-install --enable
 python3 ai/agent/gateway.py --check
 systemctl --user start arr-agent.service
 python3 ai/agent/gateway.py --status
 ```
 
-`scripts/install-agent`:
+`scripts/agent-install`:
 
 - validates the paths (no whitespace, quotes, backslashes or `%`), the installed versions and the
   pairing;
@@ -262,7 +262,7 @@ Do this from a separate SSH shell, never through the agent being stopped.
    `~/.local/state/arr-agent` and `~/.pi/agent` somewhere private (they hold secrets).
 3. Install the chosen version, for example
    `npm install -g @earendil-works/pi-coding-agent@<version>`.
-4. `scripts/install-agent --enable`, `python3 ai/agent/gateway.py --check`, and
+4. `scripts/agent-install --enable`, `python3 ai/agent/gateway.py --check`, and
    `python3 ai/agent/smoke_test.py` (one small real model request, then a stop and resume of the
    same session; it never connects Telegram).
 5. `systemctl --user start arr-agent.service`, `gateway.py --status`, and send a real Telegram
@@ -284,7 +284,7 @@ terminal sessions and the service's history stay.
 ### Tests
 
 ```bash
-python3 -m py_compile ai/agent/*.py scripts/install-agent
+python3 -m py_compile ai/agent/*.py scripts/agent-install
 python3 -m unittest discover -s ai/agent -p 'test_*.py' -v
 systemd-analyze --user verify ~/.config/systemd/user/arr-agent.service
 ```
@@ -299,8 +299,8 @@ a handover.
 |---|---|---|
 | `ai/homelab-plugin/skills/` | The seven skills | [On GitHub](https://github.com/bugrauluyurt/homelab-media-stack/tree/main/ai/homelab-plugin/skills) |
 | `gateway.py` | Supervises Pi in RPC mode, heartbeat, `--check`, `--status` | [On GitHub](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/ai/agent/gateway.py) |
-| `arr-agent.service` | The systemd user unit | [install-agent](../reference/scripts.md#install-agent) |
-| `install-agent` | Pins versions, renders and enables the unit, never starts it | [scripts](../reference/scripts.md#install-agent) |
+| `arr-agent.service` | The systemd user unit | [agent-install](../reference/scripts.md#agent-install) |
+| `agent-install` | Pins versions, renders and enables the unit, never starts it | [scripts](../reference/scripts.md#agent-install) |
 | `smoke_test.py` | One live model request and a session resume | [On GitHub](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/ai/agent/smoke_test.py) |
 
 ## When it goes wrong

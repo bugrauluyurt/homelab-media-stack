@@ -128,7 +128,7 @@ manage them, or the library copy loses its seeding twin without saving any space
 ## Quality rules (Recyclarr)
 
 The Recyclarr container syncs [TRaSH Guides](https://trash-guides.info/) quality profiles from
-[`recyclarr/recyclarr.yml`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/recyclarr/recyclarr.yml)
+[`apps/recyclarr/recyclarr.yml`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/apps/recyclarr/recyclarr.yml)
 into Radarr (*HD Bluray + WEB*, plus the *Golden Rule HD* and *Unwanted Formats* groups) and
 Sonarr (*WEB-1080p*), with TRaSH's quality sizes. Both profiles target 1080p, so a server
 without a hardware video encoder (a Raspberry Pi 5 has none) never has to transcode; the reasoning
@@ -174,7 +174,7 @@ of this up; `--dry-run` makes it log what it would do without acting. Day-to-day
 
 ## Stuck requests
 
-[`watch-activity`](../reference/scripts.md#watch-activity) runs every minute from
+[`activity-watch`](../reference/scripts.md#activity-watch) runs every minute from
 [`arr-watch.timer`](../reference/systemd.md#arr-watchtimer). It pushes "Request still not
 downloaded" to ntfy, once per request, when a Seerr request was approved more than 48 hours ago
 (`STUCK_HOURS`), is still pending or processing, and is actually out: for a movie, Radarr says it
@@ -186,7 +186,7 @@ no indexer carries the title; see [Indexers](../operations/indexers.md).
 
 qBittorrent's downloads are capped at 20 MB/s while someone watches Jellyfin or Plex or the server
 is busy, and uploads are always capped at 10 Mbps. That is
-[`throttle-downloads`](../reference/scripts.md#throttle-downloads), explained in
+[`downloads-throttle`](../reference/scripts.md#downloads-throttle), explained in
 [Monitoring](monitoring.md).
 
 ## Subtitles (Bazarr)
@@ -227,21 +227,21 @@ Bazarr profile. French trackers for the downloads themselves are covered in
 | `configure-seerr.py` | Connects Seerr to Jellyfin, Radarr and Sonarr; ntfy for available and failed requests | [scripts](../reference/scripts.md#configure-seerrpy) |
 | `configure-arr.py` | Root folders, hardlinks, download clients, delay profiles, Jellyfin refresh, audio-description penalty, ntfy, Prowlarr links, the Usenet indexers, the `french` tag | [scripts](../reference/scripts.md#configure-arrpy) |
 | `configure-sabnzbd.py` | Usenet server, download folders and one category per app | [scripts](../reference/scripts.md#configure-sabnzbdpy) |
-| `add-indexers.py` | Adds the public and optional indexers to Prowlarr and tests them | [scripts](../reference/scripts.md#add-indexerspy) |
+| `configure-indexers.py` | Adds the public and optional indexers to Prowlarr and tests them | [scripts](../reference/scripts.md#configure-indexerspy) |
 | `configure-bazarr.py` | Bazarr's connections, providers and language profiles | [scripts](../reference/scripts.md#configure-bazarrpy) |
 | `configure-cleanuparr.py` | Cleanuparr's rules, live or dry run | [scripts](../reference/scripts.md#configure-cleanuparrpy) |
-| `recyclarr.yml` | TRaSH quality profiles and scores | [file](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/recyclarr/recyclarr.yml) |
-| `watch-activity` | Stuck-request alert | [scripts](../reference/scripts.md#watch-activity) |
-| `arr-watch.timer` | Runs `watch-activity` every minute | [systemd](../reference/systemd.md#arr-watchtimer) |
-| `throttle-downloads` | Download cap while someone watches | [scripts](../reference/scripts.md#throttle-downloads) |
-| `check-indexers` | Tests every indexer on demand | [scripts](../reference/scripts.md#check-indexers) |
+| `recyclarr.yml` | TRaSH quality profiles and scores | [file](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/apps/recyclarr/recyclarr.yml) |
+| `activity-watch` | Stuck-request alert | [scripts](../reference/scripts.md#activity-watch) |
+| `arr-watch.timer` | Runs `activity-watch` every minute | [systemd](../reference/systemd.md#arr-watchtimer) |
+| `downloads-throttle` | Download cap while someone watches | [scripts](../reference/scripts.md#downloads-throttle) |
+| `indexers-check` | Tests every indexer on demand | [scripts](../reference/scripts.md#indexers-check) |
 
 ## When it goes wrong
 
 Start at *Activity, Queue* in Radarr or Sonarr: it shows whether the download is running, stuck or
 failed to import. Then:
 
-- **Nothing found at all:** run `scripts/check-indexers`; public trackers are patchy for old or
+- **Nothing found at all:** run `scripts/indexers-check`; public trackers are patchy for old or
   obscure titles.
   [Searches find nothing](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/ai/homelab-plugin/skills/stack-logs/references/known-issues.md#searches-find-nothing-or-an-indexer-keeps-failing).
 - **Results exist but nothing is grabbed:**

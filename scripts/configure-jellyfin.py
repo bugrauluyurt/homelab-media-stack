@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Complete Jellyfin's startup wizard and add the Movies/TV libraries.
 
+Runs: by hand, once, after the stack's first start and before the other configure scripts.
+Changes: Jellyfin's startup API.
+Idempotent: yes; it exits at once when the wizard is already complete.
+
 Takes the admin account from JELLYFIN_USER / JELLYFIN_PASSWORD in .env. Safe
 to re-run: exits early if the wizard is already done.
 """

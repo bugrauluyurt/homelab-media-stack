@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """Give Glance the API keys it can't get from the apps' own settings pages.
 
+Runs: by hand, once Jellystat and ChangeDetection.io have started.
+Changes: Jellystat's database through psql in jellystat-db; .env; docker compose up -d glance.
+Idempotent: yes; a second run prints only = lines.
+
 Creates Jellystat's "glance" key and copies ChangeDetection.io's into .env, recreating
-Glance only when one changed. Idempotent: a second run prints only = lines.
+Glance only when one changed.
 """
 import json
 import subprocess

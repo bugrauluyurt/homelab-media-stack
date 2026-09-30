@@ -2,7 +2,14 @@
 """Configure Uptime Kuma: admin account, ntfy alerts, one monitor per published
 TCP port in docker-compose.yml, and a status page at /status/stack.
 
-Idempotent; re-run after adding or removing a service. Monitors added by hand are
+Runs: by hand, last among the configure scripts, and again after adding or removing a service or
+  switching a module off.
+Changes: creates a Python venv in $STATE/venv with python-socketio from PyPI on first run; Kuma
+  settings, monitors and status page; the admin password's hash in Kuma's database through docker
+  exec.
+Idempotent: yes.
+
+Monitors added by hand are
 never touched. Kuma 2 has no REST API, so this re-runs itself in a venv with
 python-socketio.
 """
@@ -16,7 +23,7 @@ import time
 import urllib.error
 import urllib.request
 
-from stack_env import ENV, REPO, STATE, STORAGE, enabled_services, require_service
+from stack_env import ENV, NTFY_SERVER, REPO, STATE, STORAGE, enabled_services, require_service
 
 require_service("uptime-kuma")
 
@@ -162,7 +169,7 @@ elif ntfy:
 else:
     ntfy_id = emit("addNotification", {
         "name": "ntfy", "type": "ntfy", "isDefault": True, "applyExisting": True,
-        "ntfyserverurl": ENV.get("NTFY_SERVER", "https://ntfy.sh"), "ntfytopic": ENV["NTFY_TOPIC"],
+        "ntfyserverurl": NTFY_SERVER, "ntfytopic": ENV["NTFY_TOPIC"],
         "ntfyPriority": 4, "ntfyAuthenticationMethod": "none"}, None)["id"]
     print("  + added ntfy notification (default for all monitors)")
 

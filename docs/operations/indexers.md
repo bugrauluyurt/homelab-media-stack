@@ -48,7 +48,7 @@ Yes, continuously and on its own:
 - Persistent problems appear under **Prowlarr → System → Health**, with a banner in the UI.
 
 You see it in three places: Glance's Lab page counts the indexers **backing off** and says when
-each retries; `health-check` fails when no indexer passes a test; and `check-indexers` shows the
+each retries; `stack-health` fails when no indexer passes a test; and `indexers-check` shows the
 detail on demand (below).
 
 ## Sites behind Cloudflare: Byparr
@@ -76,10 +76,10 @@ that fails with a Cloudflare error.
 1337x is deliberately left out: its Cloudflare setup often blocks home addresses outright
 (error 1006), which no solver gets past. Knaben indexes its listings, so little is lost.
 
-## Adding indexers: add-indexers.py
+## Adding indexers: configure-indexers.py
 
 ```bash
-scripts/add-indexers.py
+scripts/configure-indexers.py
 ```
 
 It adds the indexers in its `WANTED` list to Prowlarr, then tests each one with a real search and
@@ -96,10 +96,10 @@ and run it again, or add them by hand in **Prowlarr → Indexers → Add Indexer
 definition Prowlarr ships. A Cloudflare-protected site commonly fails to add; that is expected, not
 a configuration error. Give it the `byparr` tag and try again.
 
-## Testing indexers: check-indexers
+## Testing indexers: indexers-check
 
 ```bash
-scripts/check-indexers        # or the alias: indexers
+scripts/indexers-check        # or the alias: indexers
 ```
 
 It tests every indexer in Prowlarr and prints Prowlarr's own statistics, then any health warnings:
@@ -141,12 +141,12 @@ often aren't there at all, in any quality. No setting fixes that. The real fix i
 an account (from a sign-up window or an invite), which slots into Prowlarr exactly like the others
 and syncs to every app.
 
-`add-indexers.py` already knows two semi-private French trackers, for French TV and film that the
+`configure-indexers.py` already knows two semi-private French trackers, for French TV and film that the
 English sites rarely carry:
 
 1. Sign up (free) at draupnirr.xyz or tr4ker.net.
 2. Copy the API key from your profile page into `.env` as `DRAUPNIRR_API_KEY` or `TR4KER_API_KEY`.
-3. Run `scripts/add-indexers.py` again.
+3. Run `scripts/configure-indexers.py` again.
 
 Both enforce a minimum ratio, and a tracker that falls below it stops handing out peers. So the
 script gives them Prowlarr's `RSS only` app profile: the apps grab new releases from their feeds,
@@ -163,7 +163,7 @@ TVDB id so Jellyfin finds the right show.
 
 | Symptom | Where to look |
 |---|---|
-| "No results found" for everything | `scripts/check-indexers`: does any indexer pass? |
+| "No results found" for everything | `scripts/indexers-check`: does any indexer pass? |
 | One indexer always fails | Prowlarr → System → Health |
 | Cloudflare errors | Is Byparr healthy? `docker inspect -f '{{.State.Health.Status}}' byparr` |
 | Results exist but nothing is grabbed | Interactive Search in Radarr or Sonarr: the quality rules are probably rejecting them ([known issue](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/ai/homelab-plugin/skills/stack-logs/references/known-issues.md#releases-shown-as-rejected)) |

@@ -1,0 +1,6 @@
+# Through the socket proxy, never the raw socket - see docker-compose.yml.
+# Read by: homepage, from apps/homepage mounted at /app/config.
+# Applies: Homepage reloads it on save.
+my-docker:
+  host: socket-proxy
+  port: 2375

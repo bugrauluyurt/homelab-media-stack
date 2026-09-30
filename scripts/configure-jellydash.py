@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """Configure JellyDash: its own Jellyfin API key, the admin login and its Downloads page.
 
-Idempotent. The key is stored in .env as JELLYDASH_JELLYFIN_API_KEY, and the
+Runs: by hand, after configure-sabnzbd.py.
+Changes: Jellyfin API key; .env; docker compose up -d jellydash, which recreates it when the key
+  changed; JellyDash's database through docker exec.
+Idempotent: yes.
+
+The key is stored in .env as JELLYDASH_JELLYFIN_API_KEY, and the
 container is recreated when it changes.
 """
 import json
@@ -11,12 +16,12 @@ import sys
 import time
 import urllib.request
 
-from stack_env import ENV, REPO, require_service, set_env
+from stack_env import ENV, REPO, require_service, set_env, http, jellyfin_headers
 
 require_service("jellydash")
 
 JELLYFIN = "http://127.0.0.1:8096"
-AUTH = {"Authorization": f'MediaBrowser Token="{ENV["JELLYFIN_API_KEY"]}"'}
+AUTH = jellyfin_headers()
 APP = "JellyDash"
 DB = "/var/www/html/var/data/jellydash.sqlite"
 
@@ -74,9 +79,7 @@ CLIENTS = [
 
 
 def jellyfin(path, method="GET"):
-    r = urllib.request.Request(JELLYFIN + path, method=method, headers=AUTH)
-    raw = urllib.request.urlopen(r, timeout=30).read()
-    return json.loads(raw) if raw else None
+    return http(JELLYFIN + path, method=method, headers=AUTH, timeout=30)
 
 
 def api_key():
