@@ -8,8 +8,9 @@ Each entry says what you see, why it happens, and what to do.
   "qbittorrent bound to the tunnel". qBittorrent itself still shows as running.
 - **Cause:** qBittorrent and slskd live in gluetun's network namespace. When
   gluetun is recreated they keep running, but their network is gone.
-- **Fix:** `scripts/stack-up` re-attaches them (it runs at boot), or
-  `docker compose up -d --force-recreate qbittorrent slskd`, then `scripts/sync-port`.
+- **Fix:** `scripts/sync-port` reattaches them once gluetun is healthy and has a valid forwarded
+  port. The existing timer also restores clients left stopped during an outage. It does not
+  recreate clients while the VPN is unhealthy, or restart unrelated services.
 
 ## VPN fails shortly after torrents start, then recovers about an hour later
 - **Observed:** two Netherlands endpoints connected initially, then lost NAT-PMP and WireGuard
@@ -17,16 +18,20 @@ Each entry says what you see, why it happens, and what to do.
   With DHT disabled, the original endpoint stayed connected during validation at the usual upload
   cap, with queueing off and the original peer limits restored. A later 10-minute test that
   re-enabled DHT on the established session also stayed healthy, with downloads and uploads.
-  This did not reproduce the failure and does not prove DHT alone caused it.
+  This did not reproduce the failure and does not prove DHT alone caused it. The longer DHT-on
+  trial ran without VPN errors for about 3 hours 43 minutes, then failed shortly after reboot:
+  VPN connected at 23:17 UTC, downloaders started, resets began at 23:18:51 and NAT-PMP failed
+  at 23:20. The same credentials recovered around 00:20. Subsequent DHT-off cold starts and a
+  VPN restart with downloader reattachment stayed connected under upload traffic.
 - **Suspected cause:** an upstream traffic-triggered restriction, consistent with reports about
   Proton's anti-abuse system. DHT, startup bursts and transient provider issues remain hypotheses;
   the provider-side reason is not confirmed. Do not assume every timeout is this issue.
-- **Current policy:** DHT stays enabled for a longer owner-observed trial. `sync-port` does not
-  override it and `health-check` does not flag it. No extra watcher, scheduler or timed restart
-  was added; existing monitoring and VPN recovery remain active. If a failure is reported,
-  capture evidence before considering DHT-off as a precaution, not a proven fix. Do not replace
-  credentials or lower bandwidth or peer limits without evidence and approval. A blocked tunnel
-  can take time to recover even after traffic stops.
+- **Current policy:** DHT stays enabled at the owner's request. Passing DHT-off cold starts is
+  not proof that DHT caused earlier failures; startup torrent volume is another hypothesis.
+  Recovery scripts do not override DHT, peer limits, queueing or bandwidth. No extra watcher or
+  scheduler was added. Preserve failure evidence before further changes; do not replace
+  credentials or lower traffic limits without evidence and approval. A temporary upstream block
+  remains a hypothesis, not a confirmed provider diagnosis.
 - **Check:** read WireGuard handshake age, tunnel traffic, forwarded port and the live `dht`
   preference. Validate beyond the previous failure window with the downloaders running, not just
   an initial Docker healthy status. Never bypass the VPN to restore connectivity.

@@ -149,9 +149,11 @@ docker compose up -d "${recreate[@]}" || {
   echo "recreate failed - roll back with: update --rollback <service>"; exit 1; }
 
 if [[ " ${recreate[*]} " == *" gluetun "* ]]; then
-  reattach_vpn_apps
-  wait_gluetun_healthy
-  "$REPO/scripts/sync-port"
+  if wait_gluetun_healthy; then
+    "$REPO/scripts/sync-port" || echo "WARN: port sync failed; the timer will retry."
+  else
+    echo "WARN: VPN is not healthy; the port-sync timer will restore downloaders after recovery."
+  fi
 fi
 
 for svc in "${services[@]}"; do

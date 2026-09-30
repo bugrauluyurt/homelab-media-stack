@@ -13,53 +13,71 @@ HEAL_EVERY=7200
 MISSING_SINCE="$STATE_ROOT/port-forward-missing-since"
 LAST_HEAL="$STATE_ROOT/port-forward-last-heal"
 
-qb_set() { docker exec qbittorrent curl -s --max-time 10 -X POST \
-             "$QB/api/v2/app/setPreferences" --data-urlencode "json=$1" >/dev/null 2>&1; }
+qb_set() {
+  docker exec qbittorrent curl -fsS --max-time 10 -X POST \
+    "$QB/api/v2/app/setPreferences" --data-urlencode "json=$1" >/dev/null 2>&1 || {
+    echo "Could not update qBittorrent preferences; the next run will retry."
+    exit 1
+  }
+}
 
 read_tunnel() { tun_ip=$(tunnel_ip); port=$(forwarded_port); }
-valid_port() { [[ "$port" =~ ^[0-9]+$ ]] && [ "$port" -ge 1024 ]; }
+valid_port() { [[ "$port" =~ ^[0-9]+$ ]] && [ "$port" -ge 1024 ] && [ "$port" -le 65535 ]; }
+tunnel_ready() { vpn_healthy && [ -n "${tun_ip:-}" ] && valid_port; }
 
 restart_vpn() {
   date +%s > "$LAST_HEAL"
   echo "restarting gluetun to get a forwarded port"
-  docker compose restart gluetun >/dev/null 2>&1
+  docker compose restart --no-deps gluetun >/dev/null 2>&1 || return 1
 
   for _ in $(seq 1 36); do
     sleep 5
     read_tunnel
-    [ -n "$tun_ip" ] && valid_port && [ "$(docker inspect -f '{{.State.Health.Status}}' gluetun)" = healthy ] && break
+    tunnel_ready && return 0
   done
 
-  reattach_vpn_apps >/dev/null 2>&1
-  sleep 8
+  return 1
 }
 
+restarted=0
 read_tunnel
-if [ -z "${tun_ip:-}" ]; then
-  echo "VPN tunnel is down; nothing to sync."
-  exit 1
+# Docker can report healthy a few seconds before Proton finishes forwarding the port.
+if vpn_healthy && ! tunnel_ready; then
+  for _ in $(seq 1 15); do
+    sleep 2
+    read_tunnel
+    tunnel_ready && break
+    vpn_healthy || break
+  done
 fi
-
-if ! valid_port; then
+if ! tunnel_ready; then
   # Timed by the clock, not by run count: at boot two runs come a minute apart.
   [ "$(cat "$MISSING_SINCE" 2>/dev/null || echo 0)" -ge "$(date -d "$(uptime -s)" +%s)" ] || date +%s > "$MISSING_SINCE"
   missing=$(( $(date +%s) - $(cat "$MISSING_SINCE") ))
-  echo "no valid forwarded port from gluetun (got: '${port:-empty}') for $((missing / 60)) min"
+  echo "VPN not ready (tunnel '${tun_ip:-missing}', port '${port:-empty}') for $((missing / 60)) min"
 
   since_heal=$(( $(date +%s) - $(cat "$LAST_HEAL" 2>/dev/null || echo 0) ))
   [ "$missing" -ge "$MISSING_LIMIT" ] && [ "$since_heal" -ge "$HEAL_EVERY" ] || exit 1
 
-  restart_vpn
-  if ! valid_port; then
-    notify "media stack: VPN still has no forwarded port" warning "Proton gave no forwarded port, and restarting the VPN didn't help. Torrents still run through the VPN but get no incoming peers. The next automatic try is in $((HEAL_EVERY / 3600)) hours; see docs/flows/vpn-and-ports.md."
+  if ! restart_vpn; then
+    notify "media stack: VPN still unavailable" warning "Restarting the VPN did not restore a healthy tunnel and forwarded port. Downloaders were not recreated. The existing port-sync timer will reattach them once the VPN recovers; automatic VPN restarts remain limited to once every $((HEAL_EVERY / 3600)) hours."
     exit 1
   fi
-
-  notify "media stack: VPN forwarded port restored" white_check_mark "Proton gave no forwarded port for $((MISSING_LIMIT / 60))+ minutes, so the VPN was restarted automatically. New port: $port. Torrents and Soulseek paused for about a minute."
+  restarted=1
 fi
-rm -f "$MISSING_SINCE"
+
+# Recover stopped or detached clients even when Proton recovered without our restart.
+tunnel_ready || exit 1
+if ! vpn_apps_attached; then
+  echo "VPN ready; re-attaching downloaders."
+  reattach_vpn_apps || exit 1
+fi
 
 prefs=$(qbit_prefs)
+if ! python3 -c 'import json, sys; p = json.load(sys.stdin); assert isinstance(p, dict) and isinstance(p.get("listen_port"), int) and isinstance(p.get("current_interface_address"), str)' <<< "$prefs" 2>/dev/null; then
+  echo "qBittorrent preferences are unavailable; refusing to write guessed settings."
+  exit 1
+fi
 cur_port=$(json_get listen_port <<< "$prefs")
 cur_addr=$(json_get current_interface_address <<< "$prefs")
 
@@ -105,7 +123,12 @@ fi
 sleep 3
 ok=$(docker exec gluetun sh -c "netstat -tuln 2>/dev/null | grep -c '$tun_ip:$port'")
 if [ "${ok:-0}" -ge 1 ]; then
+  tunnel_ready || exit 1
+  rm -f "$MISSING_SINCE"
   echo "verified: listening on $tun_ip:$port"
+  if [ "$restarted" -eq 1 ]; then
+    notify "media stack: VPN forwarded port restored" white_check_mark "The VPN and downloaders recovered after an automatic restart. Forwarded port: $port."
+  fi
 else
   echo "WARNING: not listening on $tun_ip:$port"
   exit 1

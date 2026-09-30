@@ -364,7 +364,7 @@ Brings the stack up; it is `arr-stack.service`'s `ExecStart`. In order:
 3. Seeds any missing Glance YouTube list, and an empty video row until the first sync, with [`sync-youtube.py --offline`](#sync-youtubepy).
 4. Runs `docker compose up -d --remove-orphans`.
 5. Fails (exit 1) when a library service is not running: prowlarr, radarr, sonarr, lidarr, bazarr, seerr, plex, jellyfin, navidrome, each only when its module is on.
-6. When gluetun runs: waits up to 120 seconds for it to be healthy, recreates qBittorrent and slskd when they don't answer, then runs [`sync-port`](#sync-port).
+6. When gluetun runs: waits up to 120 seconds for it to be healthy, then runs [`sync-port`](#sync-port), which restores downloaders only when the tunnel and forwarded port are ready. If the wait expires, the existing port-sync timer handles recovery later.
 7. Restarts Dozzle when it started before Docker could list the containers.
 
 A compose error with every library service up is only a warning (the VPN is probably still connecting), and the script exits 0.
@@ -385,7 +385,9 @@ Reconciles qBittorrent with the live VPN tunnel. It reads the tunnel address (`t
 - lets Docker's network (`172.16.0.0/12`) and the tailnet (`100.64.0.0/10`) skip the login, while the home network must always log in;
 - turns on CSRF protection and Host header validation, allowing `gluetun`, `127.0.0.1`, `HOST_NAME`, `HOST_NAME.local`, `HOST_NAME.*.ts.net` and the server's own addresses.
 
-It then checks that qBittorrent listens on the tunnel address and port. When Proton has given no valid port (1024 or above) for 15 minutes, it restarts gluetun, waits up to 3 minutes for a healthy tunnel with a port, recreates qBittorrent and slskd, and pushes an ntfy message saying whether that worked. It tries this at most once every 2 hours. [VPN and ports](../flows/vpn-and-ports.md) tells the whole story.
+Each run first requires a healthy VPN, tunnel address and valid forwarded port (1024 to 65535), allowing up to 30 seconds for port forwarding to follow an initial healthy status. It reattaches stopped or detached downloaders even after the VPN recovers on its own, without restarting the healthy VPN or unrelated services. Missing or invalid qBittorrent preferences stop the run rather than writing guessed defaults. It then checks that qBittorrent listens on the tunnel address and port.
+
+After 15 minutes without a ready tunnel, it may restart gluetun, at most once every 2 hours. It waits up to 3 minutes for readiness; if that fails it leaves downloaders untouched and reports failure. Success is reported only after reattachment and port verification. No extra watcher or timer is needed. [VPN and ports](../flows/vpn-and-ports.md) tells the whole story.
 
 - **File:** [`scripts/sync-port`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/sync-port)
 - **Runs:** [`arr-port-sync.timer`](systemd.md#arr-port-synctimer) (90 seconds after boot, then every 15 minutes), [`stack-up`](#stack-up), [`update`](#update) after a gluetun update, by hand.
@@ -520,7 +522,7 @@ Updates services safely, in four steps:
 
 1. Takes a settings snapshot with `sudo backup-config pre-update`, and stops if that fails or the drive is off.
 2. Notes each service's current image.
-3. Pulls and recreates the services. For each image that changed, the previous one is kept as `<repository>:rollback-<date>-<time>` (one per app; older rollback tags are removed) and recorded in `$STATE/rollback/<service>`. qBittorrent and slskd are recreated with gluetun, and after a gluetun update they are re-attached, gluetun is waited for and [`sync-port`](#sync-port) runs. The updated images are marked current in `$STATE/updates`.
+3. Pulls and recreates the services. For each image that changed, the previous one is kept as `<repository>:rollback-<date>-<time>` (one per app; older rollback tags are removed) and recorded in `$STATE/rollback/<service>`. qBittorrent and slskd are recreated with gluetun. After a gluetun update, the script waits for VPN health before [`sync-port`](#sync-port) reattaches any detached clients and reconciles the port; a failed wait defers recovery to the existing timer. The updated images are marked current in `$STATE/updates`.
 4. Runs [`health-check`](#health-check); on a failure it waits for the containers to finish starting, 30 seconds more, and checks again.
 
 It pushes ntfy when recreating or the final health check fails. [Updates](../flows/updates.md) covers the flow.
@@ -621,8 +623,8 @@ Sourced by the stack's bash scripts. It sets `REPO`, exports every `.env` value,
 - `write_update_metrics`: pending image updates for node-exporter's textfile collector, written whole and renamed into place so a scrape never sees half a file;
 - `disk_of_mount PATH`: the whole disk a mount lives on, bind mounts included;
 - `service_enabled NAME`: whether a service is in an active profile;
-- `json_get`, `tunnel_ip`, `forwarded_port`, `qbit_prefs`, `wait_gluetun_healthy`;
-- `vpn_apps_attached` and `reattach_vpn_apps`: qBittorrent and slskd share gluetun's network namespace, and when gluetun is restarted or recreated under them they keep "running" with a dead network until they are recreated too. slskd is named only when its module is on, because naming a service starts it even when its profile is off.
+- `json_get`, `tunnel_ip`, `forwarded_port`, `qbit_prefs`, `vpn_healthy`, `wait_gluetun_healthy`;
+- `vpn_apps_attached` and `reattach_vpn_apps`: qBittorrent and slskd share gluetun's network namespace, and when gluetun is restarted or recreated under them they keep "running" with a dead network until they are recreated too. slskd is named only when its module is on, because naming a service starts it even when its profile is off. Reattachment requires a healthy VPN, uses `--no-deps` to avoid touching other services, and waits for the downloaders to answer.
 
 - **File:** [`scripts/stack-env.sh`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/stack-env.sh)
 - **Changes:** nothing itself.

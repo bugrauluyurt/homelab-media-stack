@@ -49,6 +49,10 @@ tunnel_ip() { docker exec gluetun sh -c "ip -4 -o addr show tun0 2>/dev/null | a
 forwarded_port() { docker exec gluetun cat /tmp/gluetun/forwarded_port 2>/dev/null | tr -d '[:space:]'; }
 qbit_prefs() { docker exec qbittorrent curl -s --max-time 10 "http://127.0.0.1:$QBIT_PORT/api/v2/app/preferences" 2>/dev/null; }
 
+vpn_healthy() {
+  [ "$(docker inspect -f '{{.State.Health.Status}}' gluetun 2>/dev/null)" = healthy ]
+}
+
 wait_gluetun_healthy() {
   timeout "${1:-180}" bash -c 'until [ "$(docker inspect -f "{{.State.Health.Status}}" gluetun 2>/dev/null)" = healthy ]; do sleep 3; done'
 }
@@ -65,5 +69,14 @@ reattach_vpn_apps() {
   local vpn_apps=(qbittorrent)
   service_enabled slskd && vpn_apps+=(slskd)
 
-  docker compose --project-directory "$REPO" up -d --force-recreate "${vpn_apps[@]}"
+  vpn_healthy || { echo "VPN is not healthy; leaving downloaders untouched."; return 1; }
+  docker compose --project-directory "$REPO" up -d --no-deps --force-recreate "${vpn_apps[@]}" || return 1
+
+  for _ in $(seq 1 30); do
+    vpn_healthy || return 1
+    vpn_apps_attached && return 0
+    sleep 2
+  done
+  echo "Downloaders are not ready yet; the next port-sync run will retry."
+  return 1
 }

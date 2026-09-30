@@ -39,12 +39,11 @@ fi
 
 # After a boot qBittorrent starts on a stale forwarded port; sync now rather than wait for the timer.
 if docker compose ps --status running --format '{{.Service}}' | grep -qx gluetun; then
-  wait_gluetun_healthy 120
-  if ! vpn_apps_attached; then
-    echo "WARN: qBittorrent or slskd not answering; re-attaching them to gluetun's namespace."
-    reattach_vpn_apps
+  if wait_gluetun_healthy 120; then
+    "$REPO/scripts/sync-port" || echo "WARN: port sync failed; the timer will retry."
+  else
+    echo "WARN: VPN is not healthy; the port-sync timer will restore downloaders after recovery."
   fi
-  "$REPO/scripts/sync-port" || echo "WARN: port sync failed; the timer will retry."
 fi
 
 # Dozzle lists containers once at start; if Docker was too busy to answer, it shows no stats for them.

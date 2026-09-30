@@ -71,10 +71,11 @@ is copied into `$CONFIG_ROOT/qbittorrent/qBittorrent/` before the first start, a
   page can reply; a qBittorrent bound there would send tracker traffic outside the tunnel, where the
   firewall drops it, and every tracker would report "Operation not permitted". Bound to the tunnel
   address, traffic goes through `tun0`, and it can't leak if the tunnel disappears.
-- **DHT remains enabled.** A successful DHT-on retest did not reproduce the earlier tunnel
-  failures, so DHT alone is not a confirmed cause. `sync-port` leaves the DHT preference alone
-  and `health-check` does not require it off. For a recurring outage, inspect the tunnel and
-  traffic evidence before changing peer discovery or replacing VPN credentials. See the
+- **DHT remains enabled.** Both DHT-on established sessions and DHT-off cold starts passed
+  testing, while a reboot with DHT on failed. These observations do not isolate DHT as the cause;
+  startup traffic volume and transient upstream issues remain hypotheses. Recovery scripts do
+  not override DHT or impose new peer, queueing or bandwidth limits. Before replacing credentials
+  or changing peer discovery, inspect the tunnel and traffic evidence. See the
   [troubleshooting notes](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/ai/homelab-plugin/skills/stack-logs/references/known-issues.md#vpn-fails-shortly-after-torrents-start-then-recovers-about-an-hour-later).
 - **Login-free networks.** The Docker network (`172.16.0.0/12`: the arr apps, Homepage) and the
   tailnet (`100.64.0.0/10`: your phone) skip the login, so the apps need no stored credential. The
@@ -96,10 +97,11 @@ runs from [`arr-port-sync.timer`](../reference/systemd.md#arr-port-synctimer) 90
 and then every 15 minutes, from `stack-up` as soon as the tunnel is healthy after the stack starts,
 and by hand. In order, it:
 
-1. Reads the tunnel address (`tun0` inside gluetun) and the forwarded port from gluetun's port file.
-   No tunnel: it prints "VPN tunnel is down; nothing to sync." and exits 1.
-2. Checks the port is a number of 1024 or more. If not, it follows the
-   [missing-port rules](#when-proton-gives-no-port).
+1. Reads VPN health, the tunnel address (`tun0` inside gluetun) and the forwarded port.
+2. Requires a healthy VPN, a tunnel address and a port between 1024 and 65535. Otherwise it
+   follows the [missing-port rules](#when-proton-gives-no-port). Once ready, it reattaches stopped
+   or detached downloaders, even after spontaneous VPN recovery, without restarting other
+   services. It refuses to change preferences if qBittorrent's API response is invalid.
 3. Binds qBittorrent to `tun0` and the current tunnel address, if it isn't already.
 4. Sets `listen_port` to the forwarded port, if it differs.
 5. Sets the login-free networks to exactly the tailnet and the Docker network.
@@ -153,11 +155,12 @@ stateDiagram-v2
   [*] --> Synced
   Synced --> Missing: no valid port, time noted
   Missing --> Missing: under 15 min, or last restart under 2 h ago
-  Missing --> Synced: port comes back by itself
+  Missing --> Reattach: VPN and port recover by themselves
   Missing --> Restarting: missing 15 min or more
-  Restarting --> Reattach: healthy with a port, or after 3 min
-  Reattach --> Synced: port found, ntfy "restored"
-  Reattach --> Missing: still no port, ntfy "still has no port"
+  Restarting --> Reattach: healthy with a port
+  Restarting --> Missing: still unavailable after 3 min
+  Reattach --> Synced: clients answer and port is verified
+  Reattach --> Missing: recovery incomplete, retry next run
 ```
 
 - The 15 minutes (`MISSING_LIMIT`) are measured by the clock from when a run first saw the port
@@ -165,11 +168,13 @@ stateDiagram-v2
   the last boot is ignored, so the count starts again with each boot.
 - At most one restart every two hours (`HEAL_EVERY`), so a long Proton outage doesn't mean a
   restart and a push every half hour.
-- The restart is `docker compose restart gluetun`; it waits up to 3 minutes for a tunnel address, a
-  valid port and a healthy gluetun, then recreates qBittorrent and slskd in the new namespace (see
-  [below](#re-attaching-qbittorrent-and-slskd)).
-- It then pushes **"VPN forwarded port restored"** to ntfy, with the new port, or **"VPN still has
-  no forwarded port"** if the restart didn't help. Torrents and Soulseek pause for about a minute.
+- The restart is `docker compose restart --no-deps gluetun`; it waits up to 3 minutes for a tunnel address,
+  a valid port and a healthy gluetun. Only then may it recreate qBittorrent and slskd in the new
+  namespace (see [below](#re-attaching-qbittorrent-and-slskd)). A failed wait leaves them untouched.
+- Every later run can reattach missing downloaders after the tunnel recovers, without another
+  VPN restart. This uses the existing timer, not an additional watcher.
+- It pushes **"VPN forwarded port restored"** only after clients answer and their port is verified,
+  or **"VPN still unavailable"** if the restart did not restore readiness.
 - The state lives in `$STATE_ROOT/port-forward-missing-since` and
   `$STATE_ROOT/port-forward-last-heal`.
 
