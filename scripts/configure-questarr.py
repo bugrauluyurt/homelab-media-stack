@@ -8,7 +8,7 @@ import secrets
 import subprocess
 import urllib.parse
 
-from stack_env import ENV, arr_key, http, require_service
+from stack_env import ENV, NTFY_SERVER, arr_key, http, require_service
 
 require_service("questarr")
 
@@ -90,7 +90,7 @@ else:
 # Questarr has one shared login and no approval step, so "Download Started" is how you learn
 # a viewer picked a release.
 if ENV.get("NTFY_TOPIC"):
-    host = urllib.parse.urlparse(ENV.get("NTFY_SERVER", "https://ntfy.sh")).netloc
+    host = urllib.parse.urlparse(NTFY_SERVER).netloc
     urls = f"ntfys://{host}/{ENV['NTFY_TOPIC']}"
 
     if call("/settings/apprise").get("urls") == urls:

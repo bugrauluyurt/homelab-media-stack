@@ -55,7 +55,7 @@ class GrafanaWatchTests(unittest.TestCase):
         password.assert_not_called()
         self.assertNotIn("PASSWORD", sql.call_args_list[2].args[0])
         self.assertTrue(all(len(call.args) == 1 for call in api.call_args_list))
-        self.assertTrue(all(line.startswith("=") for line in output.getvalue().splitlines()))
+        self.assertTrue(all(line.startswith("  =") for line in output.getvalue().splitlines()))
 
     def test_reject_mismatched_datasource_before_mutation(self):
         for change in ({"user": "other"}, {"url": "other:5432"}, {"type": "mysql"},

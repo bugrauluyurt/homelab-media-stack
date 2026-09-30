@@ -112,14 +112,14 @@ def main():
                          "connMaxLifetime": 14400},
             "secureJsonData": {"password": password},
         })
-        print("+ Jellystat read-only Grafana datasource created")
+        print("  + Jellystat read-only Grafana datasource created")
     else:
-        print("= Jellystat read-only Grafana datasource already configured")
+        print("  = Jellystat read-only Grafana datasource already configured")
 
     health = api(f"/api/datasources/uid/{UID}/health")
     if not health or health.get("status") != "OK":
         sys.exit("Grafana datasource health check failed")
-    print("= Connection healthy; viewing columns readable, writes and client IP column denied")
+    print("  = Connection healthy; viewing columns readable, writes and client IP column denied")
 
 
 if __name__ == "__main__":

@@ -16,7 +16,7 @@ import time
 import urllib.error
 import urllib.request
 
-from stack_env import ENV, REPO, STATE, STORAGE, enabled_services, require_service
+from stack_env import ENV, NTFY_SERVER, REPO, STATE, STORAGE, enabled_services, require_service
 
 require_service("uptime-kuma")
 
@@ -162,7 +162,7 @@ elif ntfy:
 else:
     ntfy_id = emit("addNotification", {
         "name": "ntfy", "type": "ntfy", "isDefault": True, "applyExisting": True,
-        "ntfyserverurl": ENV.get("NTFY_SERVER", "https://ntfy.sh"), "ntfytopic": ENV["NTFY_TOPIC"],
+        "ntfyserverurl": NTFY_SERVER, "ntfytopic": ENV["NTFY_TOPIC"],
         "ntfyPriority": 4, "ntfyAuthenticationMethod": "none"}, None)["id"]
     print("  + added ntfy notification (default for all monitors)")
 

@@ -5,7 +5,7 @@ Re-running this is safe: every step checks for an existing entry first.
 """
 import subprocess
 
-from stack_env import CONFIG as CFG, ENV, arr_key as api_key, enabled_services, http
+from stack_env import ENV, NTFY_SERVER, arr_key as api_key, CONFIG as CFG, enabled_services, http
 
 QBIT_HOST, QBIT_PORT = "gluetun", int(ENV["QBIT_PORT"])
 
@@ -356,7 +356,7 @@ def ensure_ntfy(app):
         return
 
     schema = next(x for x in call(app, "GET", "/notification/schema") if x["implementation"] == "Ntfy")
-    values = {"serverUrl": ENV.get("NTFY_SERVER", "https://ntfy.sh"), "topics": [ENV["NTFY_TOPIC"]],
+    values = {"serverUrl": NTFY_SERVER, "topics": [ENV["NTFY_TOPIC"]],
               "tags": ["warning"]}
     body = {**schema, "name": "ntfy", "tags": [], "includeHealthWarnings": False,
             **{e: True for e in NTFY_EVENTS if e in schema},
