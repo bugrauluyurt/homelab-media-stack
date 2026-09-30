@@ -156,7 +156,7 @@ Sets up Radarr and Sonarr, Lidarr when the music module is on, and Prowlarr's li
 - Radarr and Sonarr: root folder (`/data/media/movies`, `/data/media/tv`); hardlinks, extra files and media info on, recycle bin off; qBittorrent at `gluetun:QBIT_PORT` (category `radarr` or `sonarr`); SABnzbd when `USENET_HOST` is set; a delay profile preferring Usenet, with torrents waiting 60 minutes; a Jellyfin connection that rescans on import; an `Audio Description` custom format scored -10000 in the `HD Bluray + WEB` (Radarr) and `WEB-1080p` (Sonarr) profiles; ntfy alerts for health issues, manual interaction, failed downloads and failed imports when `NTFY_TOPIC` is set.
 - Sonarr only: new series folders named `{Series Title} [tvdbid-{TvdbId}]`, and an auto-tag `french` for French-language series, which picks Bazarr's French profile.
 - Lidarr: root folder `/data/media/music` with new artists unmonitored, hardlinks, qBittorrent (category `music`), SABnzbd, a delay profile of Soulseek, then Usenet, then torrents after 60 minutes, every import list off, ntfy.
-- Prowlarr: Radarr, Sonarr (and Lidarr) linked with full sync and their Newznab categories, NZBgeek when `NZBGEEK_API_KEY` is set, ntfy.
+- Prowlarr: Radarr, Sonarr (and Lidarr) linked with full sync and their Newznab categories, NZBgeek and NZBFinder, each when its API key (`NZBGEEK_API_KEY`, `NZBFINDER_API_KEY`) is set, ntfy.
 
 - **File:** [`scripts/configure-arr.py`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/configure-arr.py)
 - **Runs:** by hand, after [`configure-sabnzbd.py`](#configure-sabnzbdpy).
@@ -238,14 +238,14 @@ Sets up Jellyfin's plugins and look. It adds the plugin repositories (IAmParadox
 
 ### configure-cleanuparr.py
 
-Configures Cleanuparr to remove stalled, failed and fake or malicious downloads: the admin account (user `admin`, `CLEANUPARR_PASSWORD`), qBittorrent, Sonarr and Radarr, the malware blocker with the permissive blocklist, the queue cleaner (3 strikes for failed imports and for downloads stuck on metadata), a stall rule (12 strikes, reset by any progress, about an hour without progress), and the `games` category ignored. It stays in dry-run while anything is still being connected and ends live unless you pass `--dry-run`.
+Configures Cleanuparr to remove stalled, failed and fake or malicious downloads: the admin account (user `admin`, `CLEANUPARR_PASSWORD`), qBittorrent, Sonarr, Radarr and Lidarr (when the music module is on), the malware blocker with the permissive blocklist, the queue cleaner (3 strikes for failed imports and for downloads stuck on metadata), a stall rule for public and private torrents (12 strikes, reset by any progress, about an hour without progress), and the `games` category ignored. It stays in dry-run while anything is still being connected and ends live unless you pass `--dry-run`.
 
 - **File:** [`scripts/configure-cleanuparr.py`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/configure-cleanuparr.py)
 - **Runs:** by hand, after [`configure-arr.py`](#configure-arrpy).
 - **Flags:** `--dry-run` leaves (or puts) Cleanuparr in dry-run mode, where destructive actions are only logged.
 - **Root:** sudo if needed.
 - **Changes:** Cleanuparr API. It refuses to go live while the download cleaner is on.
-- **Why:** the stricter `blacklist` matches `*.srt`, `*.sub` and `*.idx` and would strip subtitles. Game releases legitimately ship `.exe` files and archives. There is no "slow" rule, since slow is normal on public trackers. The download cleaner (seeding, orphan and no-hardlink removal) stays off because hardlinks mean seeding costs no disk space. [`health-check`](#health-check) verifies all three through [`cleanuparr-state`](#cleanuparr-state).
+- **Why:** the stricter `blacklist` matches `*.srt`, `*.sub` and `*.idx` and would strip subtitles. Game releases legitimately ship `.exe` files and archives. The stall rule covers private torrents and removes them from qBittorrent too, because a tracker that refuses peers (for a low ratio, say) stalls its torrents for good. There is no "slow" rule, since slow is normal on public trackers. The download cleaner (seeding, orphan and no-hardlink removal) stays off because hardlinks mean seeding costs no disk space. [`health-check`](#health-check) verifies all three through [`cleanuparr-state`](#cleanuparr-state).
 - **Idempotent:** yes.
 
 ### configure-questarr.py

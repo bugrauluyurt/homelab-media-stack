@@ -54,6 +54,20 @@ Each entry says what you see, why it happens, and what to do.
 - **Cause 2:** DNS answered with IPv6 (AAAA) addresses the tunnel has no route for.
   `DOT_IPV6: "off"` on gluetun in `docker-compose.yml` prevents it; keep it off.
 
+## Downloads from one private tracker stall at 0 seeds ("ratio insuffisant")
+- **Symptom:** downloads from one private or semi-private tracker sit at 0% with 0 seeds and
+  0 peers, although the search showed seeders. qBittorrent → the torrent → **Trackers** shows the
+  tracker refusing the announce, e.g. TR4KER's "ratio insuffisant; uploadez avant de télécharger".
+- **Cause:** the account's ratio is below the tracker's minimum, so it hands out no peers. Private
+  torrents have DHT and PeX off, so the tracker is their only source. Well-seeded French TV has
+  hardly any leechers, so seeding it barely raises the ratio.
+- **What happens already:** Cleanuparr's stall rule removes such a download after about an hour
+  (from qBittorrent too) and blocklists it, and the app searches again.
+- **Fix:** raise the ratio on the tracker's site (bonus points, freeleech). If the apps keep
+  picking that tracker, switch it off in Prowlarr until then and re-run
+  `scripts/configure-questarr.py`. Lowering its priority won't steer around it: the apps rank
+  quality and custom format score before indexer priority.
+
 ## Trackers say "Host not found"
 - **Cause:** gluetun's `BLOCK_MALICIOUS` DNS filter also blocks public tracker domains, which
   then fail with NXDOMAIN. It is `"off"` in `docker-compose.yml`; keep it off.
@@ -132,9 +146,10 @@ Each entry says what you see, why it happens, and what to do.
 - **Every game search in Questarr takes 30 s:** Questarr waits for all indexers, up to 30 s. One
   that answers slowly instead of failing (Knaben, September 2026) holds every search to that limit,
   and Prowlarr's backoff doesn't catch it. Questarr's log names it ("error searching indexer" after
-  a timeout). Switch it off in Prowlarr (edit the indexer, untick **Enable**), then re-run
-  `scripts/configure-questarr.py`, which copies the on/off state into Questarr. Turn it back on
-  once Prowlarr's **Test** answers in a few seconds.
+  a timeout). Downtime happens and usually passes within hours, so don't switch an indexer off
+  at the first slow answer. If it stays slow for a day, switch it off in Prowlarr (edit the
+  indexer, untick **Enable**), then re-run `scripts/configure-questarr.py`, which copies the
+  on/off state into Questarr. Turn it back on once Prowlarr's **Test** answers in a few seconds.
 
 ## Releases shown as rejected
 - **Cause:** usually TRaSH's quality rules: a low-quality or unknown release group, or a file
