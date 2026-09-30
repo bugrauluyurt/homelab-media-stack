@@ -30,7 +30,14 @@ step() {
 
 in_docker() { docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/repo -w /repo "$@"; }
 
-tracked_files() { git ls-files -z --cached --others --exclude-standard | xargs -0 -I{} sh -c '[ -f "{}" ] && echo "{}"'; }
+# Exits 0 even when the last entry is a symlinked folder, so pipefail steps see only their own result.
+tracked_files() {
+  local file
+
+  git ls-files -z --cached --others --exclude-standard | while IFS= read -r -d '' file; do
+    if [ -f "$file" ]; then echo "$file"; fi
+  done
+}
 
 mapfile -t python_files < <(tracked_files | while read -r file; do
   case "$file" in
