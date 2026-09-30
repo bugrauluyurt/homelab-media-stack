@@ -59,9 +59,21 @@ Operating skills live in `ai/homelab-plugin/skills/` (linked into `.claude/skill
   (`+` changed, `=` already right, `~` skipped, `-` removed, `!` warning).
 - Code style: blank lines between logical steps; a comment only for a non-obvious reason, in
   one line; names that say what they hold; `${VAR:-x}` and `ENV.get()` defaults; no em or en dashes.
-- Verify a change with `scripts/check` (needs only Docker; CI runs the same), then
-  `scripts/health-check` on the server. health-check writes a test file on the drive and starts
-  throwaway containers, so keep it for validating changes rather than read-only investigations.
+- **Tests are required before handing off changes or opening/updating a PR.** Run the relevant
+  focused tests, then the full `scripts/check` against the final source, including new files;
+  CI runs the same checks. Rerun affected tests and the full check after subsequent edits.
+- Add regression coverage for bug fixes. Tests must control clock, boot time, network and other
+  external inputs they rely on; do not assume the runner has the same uptime or state as this server.
+- Report the test commands and results in the PR. Inspect failed CI logs and fix the cause rather
+  than skipping tests or weakening assertions. If validation is blocked, disclose the exact
+  blocker and unverified scope; do not claim the checks passed.
+- Keep secrets out of validation artifacts. If private deployment files prevent a clean source
+  scan, run `scripts/check` in a fresh source-only checkout/export containing every intended
+  change and new file, and report that scope explicitly; do not disable the secret scan.
+- For changes affecting the running stack, also run `scripts/health-check` on the server after
+  authorized deployment. It writes a test file on the drive and starts throwaway containers, so
+  keep it for validating deployed changes rather than read-only investigations. Testing does
+  not grant permission to restart services, change VPN settings or perform other protected actions.
 - A new script or unit gets an entry in the reference pages; `scripts/check` fails without one.
 - Every user-visible change adds its entry as `changelog.d/<name>.<heading>.md`, never an edit to
   `CHANGELOG.md` (headings: breaking or removed, added, changed or deprecated, fixed or security;
