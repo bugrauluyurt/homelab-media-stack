@@ -128,7 +128,8 @@ in `.env`) and an indexer. The stack is set up for **NZBgeek** (`NZBGEEK_API_KEY
 - `configure-sabnzbd.py` sets up SABnzbd with the provider.
 - `configure-arr.py` adds each one to Prowlarr, which syncs it to every linked app, adds SABnzbd
   to Radarr, Sonarr and Lidarr, and sets their delay profiles: **Usenet first**, with torrents
-  waiting 60 minutes (in Lidarr, Soulseek comes before both).
+  waiting 60 minutes (in Lidarr, Soulseek comes before both). Sonarr series tagged `french`
+  don't wait, because their new episodes come from the ratio trackers.
 - Questarr's game searches include Usenet results too; picking one sends it to SABnzbd.
 
 Any other Newznab indexer can be added in Prowlarr the same way; it syncs like the rest.

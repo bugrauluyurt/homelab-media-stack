@@ -281,6 +281,26 @@ def ensure_series_folder_id():
     print(f"  + sonarr: series folders named '{SERIES_FOLDER}'")
 
 
+def ensure_french_delay_profile():
+    """French series grab torrents at once: their new episodes come from the ratio trackers, where an early grab earns ratio."""
+    french_tag_id = next(tag["id"] for tag in call("sonarr", "GET", "/tag") if tag["label"] == "french")
+    wanted = {"enableUsenet": True, "enableTorrent": True, "preferredProtocol": "usenet",
+              "usenetDelay": 0, "torrentDelay": 0, "bypassIfHighestQuality": False, "tags": [french_tag_id]}
+    french_profile = next((profile for profile in call("sonarr", "GET", "/delayprofile")
+                           if profile["tags"] == [french_tag_id]), None)
+
+    if french_profile and {**french_profile, **wanted} == french_profile:
+        print("  = sonarr: French series grab torrents without delay")
+        return
+
+    if french_profile:
+        call("sonarr", "PUT", f"/delayprofile/{french_profile['id']}", {**french_profile, **wanted})
+    else:
+        call("sonarr", "POST", "/delayprofile", wanted)
+
+    print("  + sonarr: French series grab torrents without delay")
+
+
 def ensure_french_tag():
     """Tag French-language series 'french', which picks Bazarr's French subtitle profile."""
     if any(a["name"] == "french" for a in call("sonarr", "GET", "/autotagging")):
@@ -360,6 +380,7 @@ if __name__ == "__main__":
 
     ensure_series_folder_id()
     ensure_french_tag()
+    ensure_french_delay_profile()
 
     music = "lidarr" in enabled_services()
     if music:

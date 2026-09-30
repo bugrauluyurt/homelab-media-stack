@@ -83,7 +83,8 @@ A show follows the same path through Sonarr, with its own categories and folders
    formats (synced from TRaSH Guides by [Recyclarr](#quality-rules-recyclarr)). Then the delay
    profile decides between sources: Usenet releases can be grabbed at once, torrent releases are
    held back for 60 minutes, so a Usenet copy that turns up in that window wins. Even a torrent of
-   the highest quality waits (`bypassIfHighestQuality` is off).
+   the highest quality waits (`bypassIfHighestQuality` is off). Series tagged `french` skip the
+   wait: their new episodes come from the ratio trackers, where an early grab earns ratio.
 5. **The download.** Usenet goes to SABnzbd, which runs outside the VPN on purpose: Usenet is SSL
    and download only, nothing is shared. Torrents go to qBittorrent, which lives inside gluetun's
    network and can only reach the internet through the tunnel (see
