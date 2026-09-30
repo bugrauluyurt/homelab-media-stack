@@ -89,7 +89,7 @@ prints the result. It is idempotent: indexers already present are left alone. Th
 |---|---|
 | The Pirate Bay, YTS, EZTV, LimeTorrents, TorrentProject2, Knaben | Public, general |
 | Torrent9, World-torrent | Public, French |
-| Draupnirr, TR4KER | Semi-private, French; added only once their API key is in `.env` |
+| Draupnirr, TR4KER | Semi-private, French; added only once their API key is in `.env`, for new releases only |
 
 To add more, edit `WANTED` at the top of the script (the names are Prowlarr's definition names)
 and run it again, or add them by hand in **Prowlarr → Indexers → Add Indexer**, which lists every
@@ -146,6 +146,13 @@ English sites rarely carry:
 1. Sign up (free) at draupnirr.xyz or tr4ker.net.
 2. Copy the API key from your profile page into `.env` as `DRAUPNIRR_API_KEY` or `TR4KER_API_KEY`.
 3. Run `scripts/add-indexers.py` again.
+
+Both enforce a minimum ratio, and a tracker that falls below it stops handing out peers. So the
+script gives them Prowlarr's `RSS only` app profile: the apps grab new releases from their feeds,
+where plenty of people are still downloading and seeding pays back, and you can still pick from
+them in an interactive search. A backlog search skips them, because an old episode with hundreds
+of seeders and no downloaders costs ratio that seeding never earns back; Usenet and the public
+trackers cover those. Seeding is not affected: everything already downloaded keeps seeding.
 
 Sonarr lists French shows under their English TVDB name, with "(FR)" added. It still matches
 French release names through the show's alternate titles, and names new series folders with the

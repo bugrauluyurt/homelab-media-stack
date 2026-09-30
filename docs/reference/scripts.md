@@ -192,14 +192,14 @@ Gives Lidarr its Soulseek source: installs the Tubifarry plugin (Lidarr runs its
 
 ### add-indexers.py
 
-Adds public torrent indexers to Prowlarr (thepiratebay, yts, eztv, limetorrents, torrentproject2, Knaben, and the French torrent9 and world-torrent), plus the semi-private draupnirr and tr4ker once `DRAUPNIRR_API_KEY` or `TR4KER_API_KEY` is set, then runs a real search on every indexer and prints its hit count. Cloudflare-protected sites commonly fail the test; that is expected, not a configuration error. [Indexers](../operations/indexers.md) explains adding and fixing them.
+Adds public torrent indexers to Prowlarr (thepiratebay, yts, eztv, limetorrents, torrentproject2, Knaben, and the French torrent9 and world-torrent), plus the semi-private draupnirr and tr4ker once `DRAUPNIRR_API_KEY` or `TR4KER_API_KEY` is set, on an `RSS only` app profile, then runs a real search on every indexer and prints its hit count. Cloudflare-protected sites commonly fail the test; that is expected, not a configuration error. [Indexers](../operations/indexers.md) explains adding and fixing them.
 
 - **File:** [`scripts/add-indexers.py`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/add-indexers.py)
 - **Runs:** by hand, after [`configure-arr.py`](#configure-arrpy) so Prowlarr syncs the new indexers to the apps.
 - **Root:** sudo if needed.
-- **Changes:** Prowlarr API (new indexers at priority 25).
-- **Why:** 1337x is left out: its Cloudflare often blocks residential IPs (error 1006), which Byparr can't get past, and Knaben indexes its listings.
-- **Idempotent:** yes; indexers already present are skipped. The test searches run every time.
+- **Changes:** Prowlarr API (new indexers at priority 25; the `RSS only` app profile, which the account trackers use).
+- **Why:** 1337x is left out: its Cloudflare often blocks residential IPs (error 1006), which Byparr can't get past, and Knaben indexes its listings. The account trackers enforce a ratio, so the apps use them for RSS and interactive search only: a new release has downloaders to upload to, while a backlog search grabs old releases that have none.
+- **Idempotent:** yes; indexers already present are skipped, except that account trackers are moved to `RSS only`. The test searches run every time.
 
 ### configure-plex.py
 
