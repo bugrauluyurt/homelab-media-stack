@@ -202,6 +202,7 @@ In the tables below, **Required** is *yes* when the core stack or a core script 
 | <a id="usenet_pass"></a>`USENET_PASS` | with `USENET_HOST` | none | Provider password; single-quote it when it contains `$`. | `configure-sabnzbd.py` |
 | <a id="usenet_connections"></a>`USENET_CONNECTIONS` | no | `20` | Connections SABnzbd opens. | `configure-sabnzbd.py` |
 | <a id="nzbgeek_api_key"></a>`NZBGEEK_API_KEY` | no | empty | Adds the NZBgeek indexer to Prowlarr. | `configure-arr.py` |
+| <a id="nzbfinder_api_key"></a>`NZBFINDER_API_KEY` | no | empty | Adds the NZBFinder indexer to Prowlarr; it is strong on French releases. | `configure-arr.py` |
 | <a id="draupnirr_api_key"></a>`DRAUPNIRR_API_KEY` | no | empty | Adds the semi-private draupnirr tracker (French TV) to Prowlarr. | [`add-indexers.py`](scripts.md#add-indexerspy) |
 | <a id="tr4ker_api_key"></a>`TR4KER_API_KEY` | no | empty | Adds the semi-private tr4ker tracker (French TV) to Prowlarr. | `add-indexers.py` |
 | <a id="sabnzbd_user"></a>`SABNZBD_USER` | no | empty (`admin`) | SABnzbd's web login; the apps use its API key instead. | `configure-sabnzbd.py` |

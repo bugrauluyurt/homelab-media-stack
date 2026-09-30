@@ -22,6 +22,9 @@ SYNC_CATEGORIES = {"radarr": [2000, 2010, 2020, 2030, 2040, 2045, 2050, 2060],
                    "sonarr": [5000, 5010, 5020, 5030, 5040, 5045, 5050],
                    "lidarr": [3000, 3010, 3020, 3030, 3040, 3050, 3060]}
 
+# Prowlarr's Newznab preset name -> the .env key that turns it on.
+USENET_INDEXERS = {"NZBgeek": "NZBGEEK_API_KEY", "NZBFinder": "NZBFINDER_API_KEY"}
+
 
 def call(app, method, path, body=None):
     cfg = APPS[app]
@@ -172,23 +175,28 @@ def ensure_delay_profile(app):
     print(f"  + {app}: delay profile set ({'Soulseek, then ' if app == 'lidarr' else ''}Usenet first, torrents after {TORRENT_DELAY} min)")
 
 
-def ensure_nzbgeek():
-    """NZBgeek in Prowlarr; Prowlarr syncs it to every linked app."""
-    if not ENV.get("NZBGEEK_API_KEY"):
-        return
+def ensure_usenet_indexers():
+    """Usenet indexers in Prowlarr, each once its API key is set; Prowlarr syncs them to every linked app."""
+    existing_indexer_names = {indexer["name"] for indexer in call("prowlarr", "GET", "/indexer") or []}
+    schema = None
 
-    if any(i["name"] == "NZBgeek" for i in call("prowlarr", "GET", "/indexer") or []):
-        print("  = prowlarr: NZBgeek already added")
-        return
+    for indexer_name, env_key in USENET_INDEXERS.items():
+        if not ENV.get(env_key):
+            continue
 
-    schema = next(x for x in call("prowlarr", "GET", "/indexer/schema")
-                  if x["implementation"] == "Newznab" and x.get("name") == "NZBgeek")
-    body = {**schema, "name": "NZBgeek", "enable": True, "appProfileId": 1,
-            "fields": [{**f, "value": ENV["NZBGEEK_API_KEY"] if f["name"] == "apiKey" else f.get("value")}
-                       for f in schema["fields"]]}
+        if indexer_name in existing_indexer_names:
+            print(f"  = prowlarr: {indexer_name} already added")
+            continue
 
-    call("prowlarr", "POST", "/indexer", body)
-    print("  + prowlarr: added NZBgeek")
+        schema = schema or call("prowlarr", "GET", "/indexer/schema")
+        preset = next(template for template in schema
+                      if template["implementation"] == "Newznab" and template.get("name") == indexer_name)
+        body = {**preset, "name": indexer_name, "enable": True, "appProfileId": 1,
+                "fields": [{**field, "value": ENV[env_key] if field["name"] == "apiKey" else field.get("value")}
+                           for field in preset["fields"]]}
+
+        call("prowlarr", "POST", "/indexer", body)
+        print(f"  + prowlarr: added {indexer_name}")
 
 
 AD_FORMAT = "Audio Description"
@@ -367,7 +375,7 @@ if __name__ == "__main__":
     print("[prowlarr]")
     for a in ("radarr", "sonarr", *(("lidarr",) if music else ())):
         ensure_prowlarr_app(a)
-    ensure_nzbgeek()
+    ensure_usenet_indexers()
     ensure_ntfy("prowlarr")
 
     print("\nDone.")

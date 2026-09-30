@@ -62,13 +62,13 @@ re-run.
 ## Cleanuparr
 
 Cleanuparr removes downloads that will never finish or should never be imported, and blocklists
-them so Radarr and Sonarr grab a different release. Open it at `http://<tailscale-ip>:11011`,
+them so Radarr, Sonarr and Lidarr grab a different release. Open it at `http://<tailscale-ip>:11011`,
 user `admin`, password `CLEANUPARR_PASSWORD` from `.env`. `configure-cleanuparr.py` sets it up,
 and is safe to re-run.
 
 | Rule | What it does |
 |---|---|
-| **Stalled** | No progress at all for about an hour (12 strikes, one per 5-minute run) removes the download and blocklists the release. Any progress resets the count, so slow but moving downloads are never touched |
+| **Stalled** | No progress at all for about an hour (12 strikes, one per 5-minute run) removes the download, public or private, and blocklists the release. Any progress resets the count, so slow but moving downloads are never touched |
 | **Failed import** | A download that can't be imported after 3 checks is removed and blocklisted |
 | **Stuck on metadata** | A magnet that never resolves is removed after 3 checks |
 | **Malware** | Blocks executables, shortcuts and archives inside downloads |
@@ -78,7 +78,7 @@ and is safe to re-run.
 Its safety settings, and why:
 
 - **No access to your media.** Cleanuparr has no `/data` mount; it acts only through the
-  qBittorrent, Radarr and Sonarr APIs and can't touch files itself.
+  qBittorrent, Radarr, Sonarr and Lidarr APIs and can't touch files itself.
 - **Game downloads are ignored.** The qBittorrent category `games` is on its ignore list: game
   releases always contain executables and archives, so the malware rule would reject every one.
 - **The malware list is `blacklist_permissive`, on purpose.** The stricter default list blocks

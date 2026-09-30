@@ -14,7 +14,7 @@ categories it carries.
 ```mermaid
 flowchart LR
     public["Public torrent sites"] --> P["Prowlarr (:9696)"]
-    usenet["NZBgeek (Usenet)"] --> P
+    usenet["NZBgeek, NZBFinder (Usenet)"] --> P
     accounts["Trackers with an account"] --> P
     P -. "indexers tagged byparr" .- B["Byparr (Cloudflare)"]
     P -->|"movie categories"| R["Radarr"]
@@ -118,17 +118,18 @@ A failing indexer gets a line with the error below it. The same lives in the UI 
 Indexers → Test All Indexers**, and the statistics at **Prowlarr → System → Status**. The script
 reads Prowlarr's API key from its settings with `sudo`.
 
-## The Usenet indexer
+## Usenet indexers
 
 Usenet is the preferred source: it downloads at the full speed of your line, shares nothing, and
 runs outside the VPN. It needs two paid accounts, both optional: a Usenet provider (`USENET_*`
-in `.env`) and an indexer. The stack is set up for **NZBgeek** (`NZBGEEK_API_KEY`):
+in `.env`) and an indexer. The stack is set up for **NZBgeek** (`NZBGEEK_API_KEY`) and **NZBFinder**
+(`NZBFINDER_API_KEY`), which is strong on French releases; set either or both:
 
 - `configure-sabnzbd.py` sets up SABnzbd with the provider.
-- `configure-arr.py` adds NZBgeek to Prowlarr, which syncs it to every linked app, adds SABnzbd
+- `configure-arr.py` adds each one to Prowlarr, which syncs it to every linked app, adds SABnzbd
   to Radarr, Sonarr and Lidarr, and sets their delay profiles: **Usenet first**, with torrents
   waiting 60 minutes (in Lidarr, Soulseek comes before both).
-- Questarr's game searches include NZBgeek results too; picking one sends it to SABnzbd.
+- Questarr's game searches include Usenet results too; picking one sends it to SABnzbd.
 
 Any other Newznab indexer can be added in Prowlarr the same way; it syncs like the rest.
 

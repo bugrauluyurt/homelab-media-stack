@@ -77,7 +77,7 @@ A show follows the same path through Sonarr, with its own categories and folders
    every app it is linked to (full sync, by category: movies to Radarr, TV to Sonarr, audio to
    Lidarr). The app sends its search to Prowlarr, and Prowlarr asks each site. Sites behind
    Cloudflare's bot check are reached through Byparr (`byparr:8191`, a headless browser on the Docker
-   network with no host port). Usenet results come from NZBgeek once `NZBGEEK_API_KEY` is set.
+   network with no host port). Usenet results come from NZBgeek and NZBFinder once their API keys are set.
    Adding and testing indexers is covered in [Indexers](../operations/indexers.md).
 4. **The app picks a release.** It scores every result against its quality profile and custom
    formats (synced from TRaSH Guides by [Recyclarr](#quality-rules-recyclarr)). Then the delay
@@ -153,13 +153,13 @@ is in [Architecture](../architecture.md).
 
 ## Cleanup (Cleanuparr)
 
-Cleanuparr (port 11011) watches qBittorrent through its API, together with Radarr and Sonarr, and
+Cleanuparr (port 11011) watches qBittorrent through its API, together with Radarr, Sonarr and Lidarr, and
 removes downloads that will never finish. Each removal is **blocklisted**, so the app searches for
 a different release. It has no access to the media folders: it acts only through the apps' APIs.
 
 | Rule | What it does |
 |---|---|
-| Stalled | About one hour with no progress at all (12 strikes on 5-minute runs); any progress resets the count, so slow but moving downloads are never touched |
+| Stalled | About one hour with no progress at all (12 strikes on 5-minute runs); any progress resets the count, so slow but moving downloads are never touched. Private torrents count too: a tracker that refuses peers, for a low ratio, stalls them for good |
 | Failed import | Removed after 3 strikes |
 | Stuck on metadata | A magnet that never resolves, removed after 3 strikes |
 | Malware | Checks the files in each torrent against the `blacklist_permissive` list. The stricter list also matches `.srt`, `.sub` and `.idx`, which would strip subtitle files |
@@ -224,7 +224,7 @@ Bazarr profile. French trackers for the downloads themselves are covered in
 | Name | Role | Reference |
 |---|---|---|
 | `configure-seerr.py` | Connects Seerr to Jellyfin, Radarr and Sonarr; ntfy for available and failed requests | [scripts](../reference/scripts.md#configure-seerrpy) |
-| `configure-arr.py` | Root folders, hardlinks, download clients, delay profiles, Jellyfin refresh, audio-description penalty, ntfy, Prowlarr links, NZBgeek, the `french` tag | [scripts](../reference/scripts.md#configure-arrpy) |
+| `configure-arr.py` | Root folders, hardlinks, download clients, delay profiles, Jellyfin refresh, audio-description penalty, ntfy, Prowlarr links, the Usenet indexers, the `french` tag | [scripts](../reference/scripts.md#configure-arrpy) |
 | `configure-sabnzbd.py` | Usenet server, download folders and one category per app | [scripts](../reference/scripts.md#configure-sabnzbdpy) |
 | `add-indexers.py` | Adds the public and optional indexers to Prowlarr and tests them | [scripts](../reference/scripts.md#add-indexerspy) |
 | `configure-bazarr.py` | Bazarr's connections, providers and language profiles | [scripts](../reference/scripts.md#configure-bazarrpy) |
