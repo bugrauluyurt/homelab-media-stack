@@ -7,6 +7,23 @@ a minor version adds features, and a patch fixes bugs. A change records its entr
 next version, and merging the release pull request writes the entries here and publishes it
 ([how releases work](docs/operations/releasing.md)).
 
+## 2.5.0 - 2026-09-30
+
+### Added
+- The maintenance guide explains how to upgrade the stack itself to a new release, apart from
+  image updates.
+
+### Fixed
+- VPN recovery no longer recreates downloaders while the tunnel is unhealthy. The existing
+  port-sync timer restores stopped or detached downloaders after the VPN recovers, without
+  restarting unrelated services. Invalid qBittorrent API responses no longer result in guessed
+  preference writes, and recovery is reported only after port verification.
+- VPN recovery tests now use a controlled clock and boot time, so release checks also pass
+  on freshly booted CI runners. Regression coverage preserves the production reboot safeguard
+  and verifies the recovery delay and restart cooldown without changing runtime behavior.
+- Agent instructions now explicitly require focused tests, full source checks, regression
+  coverage and accurate validation results before handing off changes or opening/updating PRs.
+
 ## 2.4.0 - 2026-09-29
 
 ### Added
