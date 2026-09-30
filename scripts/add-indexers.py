@@ -22,6 +22,11 @@ WANTED = ["thepiratebay", "yts", "eztv", "limetorrents",
 ACCOUNTS = {"draupnirr": "DRAUPNIRR_API_KEY", "tr4ker": "TR4KER_API_KEY"}
 FRENCH = {"torrent9", "world-torrent", *ACCOUNTS}
 
+# Account trackers enforce a ratio, so the apps get them for RSS and interactive search only: new
+# releases have downloaders to upload to, while a backlog search grabs old ones that have none.
+RSS_ONLY = {"name": "RSS only", "enableRss": True, "enableAutomaticSearch": False,
+            "enableInteractiveSearch": True, "minimumSeeders": 1}
+
 
 def call(method, path, body=None, timeout=90):
     data = json.dumps(body).encode() if body is not None else None
@@ -34,7 +39,25 @@ def call(method, path, body=None, timeout=90):
         return json.loads(raw) if raw else None
 
 
+def rss_only_profile_id():
+    rss_only_profile = next((profile for profile in call("GET", "/api/v1/appprofile")
+                             if profile["name"] == RSS_ONLY["name"]), None)
+
+    if not rss_only_profile:
+        print(f"  + app profile {RSS_ONLY['name']}")
+        return call("POST", "/api/v1/appprofile", RSS_ONLY)["id"]
+
+    if {**rss_only_profile, **RSS_ONLY} != rss_only_profile:
+        call("PUT", f"/api/v1/appprofile/{rss_only_profile['id']}", {**rss_only_profile, **RSS_ONLY})
+        print(f"  + app profile {RSS_ONLY['name']} reset")
+    else:
+        print(f"  = app profile {RSS_ONLY['name']}")
+
+    return rss_only_profile["id"]
+
+
 schema = call("GET", "/api/v1/indexer/schema")
+rss_profile_id = rss_only_profile_id()
 existing = {i["name"] for i in call("GET", "/api/v1/indexer")}
 by_def = {i["definitionName"]: i for i in schema}
 
@@ -55,7 +78,8 @@ for name in WANTED + [n for n, k in ACCOUNTS.items() if ENV.get(k)]:
         continue
 
     body = dict(tmpl)
-    body.update({"enable": True, "priority": 25, "tags": [], "appProfileId": 1})
+    body.update({"enable": True, "priority": 25, "tags": [],
+                 "appProfileId": rss_profile_id if name in ACCOUNTS else 1})
     if name in ACCOUNTS:
         body["fields"] = [{**f, "value": ENV[ACCOUNTS[name]]} if f["name"] == "apikey" else f
                           for f in tmpl["fields"]]
@@ -65,6 +89,20 @@ for name in WANTED + [n for n, k in ACCOUNTS.items() if ENV.get(k)]:
         added.append(tmpl["name"])
     except urllib.error.HTTPError as e:
         failed.append((name, e.read().decode()[:120]))
+    except OSError as e:
+        failed.append((name, f"unreachable ({type(e).__name__})"))
+
+for account_indexer in call("GET", "/api/v1/indexer"):
+    if account_indexer["definitionName"] not in ACCOUNTS:
+        continue
+
+    if account_indexer["appProfileId"] == rss_profile_id:
+        print(f"  = {account_indexer['name']} RSS only")
+        continue
+
+    call("PUT", f"/api/v1/indexer/{account_indexer['id']}?forceSave=true",
+         {**account_indexer, "appProfileId": rss_profile_id})
+    print(f"  + {account_indexer['name']} moved to RSS only")
 
 print(f"  added:   {', '.join(added) or '(none)'}")
 print(f"  skipped: {', '.join(skipped) or '(none)'} (already present)")

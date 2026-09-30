@@ -60,7 +60,8 @@ Each entry says what you see, why it happens, and what to do.
   tracker refusing the announce, e.g. TR4KER's "ratio insuffisant; uploadez avant de télécharger".
 - **Cause:** the account's ratio is below the tracker's minimum, so it hands out no peers. Private
   torrents have DHT and PeX off, so the tracker is their only source. Well-seeded French TV has
-  hardly any leechers, so seeding it barely raises the ratio.
+  hardly any leechers, so seeding it barely raises the ratio. `add-indexers.py` keeps the account
+  trackers on Prowlarr's `RSS only` app profile so backlog searches can't drain the ratio again.
 - **What happens already:** Cleanuparr's stall rule removes such a download after about an hour
   (from qBittorrent too) and blocklists it, and the app searches again.
 - **Fix:** raise the ratio on the tracker's site (bonus points, freeleech). If the apps keep
