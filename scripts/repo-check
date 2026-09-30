@@ -103,8 +103,24 @@ docs_cover_every_file() {
 }
 
 # The project's writing style has no em or en dashes; the vendored Grafana dashboard is exempt.
+# In Python: grep -P rejects \x{2013} outside a UTF-8 locale, and the negation turned that error into a pass.
 no_dashes() {
-  ! tracked_files | grep -v '^apps/grafana/dashboards/node-exporter-full.json$' | xargs grep -I -n -P '[\x{2013}\x{2014}]'
+  tracked_files | grep -v '^apps/grafana/dashboards/node-exporter-full.json$' | python3 -c '
+import sys
+
+found = False
+for file_name in sys.stdin.read().splitlines():
+    try:
+        lines = open(file_name, encoding="utf-8").read().splitlines()
+    except (UnicodeDecodeError, OSError):
+        continue
+
+    for line_number, line in enumerate(lines, start=1):
+        if "\u2013" in line or "\u2014" in line:
+            print(f"  {file_name}:{line_number}: {line.strip()[:120]}")
+            found = True
+
+sys.exit(found)'
 }
 
 # A script run as ./scripts/NAME needs its executable bit in git.
