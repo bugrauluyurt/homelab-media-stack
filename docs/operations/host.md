@@ -29,7 +29,7 @@ The nightly backup keeps a copy of the hand-edited files (`/etc/fstab`,
 
 ## After a reinstall
 
-1. Install the prerequisites and run `host-install` ([below](#what-install-host-does)).
+1. Install the prerequisites and run `host-install` ([below](#what-host-install-does)).
 2. Enable the units, as in [Getting started](../getting-started.md#enable-the-timers).
 3. Restart Docker once for log rotation: `sudo systemctl restart docker`.
 4. Put back the manual changes: `authorized_keys` with its `from=` pins, the avahi interfaces, the

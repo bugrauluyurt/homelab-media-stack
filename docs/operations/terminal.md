@@ -13,7 +13,7 @@ them in zsh or bash.
 | `health` | `scripts/stack-health` | One-shot status of the whole stack ([Troubleshooting](../troubleshooting.md)) |
 | `update` | `scripts/stack-update` | Snapshot, update, health check; `update --rollback <service>` ([Updates](../flows/updates.md)) |
 | `leaktest` | `scripts/vpn-leak-test` | Proves torrent traffic exits through the VPN ([VPN and ports](../flows/vpn-and-ports.md)) |
-| `indexers` | `scripts/indexers-check` | Which indexers work ([Indexers](indexers.md#testing-indexers-check-indexers)) |
+| `indexers` | `scripts/indexers-check` | Which indexers work ([Indexers](indexers.md#testing-indexers-indexers-check)) |
 | `drive-off` | `scripts/drive-off` | Stops the stack and unmounts the media drive before you switch it off ([Storage and boot](../flows/storage-and-boot.md)) |
 | `stack` | `cd $MEDIA_STACK_DIR` | Jump to the repository |
 | `qbt` | qbt-tui | What is downloading: torrents, speed, peers, progress |

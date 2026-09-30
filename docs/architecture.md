@@ -394,6 +394,27 @@ publishes no port, so only containers on the `arr` network can ask it. The healt
 confirms that a write is refused, that log reads work, and that Homepage and Glance hold no
 socket.
 
+### Repository layout
+
+The repository is the stack's source; runtime data never lives in it ([Config outside the repo](#config-outside-the-repo)).
+
+| Path | Holds |
+|---|---|
+| `docker-compose.yml`, `compose.gpu.yml`, `.env.example` | Every service, grouped by module; the GPU overlay; every setting |
+| `apps/` | The config the repo ships per app, bind-mounted or copied in as a seed |
+| `scripts/` | One file per job, named area first (`stack-*`, `vpn-*`, `host-*`, `configure-*`) |
+| `host/` | What `host-install` puts on the machine: `systemd/` templates, SSH and Docker defaults |
+| `docs/`, `ai/`, `tests/`, `changelog.d/` | This site, the agent and its skills, the test suite, release notes |
+
+- **One compose file, not one per app.** The services share YAML anchors (`*common`, `*hc`, `*nnp`),
+  which don't cross files, so a split would repeat them in every file. Each module has its own
+  section in the file instead.
+- **`scripts/` stays flat.** The units run `@REPO@/scripts/<name>`, the Python scripts import
+  `stack_env` from their own folder, and the skills find the repository through
+  `scripts/stack-health`; names that start with their area keep related scripts together.
+- **`apps/`, not `config/`.** `config/` is ignored anywhere in the tree and would read as
+  `$CONFIG_ROOT`, the runtime data.
+
 ### Idempotent configure scripts
 
 Every `configure-*.py` script reads the current state first and changes only what differs,

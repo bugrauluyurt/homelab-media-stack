@@ -27,9 +27,14 @@ Operating skills live in `ai/homelab-plugin/skills/` (linked into `.claude/skill
 ## Layout
 - `docker-compose.yml`: every service; `compose.gpu.yml`: opt-in GPU transcoding.
 - `.env` holds every secret and this machine's values (gitignored); `.env.example` documents each key.
-- `scripts/`: idempotent `configure-*.py` API setup, the operational scripts, and their shared
-  helpers `stack_env.py` (Python) and `stack-env.sh` (bash). New helpers go into those two files.
-- `host/systemd/`: unit and udev templates with `@PLACEHOLDERS@`, rendered by `scripts/host-install`.
+- `apps/`: the config files the repo ships per app (Glance, Homepage, Grafana, gluetun, Prometheus,
+  qBittorrent, Recyclarr, Scrutiny...), bind-mounted or copied in as seeds.
+- `scripts/`: flat, one file per job, named area first: `stack-*` (up, health, update, backup),
+  `vpn-*`, `host-*`, `drive-off`, `configure-*` for API setup, plus the shared helpers
+  `stack_env.py` (Python) and `stack-env.sh` (bash). New helpers go into those two files, and every
+  script opens with a `Runs:` / `Changes:` / `Idempotent:` header.
+- `host/`: what `scripts/host-install` puts on the machine: `host/systemd/` unit and udev templates
+  with `@PLACEHOLDERS@`, SSH hardening and Docker defaults.
 - `docs/`: how everything works. Start at `docs/architecture.md`; each script and unit has an entry in
   `docs/reference/scripts.md` and `docs/reference/systemd.md`, each `.env` key in `docs/reference/configuration.md`.
 - App data lives in `$CONFIG_ROOT`; media in `$DATA_ROOT`, inside the `$STORAGE_MOUNT` mount.

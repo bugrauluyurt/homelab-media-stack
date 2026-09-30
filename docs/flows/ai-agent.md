@@ -20,7 +20,7 @@ viewers.
 
 Only two things may act without asking, both approved in `AGENTS.md`: `vpn-port-sync` restarting gluetun
 after 15 minutes without a forwarded port ([VPN and ports](vpn-and-ports.md)), and
-`downloads-throttle` capping downloads while someone watches ([Monitoring](monitoring.md#throttle-downloads-keeping-playback-smooth)).
+`downloads-throttle` capping downloads while someone watches ([Monitoring](monitoring.md#downloads-throttle-keeping-playback-smooth)).
 
 ## The skills
 
