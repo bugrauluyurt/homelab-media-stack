@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Set up Jellyfin's plugins and look: the Abyss theme, Home Screen Sections and
-Jellyfin Enhanced. Abyss's Spotlight banner comes from jellyfin/custom-cont-init.d.
+Jellyfin Enhanced. Abyss's Spotlight banner comes from apps/jellyfin/custom-cont-init.d.
 With HWACCEL in .env (and compose.gpu.yml), also hardware transcoding.
 
 Idempotent. The container restarts only when a plugin was added or removed.

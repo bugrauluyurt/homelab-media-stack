@@ -79,7 +79,7 @@ Things worth knowing:
   first row is 0 and the next one isn't 1; the script numbers them 0, 1, 2 and so on. If the home
   screen ever says "Nothing here", see the
   [known issue](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/ai/homelab-plugin/skills/stack-logs/references/known-issues.md#jellyfin-home-screen-shows-nothing-here).
-- **Spotlight isn't a plugin.** `jellyfin/custom-cont-init.d/abyss-spotlight.sh` (vendored from
+- **Spotlight isn't a plugin.** `apps/jellyfin/custom-cont-init.d/abyss-spotlight.sh` (vendored from
   Abyss, MIT) adds its loader to Jellyfin's `index.html` on every container start, so it survives
   image updates.
 - **Links follow the address you used.** The plugins reach Seerr and the arr apps over the

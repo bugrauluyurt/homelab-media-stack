@@ -101,7 +101,7 @@ docs_cover_every_file() {
 
 # The project's writing style has no em or en dashes; the vendored Grafana dashboard is exempt.
 no_dashes() {
-  ! tracked_files | grep -v '^grafana/dashboards/node-exporter-full.json$' | xargs grep -I -n -P '[\x{2013}\x{2014}]'
+  ! tracked_files | grep -v '^apps/grafana/dashboards/node-exporter-full.json$' | xargs grep -I -n -P '[\x{2013}\x{2014}]'
 }
 
 step "Python syntax" python_syntax

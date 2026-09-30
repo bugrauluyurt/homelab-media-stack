@@ -64,7 +64,7 @@ services:
       - "5030:5030"
     volumes:
       - ${CONFIG_ROOT}/gluetun:/gluetun
-      - ./gluetun/auth.toml:/gluetun/auth/config.toml:ro
+      - ./apps/gluetun/auth.toml:/gluetun/auth/config.toml:ro
     environment:
       # Exact endpoint from the private Proton WireGuard config.
       VPN_SERVICE_PROVIDER: custom
@@ -222,7 +222,7 @@ services:
       SONARR_API_KEY: ${SONARR_API_KEY}
     volumes:
       - ${CONFIG_ROOT}/recyclarr:/config
-      - ./recyclarr/recyclarr.yml:/config/recyclarr.yml:ro
+      - ./apps/recyclarr/recyclarr.yml:/config/recyclarr.yml:ro
 
   seerr:
     <<: *common
@@ -255,7 +255,7 @@ services:
       test: ["CMD", "curl", "-sf", "-o", "/dev/null", "http://127.0.0.1:8096/health"]
     volumes:
       - ${CONFIG_ROOT}/jellyfin:/config
-      - ./jellyfin/custom-cont-init.d:/custom-cont-init.d:ro
+      - ./apps/jellyfin/custom-cont-init.d:/custom-cont-init.d:ro
       - *media-mount
 
   # Deliberately no /data: it acts only through the qBittorrent and arr APIs, and the
@@ -471,7 +471,7 @@ services:
       HOMEPAGE_VAR_SEERR_API_KEY: ${SEERR_API_KEY}
       HOMEPAGE_VAR_JELLYFIN_API_KEY: ${JELLYFIN_API_KEY}
     volumes:
-      - ./homepage:/app/config
+      - ./apps/homepage:/app/config
       # Read-only: the disk widget only reports the drive's usage.
       - type: bind
         source: ${DATA_ROOT}
@@ -510,7 +510,7 @@ services:
       STORAGE_MOUNT: ${STORAGE_MOUNT:-/mnt/storage}
       WEATHER_LOCATION: ${WEATHER_LOCATION:-}
     volumes:
-      - ./glance:/app/config:ro
+      - ./apps/glance:/app/config:ro
       # Latest YouTube uploads written by scripts/sync-youtube.py, served at /assets/youtube/.
       - ${CONFIG_ROOT}/glance/youtube:/app/config/assets/youtube:ro
       - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
@@ -566,7 +566,7 @@ services:
     # node-exporter runs on the host network; this is how Prometheus reaches it.
     extra_hosts: ["host.docker.internal:host-gateway"]
     volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./apps/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ${CONFIG_ROOT}/prometheus:/prometheus
 
   # On the host network: in a container network it counts only its own container's traffic.
@@ -632,8 +632,8 @@ services:
       GF_SERVER_ROOT_URL: http://${HOST_NAME}:3001
     volumes:
       - ${CONFIG_ROOT}/grafana:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./apps/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./apps/grafana/dashboards:/var/lib/grafana/dashboards:ro
 
   dozzle:
     <<: *common
@@ -675,7 +675,7 @@ services:
     volumes:
       - ${CONFIG_ROOT}/uptime-kuma:/app/data
 
-  # SYS_RAWIO lets smartctl reach the drive behind its USB-SATA bridge (sat type in scrutiny/collector.yaml).
+  # SYS_RAWIO lets smartctl reach the drive behind its USB-SATA bridge (sat type in apps/scrutiny/collector.yaml).
   scrutiny:
     <<: *common
     image: ghcr.io/analogj/scrutiny:master-omnibus
@@ -691,7 +691,7 @@ services:
     volumes:
       - ${CONFIG_ROOT}/scrutiny/config:/opt/scrutiny/config
       - ${CONFIG_ROOT}/scrutiny/influxdb:/opt/scrutiny/influxdb
-      - ./scrutiny/collector.yaml:/opt/scrutiny/config/collector.yaml:ro
+      - ./apps/scrutiny/collector.yaml:/opt/scrutiny/config/collector.yaml:ro
       - /run/udev:/run/udev:ro
     healthcheck:
       <<: *hc

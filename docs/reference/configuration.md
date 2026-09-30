@@ -256,7 +256,7 @@ The stack is a core plus optional modules, each a Docker Compose profile. `COMPO
 2. Stop and remove its containers yourself: `stack-up`'s `docker compose up -d --remove-orphans` leaves them running, because their services are still defined in `docker-compose.yml`. For example, for the games module: `docker compose rm -sf questarr sftpgo`.
 3. Re-run [`configure-uptime-kuma.py`](scripts.md#configure-uptime-kumapy) if monitoring is on, so it deletes the module's monitors.
 
-From then on the scripts skip the module (they print `~ <service> is off (COMPOSE_PROFILES in .env); skipped`). The dashboards don't follow `COMPOSE_PROFILES`: Homepage's `homepage/services.yaml` and Glance's `glance/glance.yml` keep every card, and a switched-off module's cards show an error or no data. Remove them from those files if they bother you.
+From then on the scripts skip the module (they print `~ <service> is off (COMPOSE_PROFILES in .env); skipped`). The dashboards don't follow `COMPOSE_PROFILES`: Homepage's `apps/homepage/services.yaml` and Glance's `apps/glance/glance.yml` keep every card, and a switched-off module's cards show an error or no data. Remove them from those files if they bother you.
 
 | Module | Homepage cards | Glance widgets |
 |---|---|---|
@@ -287,7 +287,7 @@ The `cpus:` limit of jellyfin, plex and byparr, each on its own; default `3`. Ke
 
 `STORAGE_MOUNT` (default `/mnt/storage`) must be a real mount point: `arr-stack.service` and `stack-up` refuse to start without it, so media never lands on the system disk, and `health-check` fails when `DATA_ROOT` is not on it. On a single-disk machine, bind-mount a folder there, for example with the fstab line `/srv/media /mnt/storage none bind 0 0`. The installed units embed the mount path and its mount unit name, so re-run [`install-host`](scripts.md#install-host) after changing it. [Storage and boot](../flows/storage-and-boot.md) covers the drive's power cycle.
 
-`STORAGE_DEVICE` (default `/dev/sda`) is the whole-disk device Scrutiny reads SMART data from; it appears as `/dev/sda` inside the container. A `/dev/disk/by-id/...` path survives device reordering (`ls -l /dev/disk/by-id/`). `scrutiny/collector.yaml` sets the device type `sat`, for a drive behind a USB-SATA bridge, and the container gets `SYS_RAWIO` so smartctl can reach it. `health-check` doesn't use this key: it finds the disk from the mount and adds `-d sat` itself for a USB drive.
+`STORAGE_DEVICE` (default `/dev/sda`) is the whole-disk device Scrutiny reads SMART data from; it appears as `/dev/sda` inside the container. A `/dev/disk/by-id/...` path survives device reordering (`ls -l /dev/disk/by-id/`). `apps/scrutiny/collector.yaml` sets the device type `sat`, for a drive behind a USB-SATA bridge, and the container gets `SYS_RAWIO` so smartctl can reach it. `health-check` doesn't use this key: it finds the disk from the mount and adds `-d sat` itself for a USB drive.
 
 ### Needle image
 

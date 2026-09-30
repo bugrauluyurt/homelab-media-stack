@@ -62,7 +62,7 @@ Jellyfin, Plex and the arr apps are untouched by it, so your own streams stay di
 ## qBittorrent's side
 
 The seed config,
-[`qbittorrent/qBittorrent.conf`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/qbittorrent/qBittorrent.conf),
+[`apps/qbittorrent/qBittorrent.conf`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/apps/qbittorrent/qBittorrent.conf),
 is copied into `$CONFIG_ROOT/qbittorrent/qBittorrent/` before the first start, and
 [`sync-port`](../reference/scripts.md#sync-port) keeps the live settings in line with it.
 
@@ -221,7 +221,7 @@ re-announcing at once briefly swamp the VPN's DNS.
 ## The forwarded-port monitor
 
 gluetun's control server (port 8000, not published) requires authentication on every route.
-[`gluetun/auth.toml`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/gluetun/auth.toml)
+[`apps/gluetun/auth.toml`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/apps/gluetun/auth.toml)
 opens exactly one route without credentials, read-only: `GET /v1/portforward`. Only containers on
 the `arr` network can reach it.
 [`configure-uptime-kuma.py`](../reference/scripts.md#configure-uptime-kumapy) adds a
@@ -246,7 +246,7 @@ log in, and cross-site requests refused.
 | `leak-test` | Proves qBittorrent exits through Proton | [scripts](../reference/scripts.md#leak-test) |
 | `configure-uptime-kuma.py` | The forwarded-port monitor | [scripts](../reference/scripts.md#configure-uptime-kumapy) |
 | `health-check` | The VPN checks | [scripts](../reference/scripts.md#health-check) |
-| `gluetun/auth.toml` | The one open control-server route | [file](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/gluetun/auth.toml) |
+| `apps/gluetun/auth.toml` | The one open control-server route | [file](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/apps/gluetun/auth.toml) |
 
 ## When it goes wrong
 

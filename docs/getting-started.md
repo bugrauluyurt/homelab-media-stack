@@ -301,13 +301,13 @@ torrents still run inside the VPN but reach only peers that accept incoming conn
 
 ## Seed qBittorrent's config
 
-qBittorrent starts from the settings in `qbittorrent/`: bound to the tunnel interface, login
+qBittorrent starts from the settings in `apps/qbittorrent/`: bound to the tunnel interface, login
 free only for the tailnet and Docker, CSRF and Host checks on, and categories that save into
 `/data/torrents`. Copy them into place before its first start (in the shell where you loaded `.env`):
 
 ```bash
 install -d "$CONFIG_ROOT/qbittorrent/qBittorrent"
-cp qbittorrent/qBittorrent.conf qbittorrent/categories.json "$CONFIG_ROOT/qbittorrent/qBittorrent/"
+cp apps/qbittorrent/qBittorrent.conf apps/qbittorrent/categories.json "$CONFIG_ROOT/qbittorrent/qBittorrent/"
 ```
 
 Why each setting matters is in [Security: qBittorrent](security.md#qbittorrents-web-ui).

@@ -2,7 +2,7 @@
 """Keep Glance's YouTube rows in step with your subscriptions.
 
 Sorts your subscriptions (YouTube Data API, read-only) into the tabs of
-glance/youtube-channels.json (or your private copy in $CONFIG_ROOT/glance/) and writes each tab to $CONFIG_ROOT/glance/youtube-<tab>.yml.
+apps/glance/youtube-channels.json (or your private copy in $CONFIG_ROOT/glance/) and writes each tab to $CONFIG_ROOT/glance/youtube-<tab>.yml.
 Then writes each tab's latest uploads to $CONFIG_ROOT/glance/youtube/<tab>.json, which
 Glance renders; a channel that fails keeps its previous videos.
 
@@ -30,7 +30,7 @@ TOKEN_URL = "https://oauth2.googleapis.com/token"
 
 OUT = CONFIG / "glance"
 PRIVATE_CHANNELS = OUT / "youtube-channels.json"
-CHANNELS = json.loads((PRIVATE_CHANNELS if PRIVATE_CHANNELS.exists() else REPO / "glance" / "youtube-channels.json").read_text())
+CHANNELS = json.loads((PRIVATE_CHANNELS if PRIVATE_CHANNELS.exists() else REPO / "apps" / "glance" / "youtube-channels.json").read_text())
 FEEDS = OUT / "youtube"
 METRIC = STATE / "metrics" / "youtube.prom"
 

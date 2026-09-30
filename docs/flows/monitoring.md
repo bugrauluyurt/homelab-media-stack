@@ -62,10 +62,10 @@ flowchart LR
    network, and node-exporter, which runs on the host network so it sees the server's own
    traffic, at `host.docker.internal:9100`. Check collection at `http://<tailscale-ip>:9090/targets`: every row
    should be `UP`.
-4. **Grafana** gets its Prometheus datasource and six dashboards from `grafana/` in the repository,
-   in the **Media Stack** folder. It re-reads `grafana/dashboards/` every 60 seconds, so a new
+4. **Grafana** gets its Prometheus datasource and six dashboards from `apps/grafana/` in the repository,
+   in the **Media Stack** folder. It re-reads `apps/grafana/dashboards/` every 60 seconds, so a new
    dashboard JSON appears without a restart. Edits made in the UI are allowed and survive, but for
-   anything permanent export the JSON into `grafana/dashboards/`.
+   anything permanent export the JSON into `apps/grafana/dashboards/`.
 5. **Glance** queries Prometheus for its Lab page: disk space and growth, pending updates and the
    age of the last backup.
 
@@ -113,7 +113,7 @@ checks in a row (one failure plus two retries, 60 seconds apart) it sends **DOWN
   stops handing one out while the tunnel stays up; torrents keep working but get no incoming peers
   and slow down, which no other check notices. gluetun's control server opens only that one
   read-only route, without credentials, and only to containers on the stack's network
-  (`gluetun/auth.toml`). `sync-port` usually repairs it on its own
+  (`apps/gluetun/auth.toml`). `sync-port` usually repairs it on its own
   ([VPN and ports](vpn-and-ports.md)).
 - **gluetun healthy:** gluetun's own container health check, read through the read-only Docker
   socket proxy.

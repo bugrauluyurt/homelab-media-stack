@@ -367,7 +367,7 @@ nothing needs it:
 - Quality profiles target 1080p. x265 is allowed (scored 0) because the Apple TV and iPhone
   decode HEVC, 10-bit included, in hardware, so it plays directly. Desktop browsers may not,
   and then Jellyfin would have to transcode. If HEVC causes trouble, set the x265 score back
-  to `-10000` in `recyclarr/recyclarr.yml`.
+  to `-10000` in `apps/recyclarr/recyclarr.yml`.
 - Bazarr fetches sidecar `.srt` subtitles even when a file has embedded ones: a browser can
   show embedded subtitles only after Jellyfin reads the whole file to extract them, and
   burned-in subtitles force a full re-encode.
@@ -380,7 +380,7 @@ nothing needs it:
 A typical home upload also limits streaming away from home to about 1080p, so both limits
 point the same way. With Intel or AMD graphics on an x86-64 machine, `compose.gpu.yml` and
 `HWACCEL` give Jellyfin and Plex hardware transcoding, and browsers and odd formats stop being
-a problem. The profiles still aim at 1080p unless you change `recyclarr/recyclarr.yml`
+a problem. The profiles still aim at 1080p unless you change `apps/recyclarr/recyclarr.yml`
 ([Getting started](getting-started.md#optional-hardware-transcoding)).
 
 ### socket-proxy instead of the Docker socket

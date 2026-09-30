@@ -128,7 +128,7 @@ manage them, or the library copy loses its seeding twin without saving any space
 ## Quality rules (Recyclarr)
 
 The Recyclarr container syncs [TRaSH Guides](https://trash-guides.info/) quality profiles from
-[`recyclarr/recyclarr.yml`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/recyclarr/recyclarr.yml)
+[`apps/recyclarr/recyclarr.yml`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/apps/recyclarr/recyclarr.yml)
 into Radarr (*HD Bluray + WEB*, plus the *Golden Rule HD* and *Unwanted Formats* groups) and
 Sonarr (*WEB-1080p*), with TRaSH's quality sizes. Both profiles target 1080p, so a server
 without a hardware video encoder (a Raspberry Pi 5 has none) never has to transcode; the reasoning
@@ -230,7 +230,7 @@ Bazarr profile. French trackers for the downloads themselves are covered in
 | `add-indexers.py` | Adds the public and optional indexers to Prowlarr and tests them | [scripts](../reference/scripts.md#add-indexerspy) |
 | `configure-bazarr.py` | Bazarr's connections, providers and language profiles | [scripts](../reference/scripts.md#configure-bazarrpy) |
 | `configure-cleanuparr.py` | Cleanuparr's rules, live or dry run | [scripts](../reference/scripts.md#configure-cleanuparrpy) |
-| `recyclarr.yml` | TRaSH quality profiles and scores | [file](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/recyclarr/recyclarr.yml) |
+| `recyclarr.yml` | TRaSH quality profiles and scores | [file](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/apps/recyclarr/recyclarr.yml) |
 | `watch-activity` | Stuck-request alert | [scripts](../reference/scripts.md#watch-activity) |
 | `arr-watch.timer` | Runs `watch-activity` every minute | [systemd](../reference/systemd.md#arr-watchtimer) |
 | `throttle-downloads` | Download cap while someone watches | [scripts](../reference/scripts.md#throttle-downloads) |
