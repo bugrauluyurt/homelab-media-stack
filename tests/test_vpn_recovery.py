@@ -15,6 +15,8 @@ class RecoveryTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.repo = Path(self.temp.name)
+        self.now = 1_700_000_000
+        self.boot = self.now - 3600
         (self.repo / 'scripts').mkdir()
         (self.repo / 'state').mkdir()
         shutil.copy2(ROOT / 'scripts/sync-port', self.repo / 'scripts/sync-port')
@@ -31,6 +33,17 @@ REPO=$TEST_REPO
 STATE_ROOT=$REPO/state
 QBIT_PORT=8080
 HOST_NAME=test
+uptime() { [ "$*" = '-s' ] && printf '@%s\n' "$TEST_BOOT"; }
+date() {
+  if [ "$*" = '+%s' ]; then
+    printf '%s\n' "$TEST_NOW"
+  elif [ "$#" -eq 3 ] && [ "$1" = '-d' ] && [ "$2" = "@$TEST_BOOT" ] && [ "$3" = '+%s' ]; then
+    printf '%s\n' "$TEST_BOOT"
+  else
+    echo 'unexpected date call' >&2
+    return 1
+  fi
+}
 json_get() { python3 -c 'import json,sys; print(json.load(sys.stdin).get(sys.argv[1], ""))' "$1"; }
 tunnel_ip() { echo "${TUNNEL-10.2.0.2}"; }
 forwarded_port() {
@@ -67,7 +80,8 @@ docker() {
 ''')
 
     def run_sync(self, **options):
-        env = dict(os.environ, TEST_REPO=str(self.repo), PREFS=json.dumps(self.prefs))
+        env = dict(os.environ, TEST_REPO=str(self.repo), PREFS=json.dumps(self.prefs),
+                   TEST_NOW=str(self.now), TEST_BOOT=str(self.boot))
         env.update(options)
         result = subprocess.run(['bash', str(self.repo / 'scripts/sync-port')],
                                 env=env, text=True, capture_output=True, timeout=10)
@@ -75,8 +89,7 @@ docker() {
         return result, events.read_text().splitlines() if events.exists() else []
 
     def missing_long_enough(self):
-        import time
-        (self.repo / 'state/port-forward-missing-since').write_text(str(int(time.time()) - 1000))
+        (self.repo / 'state/port-forward-missing-since').write_text(str(self.now - 1000))
 
     def test_healthy_idempotent(self):
         result, events = self.run_sync()
@@ -141,12 +154,38 @@ docker() {
         self.assertNotIn('verified:', result.stdout)
 
     def test_restart_cooldown_still_applies(self):
-        import time
         self.missing_long_enough()
-        (self.repo / 'state/port-forward-last-heal').write_text(str(int(time.time())))
+        (self.repo / 'state/port-forward-last-heal').write_text(str(self.now))
         result, events = self.run_sync(READY='0')
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(events, [])
+
+    def test_fresh_boot_discards_preboot_outage_then_waits_full_interval(self):
+        self.missing_long_enough()
+        boot = str(self.now - 300)
+        result, events = self.run_sync(READY='0', TEST_BOOT=boot)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(events, [])
+        missing = self.repo / 'state/port-forward-missing-since'
+        self.assertEqual(missing.read_text().strip(), str(self.now))
+
+        result, events = self.run_sync(READY='0', TEST_BOOT=boot,
+                                      TEST_NOW=str(self.now + 899))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(events, [])
+        self.assertEqual(missing.read_text().strip(), str(self.now))
+
+        result, events = self.run_sync(READY='0', ATTACHED='0', RECOVERS='1',
+                                      TEST_BOOT=boot, TEST_NOW=str(self.now + 900))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(events, ['restart', 'reattach', 'notify:media stack: VPN forwarded port restored'])
+
+    def test_restart_allowed_when_two_hour_cooldown_expires(self):
+        self.missing_long_enough()
+        (self.repo / 'state/port-forward-last-heal').write_text(str(self.now - 7200))
+        result, events = self.run_sync(READY='0', ATTACHED='0', RECOVERS='1')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(events, ['restart', 'reattach', 'notify:media stack: VPN forwarded port restored'])
 
     def test_boot_and_update_defer_sync_until_healthy(self):
         probe = self.repo / 'scripts/sync-port'
