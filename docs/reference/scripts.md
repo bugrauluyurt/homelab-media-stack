@@ -118,10 +118,10 @@ These run by hand while you set the server up, listed in the order [Getting star
 
 ### install-host
 
-Installs the host side of the stack: renders every template in `systemd/` with values from `.env` (see [placeholders](systemd.md#how-the-templates-are-installed)) into `/etc/systemd/system` and `/etc/udev/rules.d`, installs the SSH hardening from `host/sshd_config.d/` and Docker's log rotation from `host/docker/daemon.json`, and switches rpcbind off. It checks prerequisites first and, for anything missing, prints the `apt-get` (Debian, Ubuntu) or `pacman` (Arch) command that installs it, then stops.
+Installs the host side of the stack: renders every template in `host/systemd/` with values from `.env` (see [placeholders](systemd.md#how-the-templates-are-installed)) into `/etc/systemd/system` and `/etc/udev/rules.d`, installs the SSH hardening from `host/sshd_config.d/` and Docker's log rotation from `host/docker/daemon.json`, and switches rpcbind off. It checks prerequisites first and, for anything missing, prints the `apt-get` (Debian, Ubuntu) or `pacman` (Arch) command that installs it, then stops.
 
 - **File:** [`scripts/install-host`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/install-host)
-- **Runs:** by hand, first; again after changing `STACK_USER`, `STORAGE_MOUNT`, `STORAGE_UUID` or any file in `systemd/`.
+- **Runs:** by hand, first; again after changing `STACK_USER`, `STORAGE_MOUNT`, `STORAGE_UUID` or any file in `host/systemd/`.
 - **Checks:** Docker with the compose and buildx plugins, restic, smartctl, hdparm, lsof, ip6tables, Tailscale, avahi-daemon, mDNS in `/etc/nsswitch.conf`, Python 3.9 or newer, passwordless sudo, the stack user in the docker group, and that `ARR_SUBNET` overlaps no other Docker network and holds `PROWLARR_IP`.
 - **Root:** sudo; it needs passwordless sudo (it checks `sudo -n true`).
 - **Changes:** writes the units, timers and udev rule, then `systemctl daemon-reload` and `udevadm control --reload`; installs `/etc/ssh/sshd_config.d/10-arr-hardening.conf` (keys only, no root login), checks it with `sshd -t` and reloads ssh, warning when the `Include` line is missing from `sshd_config`; installs `/etc/docker/daemon.json` only when it differs, leaving the Docker restart to you because it restarts every container; disables and masks `rpcbind.socket` and `rpcbind.service`. Without `STORAGE_UUID` it skips the udev rule and removes an installed copy. It never enables or starts a unit.
@@ -660,7 +660,7 @@ Release tooling for this repository, not part of the server. Every change adds i
 
 ### check
 
-Every check CI and releases run, each tool from a pinned container, so it needs only Docker and Python 3: Python syntax, shell syntax, shellcheck (warnings and up), ruff, the unit tests (`tests/` and the agent's), `docker compose config` against `.env.example` with every module, with none and with the GPU override, a gitleaks secret scan, a heading in these reference pages for every file in `scripts/` and `systemd/`, no em or en dashes in tracked files (the vendored Grafana dashboard excepted), every Mermaid diagram rendering, and a strict build of the documentation site. It prints the failed steps and exits 1 when any fails.
+Every check CI and releases run, each tool from a pinned container, so it needs only Docker and Python 3: Python syntax, shell syntax, shellcheck (warnings and up), ruff, the unit tests (`tests/` and the agent's), `docker compose config` against `.env.example` with every module, with none and with the GPU override, a gitleaks secret scan, a heading in these reference pages for every file in `scripts/` and `host/systemd/`, no em or en dashes in tracked files (the vendored Grafana dashboard excepted), every Mermaid diagram rendering, and a strict build of the documentation site. It prints the failed steps and exits 1 when any fails.
 
 - **File:** [`scripts/check`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/check)
 - **Flags:** `--fast` skips rendering the diagrams and building the documentation site.

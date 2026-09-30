@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install the host side of the stack: systemd units and udev rules from systemd/ (with .env values
+# Install the host side of the stack: systemd units and udev rules from host/systemd/ (with .env values
 # filled into their @PLACEHOLDERS@), plus the SSH hardening and Docker defaults from host/.
 # Checks prerequisites first and prints the package command for anything missing. Safe to re-run.
 
@@ -98,7 +98,7 @@ render() {
       -e "s|@STORAGE_UUID@|${STORAGE_UUID:-}|g" -e "s|@STORAGE_MOUNT@|$STORAGE_MOUNT|g" -e "s|@STORAGE_UNIT@|$STORAGE_UNIT|g" "$1"
 }
 
-for template in "$REPO"/systemd/*; do
+for template in "$REPO"/host/systemd/*; do
   name=$(basename "$template")
 
   case "$template" in

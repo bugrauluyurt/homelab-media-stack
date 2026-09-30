@@ -51,7 +51,7 @@ It is safe to re-run. In order, it:
    Tailscale, avahi with mDNS name resolution, and Python 3.9 or newer. It prints `apt-get`
    package names on Debian and Ubuntu and `pacman` ones on Arch. Docker and Tailscale come from
    their own apt repositories on Debian and Ubuntu.
-2. **Renders the templates** in `systemd/`, filling in `@REPO@`, `@STACK_USER@`, `@STACK_GROUP@`,
+2. **Renders the templates** in `host/systemd/`, filling in `@REPO@`, `@STACK_USER@`, `@STACK_GROUP@`,
    `@STORAGE_UUID@`, `@STORAGE_MOUNT@` and `@STORAGE_UNIT@` from `.env`, and installs units to
    `/etc/systemd/system` and the udev rule to `/etc/udev/rules.d`. Without a `STORAGE_UUID` it
    skips (and removes) the udev rule: an always-mounted disk has nothing to hot-plug.

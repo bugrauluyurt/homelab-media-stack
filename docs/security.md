@@ -282,4 +282,4 @@ that the admin login is refused when tried from the server's tailnet address.
 
 Please report security problems privately, through the repository's **Security** tab
 (**Report a vulnerability**), not in a public issue. What is in scope and what to include is
-in [SECURITY.md](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/SECURITY.md).
+in [SECURITY.md](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/.github/SECURITY.md).

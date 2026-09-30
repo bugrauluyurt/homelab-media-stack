@@ -13,7 +13,7 @@ confinement of torrents and Soulseek, the Tailscale access model, SFTPGo's read-
 socket proxy, the backup and update scripts, and the AI agent. A flaw in one of the apps
 themselves (Jellyfin, the *arr apps, qBittorrent and the others) belongs with that project;
 tell us too if this stack's configuration makes it worse. How the pieces are meant to protect
-each other is in [docs/security.md](docs/security.md).
+each other is in [docs/security.md](../docs/security.md).
 
 ## Verifying what you run
 

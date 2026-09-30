@@ -71,7 +71,7 @@ chk "$HOST_NAME.local -> a LAN address" "getent hosts $HOST_NAME.local | python3
 echo "SECURITY"
 chk "firewall loaded (IPv4 host + Docker)"  "sudo iptables -C INPUT -j ARR-IN && sudo iptables -C OUTPUT -j ARR-OUT && sudo iptables -C DOCKER-USER -j ARR-FWD"
 chk "firewall loaded (IPv6 host + Docker)"  "sudo ip6tables -C INPUT -j ARR-IN && sudo ip6tables -C OUTPUT -j ARR-OUT && sudo ip6tables -C DOCKER-USER -j ARR-FWD"
-FIREWALL_EVERY=$(sed -n 's/^OnUnitActiveSec=//p' "$REPO/systemd/arr-firewall.timer")
+FIREWALL_EVERY=$(sed -n 's/^OnUnitActiveSec=//p' "$REPO/host/systemd/arr-firewall.timer")
 chk "firewall re-applied at boot + every $FIREWALL_EVERY" "systemctl is-enabled -q arr-firewall.service && systemctl is-enabled -q arr-firewall.timer"
 
 # Exactly the firewall's HOME_APPS are open to the home network, only to home sources; all else drops.

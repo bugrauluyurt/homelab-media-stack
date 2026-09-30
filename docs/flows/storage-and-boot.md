@@ -160,7 +160,7 @@ Nothing needs starting by hand:
 
 ### The timers
 
-| Timer | When (from `systemd/`) | Runs | Skipped while the drive is off |
+| Timer | When (from `host/systemd/`) | Runs | Skipped while the drive is off |
 |---|---|---|---|
 | [`arr-firewall.timer`](../reference/systemd.md#arr-firewalltimer) | `OnBootSec=30sec`, then `OnUnitActiveSec=15min` | `firewall` (rebuilds only when the rules changed) | no |
 | [`arr-port-sync.timer`](../reference/systemd.md#arr-port-synctimer) | `OnBootSec=90sec`, then `OnUnitActiveSec=15min` | `sync-port` | no: the run fails, without an alert |
@@ -188,7 +188,7 @@ What each timer's job does is in [Monitoring](monitoring.md), [Backups](backups.
 
 ### Installing the units
 
-The files in [`systemd/`](https://github.com/bugrauluyurt/homelab-media-stack/tree/main/systemd)
+The files in [`host/systemd/`](https://github.com/bugrauluyurt/homelab-media-stack/tree/main/host/systemd)
 are templates. [`install-host`](../reference/scripts.md#install-host) fills in `@REPO@`,
 `@STACK_USER@`, `@STACK_GROUP@`, `@STORAGE_UUID@`, `@STORAGE_MOUNT@` and `@STORAGE_UNIT@` from
 `.env`, installs units into `/etc/systemd/system` and the udev rule into `/etc/udev/rules.d`, and

@@ -29,7 +29,7 @@ Operating skills live in `ai/homelab-plugin/skills/` (linked into `.claude/skill
 - `.env` holds every secret and this machine's values (gitignored); `.env.example` documents each key.
 - `scripts/`: idempotent `configure-*.py` API setup, the operational scripts, and their shared
   helpers `stack_env.py` (Python) and `stack-env.sh` (bash). New helpers go into those two files.
-- `systemd/`: unit and udev templates with `@PLACEHOLDERS@`, rendered by `scripts/install-host`.
+- `host/systemd/`: unit and udev templates with `@PLACEHOLDERS@`, rendered by `scripts/install-host`.
 - `docs/`: how everything works. Start at `docs/architecture.md`; each script and unit has an entry in
   `docs/reference/scripts.md` and `docs/reference/systemd.md`, each `.env` key in `docs/reference/configuration.md`.
 - App data lives in `$CONFIG_ROOT`; media in `$DATA_ROOT`, inside the `$STORAGE_MOUNT` mount.
@@ -82,4 +82,4 @@ Operating skills live in `ai/homelab-plugin/skills/` (linked into `.claude/skill
 - Edit skills only under `ai/homelab-plugin/skills/`. They reach Codex with the next release, which
   sets `version` in `ai/homelab-plugin/plugin.json`.
 - Commits and pull request titles follow Conventional Commits (`type(scope): summary`, at most
-  72 characters, lowercase, imperative); the body says why. `CONTRIBUTING.md` has the types.
+  72 characters, lowercase, imperative); the body says why. `.github/CONTRIBUTING.md` has the types.

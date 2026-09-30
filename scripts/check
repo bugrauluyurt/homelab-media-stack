@@ -92,7 +92,7 @@ docs_site() { in_docker -e HOME=/tmp "$PYTHON" sh -c 'pip install -q --user --re
 docs_cover_every_file() {
   local file missing=()
 
-  for file in $(git ls-files scripts systemd); do
+  for file in $(git ls-files scripts host/systemd); do
     grep -qE "^#{2,4} .*\b$(basename "$file" | sed 's/\./\\./g')\b" docs/reference/scripts.md docs/reference/systemd.md || missing+=("$file")
   done
 

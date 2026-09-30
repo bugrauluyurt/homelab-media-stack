@@ -248,7 +248,7 @@ For an agent you can message from your phone without a terminal open, see
   pre-commit hook blocks common key formats.
 
 The threat model and every control are in [Security](docs/security.md). To report a
-vulnerability, see [SECURITY.md](SECURITY.md).
+vulnerability, see [SECURITY.md](.github/SECURITY.md).
 
 ## License
 

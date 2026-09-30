@@ -1,12 +1,12 @@
 # systemd reference
 
-Every file in [`systemd/`](https://github.com/bugrauluyurt/homelab-media-stack/tree/main/systemd): the units, timers and udev rule that start the stack with the media drive and run its scheduled jobs. It is for anyone checking when something runs, as which user, and why it did or didn't. [Storage and boot](../flows/storage-and-boot.md) tells the story; the scripts they run are in the [scripts reference](scripts.md).
+Every file in [`host/systemd/`](https://github.com/bugrauluyurt/homelab-media-stack/tree/main/host/systemd): the units, timers and udev rule that start the stack with the media drive and run its scheduled jobs. It is for anyone checking when something runs, as which user, and why it did or didn't. [Storage and boot](../flows/storage-and-boot.md) tells the story; the scripts they run are in the [scripts reference](scripts.md).
 
 **Anchors.** Each entry's heading is the file name, so its anchor is the file name in lower case with dots and `@` removed: `arr-stack.service` is `#arr-stackservice`, `arr-notify-failure@.service` is `#arr-notify-failureservice`, `99-arr-storage.rules` is `#99-arr-storagerules`.
 
 ## How the templates are installed
 
-The files in `systemd/` are templates. [`install-host`](scripts.md#install-host) fills in their placeholders from `.env` with `sed` and installs them: the udev rule into `/etc/udev/rules.d`, everything else into `/etc/systemd/system`. It then runs `systemctl daemon-reload` and `udevadm control --reload`.
+The files in `host/systemd/` are templates. [`install-host`](scripts.md#install-host) fills in their placeholders from `.env` with `sed` and installs them: the udev rule into `/etc/udev/rules.d`, everything else into `/etc/systemd/system`. It then runs `systemctl daemon-reload` and `udevadm control --reload`.
 
 | Placeholder | Filled with | Example |
 |---|---|---|
@@ -21,7 +21,7 @@ Without `STORAGE_UUID`, `install-host` skips the udev rule and removes an instal
 
 `install-host` never enables anything. The units meant to be enabled are `arr-stack.service`, `arr-firewall.service`, `arr-firewall.timer`, `arr-port-sync.timer`, `arr-backup.timer`, `arr-updates.timer`, `arr-health.timer`, `arr-watch.timer`, `arr-throttle.timer` and, with the dashboards module, `arr-youtube.timer`. [Getting started](../getting-started.md#start-the-stack) enables them in stages: the firewall first, the timers that read the apps' API keys last.
 
-The other services have no `[Install]` section: their timer, or `OnFailure=`, starts them. [`health-check`](scripts.md#health-check) fails when one of the units above is not enabled (`arr-youtube.timer` only while the dashboards module is on). Re-run `install-host` after changing a file in `systemd/` or `STACK_USER`, `STORAGE_MOUNT` or `STORAGE_UUID`.
+The other services have no `[Install]` section: their timer, or `OnFailure=`, starts them. [`health-check`](scripts.md#health-check) fails when one of the units above is not enabled (`arr-youtube.timer` only while the dashboards module is on). Re-run `install-host` after changing a file in `host/systemd/` or `STACK_USER`, `STORAGE_MOUNT` or `STORAGE_UUID`.
 
 ## How the units fit together
 
@@ -101,14 +101,14 @@ ACTION=="add", SUBSYSTEM=="block", ENV{ID_FS_UUID}=="@STORAGE_UUID@", ENV{SYSTEM
 
 When a block device with the filesystem UUID `STORAGE_UUID` appears, systemd starts the drive's mount unit (from its fstab line, a hand edit described in [Host](../operations/host.md)). Because `arr-stack.service` is wanted by that mount unit, the stack starts with it.
 
-- **File:** [`systemd/99-arr-storage.rules`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/systemd/99-arr-storage.rules)
+- **File:** [`host/systemd/99-arr-storage.rules`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/99-arr-storage.rules)
 - **Installed to:** `/etc/udev/rules.d/`, only when `STORAGE_UUID` is set.
 
 ### arr-stack.service
 
 Starts and stops the whole stack with the media drive.
 
-- **File:** [`systemd/arr-stack.service`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/systemd/arr-stack.service)
+- **File:** [`host/systemd/arr-stack.service`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/arr-stack.service)
 - **Runs:** `ExecStartPre=/usr/bin/mountpoint -q @STORAGE_MOUNT@`, then `ExecStart=@REPO@/scripts/stack-up` ([`stack-up`](scripts.md#stack-up)); on stop, `ExecStop=/usr/bin/docker compose stop`. `WorkingDirectory=@REPO@`.
 - **Type:** `oneshot` with `RemainAfterExit=yes`, so it stays active while the stack runs.
 - **User and group:** `@STACK_USER@`, `@STACK_GROUP@`.
@@ -123,7 +123,7 @@ Starts and stops the whole stack with the media drive.
 
 Applies the host firewall ([`firewall`](scripts.md#firewall)) at boot.
 
-- **File:** [`systemd/arr-firewall.service`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/systemd/arr-firewall.service)
+- **File:** [`host/systemd/arr-firewall.service`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/arr-firewall.service)
 - **Runs:** `@REPO@/scripts/firewall`, `Type=oneshot`.
 - **User:** root (no `User=`).
 - **Dependencies:** `After=docker.service tailscaled.service network-online.target`, `Wants=network-online.target`.
@@ -134,7 +134,7 @@ Applies the host firewall ([`firewall`](scripts.md#firewall)) at boot.
 
 Re-applies the firewall after Docker restarts and IPv6 prefix changes. The script rebuilds the rules only when they differ from what is loaded.
 
-- **File:** [`systemd/arr-firewall.timer`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/systemd/arr-firewall.timer)
+- **File:** [`host/systemd/arr-firewall.timer`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/arr-firewall.timer)
 - **When:** `OnBootSec=30sec`, `OnUnitActiveSec=15min`.
 - **Started by:** `WantedBy=timers.target`.
 
@@ -144,7 +144,7 @@ Re-applies the firewall after Docker restarts and IPv6 prefix changes. The scrip
 
 Runs [`sync-port`](scripts.md#sync-port), which keeps qBittorrent on the tunnel and on Proton's forwarded port.
 
-- **File:** [`systemd/arr-port-sync.service`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/systemd/arr-port-sync.service)
+- **File:** [`host/systemd/arr-port-sync.service`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/arr-port-sync.service)
 - **Runs:** `@REPO@/scripts/sync-port`, `Type=oneshot`.
 - **User and group:** `@STACK_USER@`, `@STACK_GROUP@`.
 - **Dependencies:** `After=arr-stack.service`, `Requires=docker.service`, `ConditionPathIsMountPoint=@STORAGE_MOUNT@` (while the drive is off the VPN isn't running, so the run is skipped). No `OnFailure=`.
@@ -152,7 +152,7 @@ Runs [`sync-port`](scripts.md#sync-port), which keeps qBittorrent on the tunnel 
 
 ### arr-port-sync.timer
 
-- **File:** [`systemd/arr-port-sync.timer`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/systemd/arr-port-sync.timer)
+- **File:** [`host/systemd/arr-port-sync.timer`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/arr-port-sync.timer)
 - **When:** `OnBootSec=90sec`, `OnUnitActiveSec=15min`.
 - **Started by:** `WantedBy=timers.target`.
 
@@ -162,7 +162,7 @@ Runs [`sync-port`](scripts.md#sync-port), which keeps qBittorrent on the tunnel 
 
 Runs [`health-check --notify`](scripts.md#health-check), which pushes the names of failing checks to ntfy.
 
-- **File:** [`systemd/arr-health.service`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/systemd/arr-health.service)
+- **File:** [`host/systemd/arr-health.service`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/arr-health.service)
 - **Runs:** `@REPO@/scripts/health-check --notify`, `Type=oneshot`.
 - **User and group:** `@STACK_USER@`, `@STACK_GROUP@` (the script calls sudo where it needs root).
 - **Condition:** `ConditionPathIsMountPoint=@STORAGE_MOUNT@`: the whole stack is down while the drive is off, so there is nothing to check.
@@ -171,7 +171,7 @@ Runs [`health-check --notify`](scripts.md#health-check), which pushes the names 
 
 ### arr-health.timer
 
-- **File:** [`systemd/arr-health.timer`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/systemd/arr-health.timer)
+- **File:** [`host/systemd/arr-health.timer`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/arr-health.timer)
 - **When:** `OnCalendar=00/6:20` (00:20, 06:20, 12:20 and 18:20), `RandomizedDelaySec=10min`. Not persistent.
 - **Started by:** `WantedBy=timers.target`.
 
@@ -179,7 +179,7 @@ Runs [`health-check --notify`](scripts.md#health-check), which pushes the names 
 
 Runs [`watch-activity`](scripts.md#watch-activity): alerts on software transcodes, new Jellyfin devices, failed logins and stuck requests.
 
-- **File:** [`systemd/arr-watch.service`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/systemd/arr-watch.service)
+- **File:** [`host/systemd/arr-watch.service`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/arr-watch.service)
 - **Runs:** `@REPO@/scripts/watch-activity`, `Type=oneshot`.
 - **User and group:** `@STACK_USER@`, `@STACK_GROUP@`.
 - **Condition:** `ConditionPathIsMountPoint=@STORAGE_MOUNT@`.
@@ -188,7 +188,7 @@ Runs [`watch-activity`](scripts.md#watch-activity): alerts on software transcode
 
 ### arr-watch.timer
 
-- **File:** [`systemd/arr-watch.timer`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/systemd/arr-watch.timer)
+- **File:** [`host/systemd/arr-watch.timer`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/arr-watch.timer)
 - **When:** `OnBootSec=3min`, `OnUnitActiveSec=1min`, `AccuracySec=10s`.
 - **Started by:** `WantedBy=timers.target`.
 
@@ -196,7 +196,7 @@ Runs [`watch-activity`](scripts.md#watch-activity): alerts on software transcode
 
 Runs [`throttle-downloads`](scripts.md#throttle-downloads), which caps qBittorrent while someone watches or the machine is overloaded.
 
-- **File:** [`systemd/arr-throttle.service`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/systemd/arr-throttle.service)
+- **File:** [`host/systemd/arr-throttle.service`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/arr-throttle.service)
 - **Runs:** `@REPO@/scripts/throttle-downloads`, `Type=oneshot`.
 - **User and group:** `@STACK_USER@`, `@STACK_GROUP@`.
 - **Condition:** `ConditionPathIsMountPoint=@STORAGE_MOUNT@`.
@@ -205,7 +205,7 @@ Runs [`throttle-downloads`](scripts.md#throttle-downloads), which caps qBittorre
 
 ### arr-throttle.timer
 
-- **File:** [`systemd/arr-throttle.timer`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/systemd/arr-throttle.timer)
+- **File:** [`host/systemd/arr-throttle.timer`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/arr-throttle.timer)
 - **When:** `OnBootSec=3min`, `OnUnitActiveSec=1min`, `AccuracySec=10s`.
 - **Started by:** `WantedBy=timers.target`.
 
@@ -215,7 +215,7 @@ Runs [`throttle-downloads`](scripts.md#throttle-downloads), which caps qBittorre
 
 Runs [`backup-config`](scripts.md#backup-config), the restic backup of the stack's settings.
 
-- **File:** [`systemd/arr-backup.service`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/systemd/arr-backup.service)
+- **File:** [`host/systemd/arr-backup.service`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/arr-backup.service)
 - **Runs:** `@REPO@/scripts/backup-config`, `Type=oneshot`, with `Nice=10` and `IOSchedulingClass=idle` so it yields to everything else.
 - **User:** root (no `User=`); the app configs are owned by several container UIDs.
 - **Condition:** `ConditionPathIsMountPoint=@STORAGE_MOUNT@`: the drive is powered by hand, so the backup is skipped rather than failed while it is off. A skipped run is not repeated when the drive comes back; the next one is the following day's.
@@ -225,7 +225,7 @@ Runs [`backup-config`](scripts.md#backup-config), the restic backup of the stack
 
 ### arr-backup.timer
 
-- **File:** [`systemd/arr-backup.timer`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/systemd/arr-backup.timer)
+- **File:** [`host/systemd/arr-backup.timer`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/arr-backup.timer)
 - **When:** `OnCalendar=*-*-* 04:30:00`, `RandomizedDelaySec=15min`, `Persistent=true` (if the machine was off at 04:30, it runs at the next opportunity).
 - **Started by:** `WantedBy=timers.target`.
 
@@ -233,7 +233,7 @@ Runs [`backup-config`](scripts.md#backup-config), the restic backup of the stack
 
 Runs [`check-updates`](scripts.md#check-updates), which reports new image builds and never pulls or restarts anything.
 
-- **File:** [`systemd/arr-updates.service`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/systemd/arr-updates.service)
+- **File:** [`host/systemd/arr-updates.service`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/arr-updates.service)
 - **Runs:** `@REPO@/scripts/check-updates`, `Type=oneshot`.
 - **User and group:** `@STACK_USER@`, `@STACK_GROUP@`.
 - **Dependencies:** `After=network-online.target docker.service`, `Wants=network-online.target`.
@@ -242,7 +242,7 @@ Runs [`check-updates`](scripts.md#check-updates), which reports new image builds
 
 ### arr-updates.timer
 
-- **File:** [`systemd/arr-updates.timer`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/systemd/arr-updates.timer)
+- **File:** [`host/systemd/arr-updates.timer`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/arr-updates.timer)
 - **When:** `OnCalendar=*-*-* 06:00:00`, `RandomizedDelaySec=30min`, `Persistent=true`.
 - **Started by:** `WantedBy=timers.target`.
 
@@ -250,7 +250,7 @@ Runs [`check-updates`](scripts.md#check-updates), which reports new image builds
 
 Runs [`sync-youtube.py`](scripts.md#sync-youtubepy), which syncs Glance's YouTube channel lists with your subscriptions and writes their latest uploads. With the dashboards module off, the script exits at once.
 
-- **File:** [`systemd/arr-youtube.service`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/systemd/arr-youtube.service)
+- **File:** [`host/systemd/arr-youtube.service`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/arr-youtube.service)
 - **Runs:** `@REPO@/scripts/sync-youtube.py`, `Type=oneshot`.
 - **User and group:** `@STACK_USER@`, `@STACK_GROUP@`.
 - **Dependencies:** `After=network-online.target`, `Wants=network-online.target`.
@@ -259,7 +259,7 @@ Runs [`sync-youtube.py`](scripts.md#sync-youtubepy), which syncs Glance's YouTub
 
 ### arr-youtube.timer
 
-- **File:** [`systemd/arr-youtube.timer`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/systemd/arr-youtube.timer)
+- **File:** [`host/systemd/arr-youtube.timer`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/arr-youtube.timer)
 - **When:** `OnCalendar=hourly`, `RandomizedDelaySec=10min`, `Persistent=true`.
 - **Started by:** `WantedBy=timers.target`.
 
@@ -269,11 +269,11 @@ Runs [`sync-youtube.py`](scripts.md#sync-youtubepy), which syncs Glance's YouTub
 
 A template unit that pushes a failed unit's last log lines to ntfy through [`notify-failure`](scripts.md#notify-failure). A unit with `OnFailure=arr-notify-failure@%n.service` starts one instance named after itself (`%n` is the failing unit's full name), and the instance passes that name on as `%i`.
 
-- **File:** [`systemd/arr-notify-failure@.service`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/systemd/arr-notify-failure@.service)
+- **File:** [`host/systemd/arr-notify-failure@.service`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/arr-notify-failure@.service)
 - **Runs:** `@REPO@/scripts/notify-failure %i`, `Type=oneshot`.
 - **User:** root (no `User=`).
 - **Used by:** `arr-stack.service`, `arr-firewall.service`, `arr-backup.service`, `arr-updates.service`, `arr-youtube.service`.
 
-## Not in systemd/
+## Not in host/systemd/
 
 The Telegram agent's user unit, `arr-agent.service`, is a template in `ai/agent/` and is installed into `~/.config/systemd/user/` by [`install-agent`](scripts.md#install-agent), not by `install-host`. [AI agent](../flows/ai-agent.md) covers it.

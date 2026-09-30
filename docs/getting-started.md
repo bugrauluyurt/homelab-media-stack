@@ -353,7 +353,7 @@ When everything is there it installs the host side:
   rpcbind off (no NFS here)
 ```
 
-That is: the systemd units and the udev rule from `systemd/`, filled in from `.env`; SSH
+That is: the systemd units and the udev rule from `host/systemd/`, filled in from `.env`; SSH
 set to keys only with root login off; Docker's log rotation in `/etc/docker/daemon.json`;
 and `rpcbind` disabled and masked. It enables nothing, and it is safe to re-run after
 changing `.env`. Restart Docker once (`sudo systemctl restart docker`) so the log rotation
