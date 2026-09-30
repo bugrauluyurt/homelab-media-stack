@@ -11,12 +11,12 @@ import sys
 import time
 import urllib.request
 
-from stack_env import ENV, REPO, require_service, set_env
+from stack_env import ENV, REPO, require_service, set_env, http, jellyfin_headers
 
 require_service("jellydash")
 
 JELLYFIN = "http://127.0.0.1:8096"
-AUTH = {"Authorization": f'MediaBrowser Token="{ENV["JELLYFIN_API_KEY"]}"'}
+AUTH = jellyfin_headers()
 APP = "JellyDash"
 DB = "/var/www/html/var/data/jellydash.sqlite"
 
@@ -74,9 +74,7 @@ CLIENTS = [
 
 
 def jellyfin(path, method="GET"):
-    r = urllib.request.Request(JELLYFIN + path, method=method, headers=AUTH)
-    raw = urllib.request.urlopen(r, timeout=30).read()
-    return json.loads(raw) if raw else None
+    return http(JELLYFIN + path, method=method, headers=AUTH, timeout=30)
 
 
 def api_key():

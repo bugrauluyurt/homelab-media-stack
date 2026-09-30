@@ -9,12 +9,12 @@ import datetime
 import json
 import sys
 
-from stack_env import ENV, STATE, arr_key, http, notify
+from stack_env import ENV, STATE, arr_key, http, notify, jellyfin_headers
 
 JELLYFIN = "http://127.0.0.1:8096"
 SEERR = "http://127.0.0.1:5055/api/v1"
 
-JF = {"Authorization": f'MediaBrowser Token="{ENV["JELLYFIN_API_KEY"]}"'}
+JF = jellyfin_headers()
 SR = {"X-Api-Key": ENV["SEERR_API_KEY"]}
 
 STUCK_HOURS = 48

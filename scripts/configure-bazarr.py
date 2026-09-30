@@ -9,7 +9,7 @@ import re
 import urllib.parse
 import urllib.request
 
-from stack_env import CONFIG as CFG, ENV, arr_key
+from stack_env import CONFIG as CFG, ENV, arr_key, http
 
 BAZARR = "http://127.0.0.1:6767"
 # name: (languages by preference, Sonarr tag that selects it). French shows get the tag from
@@ -27,10 +27,7 @@ KEY = bazarr_key()
 
 
 def get(path):
-    req = urllib.request.Request(BAZARR + path, headers={"X-API-KEY": KEY})
-    with urllib.request.urlopen(req, timeout=30) as r:
-        raw = r.read()
-        return json.loads(raw) if raw else None
+    return http(BAZARR + path, headers={"X-API-KEY": KEY}, timeout=30)
 
 
 def post_settings(pairs):

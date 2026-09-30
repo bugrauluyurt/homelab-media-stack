@@ -3,13 +3,12 @@
 Used by configure-sftpgo.py (your account) and add-viewer.py (everyone else's).
 """
 import base64
-import json
 import sys
 import time
 import urllib.error
 import urllib.request
 
-from stack_env import ENV
+from stack_env import ENV, http
 
 URL = "http://127.0.0.1:8090"
 ADMIN_ALLOW = ["127.0.0.0/8", "172.16.0.0/12"]
@@ -25,13 +24,7 @@ def basic(user, password):
 
 
 def request(path, headers, body=None, method=None):
-    data = json.dumps(body).encode() if body is not None else None
-    r = urllib.request.Request(URL + path, data=data, method=method or ("POST" if data else "GET"),
-                               headers={**headers, "Content-Type": "application/json"})
-
-    with urllib.request.urlopen(r, timeout=30) as resp:
-        raw = resp.read()
-        return json.loads(raw) if raw else None
+    return http(URL + path, body, method, headers, timeout=30)
 
 
 def wait_ready():

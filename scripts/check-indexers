@@ -5,18 +5,14 @@ Run by hand: Prowlarr already tracks failures and disables failing indexers itse
 this surfaces that on demand.
 """
 import json
-import subprocess
 import urllib.error
 import urllib.request
 
-from stack_env import CONFIG
+from stack_env import arr_key
 
 BASE = "http://127.0.0.1:9696"
 
-KEY = subprocess.run(
-    ["sudo", "grep", "-oPm1", "(?<=<ApiKey>)[^<]+",
-     f"{CONFIG}/prowlarr/config.xml"],
-    capture_output=True, text=True).stdout.strip()
+KEY = arr_key("prowlarr")
 
 
 def call(path, body=None, method=None, timeout=180):

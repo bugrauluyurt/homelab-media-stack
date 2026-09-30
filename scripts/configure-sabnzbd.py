@@ -9,7 +9,7 @@ import time
 import urllib.parse
 import urllib.request
 
-from stack_env import CONFIG, ENV, REPO, set_env
+from stack_env import CONFIG, ENV, REPO, set_env, sabnzbd_key
 
 URL = "http://127.0.0.1:8085/api"
 SERVER = "usenet"
@@ -29,8 +29,7 @@ MISC = {"download_dir": "/data/usenet/incomplete", "complete_dir": "/data/usenet
         "username": ENV.get("SABNZBD_USER", ""), "password": ENV.get("SABNZBD_PASSWORD", "")}
 
 INI = CONFIG / "sabnzbd" / "sabnzbd.ini"
-KEY = subprocess.run(["sudo", "grep", "-oP", r"^api_key = \K\S+", f"{CONFIG}/sabnzbd/sabnzbd.ini"],
-                     capture_output=True, text=True).stdout.strip()
+KEY = sabnzbd_key()
 
 if ENV.get("SABNZBD_API_KEY") != KEY:
     set_env("SABNZBD_API_KEY", KEY)

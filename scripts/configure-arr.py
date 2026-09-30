@@ -3,9 +3,8 @@
 
 Re-running this is safe: every step checks for an existing entry first.
 """
-import subprocess
 
-from stack_env import ENV, NTFY_SERVER, arr_key as api_key, CONFIG as CFG, enabled_services, http
+from stack_env import ENV, NTFY_SERVER, arr_key as api_key, enabled_services, http, sabnzbd_key
 
 QBIT_HOST, QBIT_PORT = "gluetun", int(ENV["QBIT_PORT"])
 
@@ -132,8 +131,7 @@ def ensure_sabnzbd_client(app):
         print(f"  = {app}: SABnzbd already configured")
         return
 
-    sab_key = subprocess.run(["sudo", "grep", "-oP", r"^api_key = \K\S+", f"{CFG}/sabnzbd/sabnzbd.ini"],
-                             capture_output=True, text=True).stdout.strip()
+    sab_key = sabnzbd_key()
     schema = next(x for x in call(app, "GET", "/downloadclient/schema") if x["implementation"] == "Sabnzbd")
 
     values = {"host": "sabnzbd", "port": 8080, "apiKey": sab_key, "useSsl": False,

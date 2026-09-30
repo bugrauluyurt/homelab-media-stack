@@ -13,7 +13,7 @@ import sys
 import urllib.parse
 import urllib.request
 
-from stack_env import ENV, STATE, enabled_services, http
+from stack_env import ENV, STATE, enabled_services, http, jellyfin_headers
 
 QBIT = f"http://127.0.0.1:{ENV['QBIT_PORT']}/api/v2"
 
@@ -43,7 +43,7 @@ def qbit(path, form=None):
 
 def watching():
     jellyfin = http("http://127.0.0.1:8096/Sessions", timeout=10, fatal=False,
-                    headers={"Authorization": f'MediaBrowser Token="{ENV["JELLYFIN_API_KEY"]}"'}) or []
+                    headers=jellyfin_headers()) or []
     plex = http("http://127.0.0.1:32400/status/sessions", timeout=10, fatal=False,
                 headers={"Accept": "application/json"}) if "plex" in enabled_services() else None
     plex = plex or {}

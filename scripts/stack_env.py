@@ -84,6 +84,18 @@ def arr_key(app):
     return key
 
 
+def jellyfin_headers():
+    """The Authorization header for Jellyfin's API, from JELLYFIN_API_KEY."""
+    return {"Authorization": f'MediaBrowser Token="{ENV["JELLYFIN_API_KEY"]}"'}
+
+
+@functools.cache
+def sabnzbd_key():
+    """SABnzbd's API key, from its root-owned sabnzbd.ini."""
+    return subprocess.run(["sudo", "grep", "-oP", r"^api_key = \K\S+", f"{CONFIG}/sabnzbd/sabnzbd.ini"],
+                          capture_output=True, text=True).stdout.strip()
+
+
 def wait_ready(url, what, tries=60, delay=2, headers=None):
     for _ in range(tries):
         try:

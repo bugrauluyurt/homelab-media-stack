@@ -18,15 +18,13 @@ Tailscale access is a separate step, see docs/flows/viewers.md.
 import functools
 import getpass
 import hashlib
-import json
 import secrets
 import sys
-import urllib.request
 
 from games_accounts import ensure, exists
-from stack_env import ENV, enabled_services
+from stack_env import ENV, enabled_services, http, jellyfin_headers
 
-JELLYFIN = ("http://127.0.0.1:8096", {"Authorization": f'MediaBrowser Token="{ENV["JELLYFIN_API_KEY"]}"'})
+JELLYFIN = ("http://127.0.0.1:8096", jellyfin_headers())
 SEERR = ("http://127.0.0.1:5055/api/v1", {"X-Api-Key": ENV["SEERR_API_KEY"]})
 NAVIDROME_URL = "http://127.0.0.1:4533"
 NEEDLE_URL = "http://127.0.0.1:4535/api"
@@ -43,13 +41,7 @@ VIEWER_POLICY = {"IsAdministrator": False, "IsDisabled": False, "EnableAllFolder
 
 def call(api, path, body=None, method=None):
     base, headers = api
-    data = json.dumps(body).encode() if body is not None else None
-    r = urllib.request.Request(base + path, data=data, method=method or ("POST" if data else "GET"),
-                               headers={**headers, "Content-Type": "application/json"})
-
-    with urllib.request.urlopen(r, timeout=60) as resp:
-        raw = resp.read()
-        return json.loads(raw) if raw else None
+    return http(base + path, body, method, headers)
 
 
 @functools.cache
