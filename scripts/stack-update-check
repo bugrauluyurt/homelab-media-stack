@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Report which stack images have a newer build upstream for this machine's architecture, pushing each new one to ntfy once.
 # Notify only: it never pulls or restarts. arr-updates.timer runs it daily; stack-health reads the result.
+# Runs: arr-updates.timer daily at 06:00; by hand.
+# Changes: $STATE/updates, $STATE/updates.notified, the metrics file, ntfy.
+# Idempotent: yes; each update notifies once.
 
 set -uo pipefail
 . "$(dirname "$0")/stack-env.sh"

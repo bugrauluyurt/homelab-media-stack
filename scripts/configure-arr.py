@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
-"""Idempotently configure Radarr, Sonarr and Prowlarr.
+"""Configure Radarr, Sonarr, Lidarr (with the music module) and Prowlarr.
 
-Re-running this is safe: every step checks for an existing entry first.
+Runs: by hand, after configure-sabnzbd.py.
+Changes: API writes to Radarr, Sonarr, Lidarr and Prowlarr.
+Idempotent: yes; every step checks for an existing entry first.
 """
 
 from stack_env import ENV, NTFY_SERVER, arr_key as api_key, enabled_services, http, sabnzbd_key

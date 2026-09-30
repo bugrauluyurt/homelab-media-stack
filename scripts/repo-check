@@ -3,6 +3,9 @@
 # Needs only Docker and Python 3; each tool runs from a pinned container.
 #   scripts/repo-check           everything
 #   scripts/repo-check --fast    skip rendering the diagrams and building the docs site
+# Runs: the CI workflow on pull requests and pushes to main, and before releases; by hand before you
+#   push.
+# Changes: nothing in the repository.
 
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1

@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """Set up SFTPGo, the read-only games download page: start it, lock its admin
 to the server, and create your login from GAMES_USER / GAMES_PASSWORD in .env.
-Viewers' logins come from viewer-add.py. Idempotent: a second run changes nothing.
+Viewers' logins come from viewer-add.py.
+
+Runs: by hand.
+Changes: folders, docker compose up -d sftpgo, SFTPGo's REST API.
+Idempotent: yes.
 """
 import subprocess
 from pathlib import Path

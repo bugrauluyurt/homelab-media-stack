@@ -1,4 +1,6 @@
 # Top-of-page info strip.
+# Read by: homepage, from apps/homepage mounted at /app/config.
+# Applies: Homepage reloads it on save.
 - resources:
     label: Pi
     cpu: true

@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Connect Grafana to narrowly scoped, read-only Jellystat viewing history."""
+"""Connect Grafana to narrowly scoped, read-only Jellystat viewing history.
+
+Runs: by hand, after Jellystat's first visit, since it needs Jellystat's tables.
+Changes: role and grants in jellystat-db; Grafana API.
+Idempotent: yes; the password is set only when the datasource is created.
+"""
 import base64
 import json
 import secrets

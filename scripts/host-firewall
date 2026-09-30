@@ -1,6 +1,11 @@
 #!/usr/bin/python3
 """Host firewall for IPv4 and IPv6. Run as root.
 
+Runs: arr-firewall.service at boot and arr-firewall.timer every 15 minutes; stack-health runs
+  host-firewall home-ports; by hand with sudo.
+Changes: iptables and ip6tables chains.
+Idempotent: yes.
+
 From the home network the server answers only on Jellyfin, Seerr and the games page (plus
 DHCP, mDNS and Tailscale); SSH and every other port answer only on the tailnet.
 

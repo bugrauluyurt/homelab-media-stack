@@ -1,3 +1,6 @@
+# Prometheus scrape targets for the monitoring module.
+# Read by: prometheus, mounted read-only.
+# Applies: when prometheus restarts.
 global:
   scrape_interval: 30s
   evaluation_interval: 30s

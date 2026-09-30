@@ -2,6 +2,10 @@
 """Back up the stack's settings (never media) to a restic repo on the media drive,
 then copy it to a second repo on the NVMe.
 
+Runs: arr-backup.timer daily at 04:30; stack-update as stack-backup pre-update; by hand with sudo.
+Changes: restic repositories (created on the first run), key file, success stamp, metric.
+Idempotent: each run adds a snapshot; retention keeps the repositories bounded.
+
 Runs as root: app configs are owned by several container UIDs.
 """
 import datetime

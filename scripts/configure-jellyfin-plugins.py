@@ -3,7 +3,11 @@
 Jellyfin Enhanced. Abyss's Spotlight banner comes from apps/jellyfin/custom-cont-init.d.
 With HWACCEL in .env (and compose.gpu.yml), also hardware transcoding.
 
-Idempotent. The container restarts only when a plugin was added or removed.
+Runs: by hand, after configure-seerr.py; again after changing TMDB_API_KEY, MDBLIST_API_KEY or
+  HWACCEL.
+Changes: Jellyfin API; docker restart jellyfin only when a plugin was added or removed or is not yet
+  active.
+Idempotent: yes.
 """
 import subprocess
 import sys

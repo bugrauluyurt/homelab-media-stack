@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Point Seerr at Jellyfin and connect it to Radarr and Sonarr. Safe to re-run."""
+"""Point Seerr at Jellyfin and connect it to Radarr and Sonarr.
+
+Runs: by hand, after Jellyfin and the arr apps are configured. Then copy Seerr's API key (Settings,
+  General) into SEERR_API_KEY for the scripts after it.
+Changes: Seerr API.
+Idempotent: yes.
+"""
 import sys
 import time
 import urllib.request

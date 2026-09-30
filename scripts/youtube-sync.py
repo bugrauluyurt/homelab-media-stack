@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Keep Glance's YouTube rows in step with your subscriptions.
 
+Runs: arr-youtube.timer hourly; stack-up with --offline; by hand once with --login.
+Changes: the list files, the video rows, the metric; .env with --login.
+Idempotent: yes.
+
 Sorts your subscriptions (YouTube Data API, read-only) into the tabs of
 apps/glance/youtube-channels.json (or your private copy in $CONFIG_ROOT/glance/) and writes each tab to $CONFIG_ROOT/glance/youtube-<tab>.yml.
 Then writes each tab's latest uploads to $CONFIG_ROOT/glance/youtube/<tab>.json, which

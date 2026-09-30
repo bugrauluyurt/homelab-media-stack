@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
 """Music: give Lidarr its Soulseek source and Navidrome its admin user.
 
+Runs: by hand, after configure-arr.py, which adds Lidarr's root folder, hardlinks, qBittorrent and
+  Prowlarr link.
+Changes: Lidarr API; restarts the lidarr container once, after installing the plugin; qBittorrent
+  category through docker exec; Navidrome admin account.
+Idempotent: yes.
+
 Installs the Tubifarry plugin (Lidarr's plugins branch), then adds slskd as
 both indexer and download client. Root folder, hardlinks, qBittorrent and the
-Prowlarr link come from configure-arr.py. Idempotent.
+Prowlarr link come from configure-arr.py.
 """
 import json
 import subprocess

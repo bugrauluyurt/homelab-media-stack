@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Test every indexer in Prowlarr and report which are actually working.
 
-Run by hand: Prowlarr already tracks failures and disables failing indexers itself;
+Runs: by hand (the indexers alias); stack-health, which needs at least one PASS.
+Changes: nothing in the stack (Prowlarr records the test results as usual).
+
+Prowlarr already tracks failures and disables failing indexers itself;
 this surfaces that on demand.
 """
 import json

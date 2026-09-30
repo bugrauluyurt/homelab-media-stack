@@ -1,6 +1,8 @@
 # yaml-language-server: $schema=https://schemas.recyclarr.dev/v8/config-schema.json
 #
 # TRaSH Guides quality profiles, tuned for direct play on a Pi 5.
+# Read by: recyclarr, mounted read-only.
+# Applies: on recyclarr's next daily sync.
 #
 # This machine has no hardware video encoder, so anything a client can't
 # decode forces a transcode it can't do. Both profiles target 1080p.

@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # Update stack services safely: take a settings snapshot, keep the running
 # images as <repo>:rollback-<stamp>, pull and recreate, then run stack-health.
+# Runs: by hand (the update alias); the stack-update skill, which asks first.
+# Changes: pulls images, recreates containers, tags rollback images; a rollback stops the service,
+#   copies its settings folders under $CONFIG_ROOT back from the snapshot, fixes their ownership and
+#   recreates it.
+# Idempotent: a second run finds nothing to update. Only an image that actually changed replaces the
+#   rollback record, so running it twice never makes the new image the one to roll back to.
 #
 #   update                        every service stack-update-check found an update for
 #   update jellyfin sonarr        just these services

@@ -1,4 +1,8 @@
-"""Paths, settings and HTTP helpers shared by the Python scripts, read from the repo's .env."""
+"""Paths, settings and HTTP helpers shared by the Python scripts, read from the repo's .env.
+
+Used by: every Python script in scripts/.
+Changes: .env, only through set_env.
+"""
 import functools
 import json
 import os

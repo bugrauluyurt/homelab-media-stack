@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Install the user service; never start it or replace any Pi/Telegram credentials."""
+"""Install arr-agent.service, the Telegram gateway's user service; never start it or replace any Pi/Telegram credentials.
+
+Runs: by hand.
+Changes: the agent's config file and user unit.
+Idempotent: yes.
+"""
 import argparse
 import json
 import os

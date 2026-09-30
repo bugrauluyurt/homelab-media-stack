@@ -1,3 +1,6 @@
+# Grafana's Prometheus datasource.
+# Read by: grafana, mounted read-only.
+# Applies: when grafana restarts.
 apiVersion: 1
 datasources:
   - name: Prometheus

@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 # OnFailure= handler: push the failed unit's last log lines to ntfy.
+# Runs: arr-notify-failure@.service, started with the failed unit's name when arr-stack,
+#   arr-firewall, arr-backup, arr-updates or arr-youtube fails.
+# Changes: one ntfy push per run.
+# Idempotent: no; every run pushes one alert.
 
 set -uo pipefail
 . "$(dirname "$0")/stack-env.sh"

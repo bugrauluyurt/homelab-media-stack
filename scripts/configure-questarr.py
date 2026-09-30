@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 """Configure Questarr: admin account, qBittorrent, indexers from Prowlarr, IGDB, ntfy.
 
-Idempotent. IGDB is set only once IGDB_CLIENT_ID and IGDB_CLIENT_SECRET are in
+Runs: by hand, after configure-sabnzbd.py and configure-indexers.py; again after setting the IGDB
+  keys.
+Changes: Questarr API; when the login fails, writes the password's bcrypt hash straight into
+  Questarr's database through docker exec.
+Idempotent: yes.
+
+IGDB is set only once IGDB_CLIENT_ID and IGDB_CLIENT_SECRET are in
 .env; they come from your own Twitch developer app.
 """
 import secrets

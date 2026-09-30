@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Changelog-driven releases: every change adds a file to changelog.d/, and the file names decide the version.
 
+Runs: the release-pr and release GitHub workflows, scripts/repo-check; by hand.
+Changes: CHANGELOG.md, changelog.d/ and the version files, with cut only.
+Idempotent: no; cut consumes changelog.d/.
+
   changelog.py next <version-file>                print the next version, or nothing when changelog.d/ is empty
   changelog.py cut <version> <version-file>...    write changelog.d/ into CHANGELOG.md under the version,
                                                   delete those files, and set the version in every file

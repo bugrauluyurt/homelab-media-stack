@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # Bring the stack up (arr-stack.service's ExecStart). A VPN-only failure must not fail
 # the unit, or systemd's BindsTo drive-lifecycle binding stops working.
+# Runs: arr-stack.service, at boot and whenever the media drive mounts. Start it with sudo systemctl
+#   start arr-stack.service rather than directly.
+# Changes: creates and starts containers; may recreate qBittorrent and slskd and restart Dozzle;
+#   qBittorrent settings through vpn-port-sync.
+# Idempotent: yes.
 
 set -uo pipefail
 . "$(dirname "$0")/stack-env.sh"

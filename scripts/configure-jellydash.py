@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """Configure JellyDash: its own Jellyfin API key, the admin login and its Downloads page.
 
-Idempotent. The key is stored in .env as JELLYDASH_JELLYFIN_API_KEY, and the
+Runs: by hand, after configure-sabnzbd.py.
+Changes: Jellyfin API key; .env; docker compose up -d jellydash, which recreates it when the key
+  changed; JellyDash's database through docker exec.
+Idempotent: yes.
+
+The key is stored in .env as JELLYDASH_JELLYFIN_API_KEY, and the
 container is recreated when it changes.
 """
 import json

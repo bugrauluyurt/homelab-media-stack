@@ -3,6 +3,10 @@
 login to the games download page (SFTPGo) and a Navidrome account for music in Needle,
 all with the same password.
 
+Runs: by hand.
+Changes: Jellyfin, Seerr, SFTPGo, Navidrome and Needle accounts through their APIs.
+Idempotent: yes; existing accounts keep their password, and the flags only switch permissions on.
+
   viewer-add.py NAME [--auto-approve] [--music-requests] [--spotify]
                                           asks for the password (or reads it from stdin)
 

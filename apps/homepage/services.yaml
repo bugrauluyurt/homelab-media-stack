@@ -1,3 +1,6 @@
+# Homepage's service cards and their widgets.
+# Read by: homepage, from apps/homepage mounted at /app/config.
+# Applies: Homepage reloads it on save.
 - Watch:
     - Jellyfin:
         icon: jellyfin.svg

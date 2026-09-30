@@ -2,6 +2,11 @@
 # Reconcile qBittorrent with the live VPN tunnel: forwarded port, bound interface,
 # login-free networks and WebUI checks. arr-port-sync.timer runs it every 15 minutes.
 # If Proton gives no forwarded port for 15 minutes it restarts gluetun, at most every two hours.
+# Runs: arr-port-sync.timer (90 seconds after boot, then every 15 minutes), stack-up, stack-update
+#   after a gluetun update, by hand.
+# Changes: qBittorrent preferences; the gluetun restart described above (an automatic exception the
+#   owner approved). State in $STATE/port-forward-missing-since and $STATE/port-forward-last-heal.
+# Idempotent: yes.
 
 set -uo pipefail
 . "$(dirname "$0")/stack-env.sh"

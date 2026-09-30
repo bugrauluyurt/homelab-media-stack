@@ -1,3 +1,6 @@
+# Grafana's dashboard provider: the JSON files in apps/grafana/dashboards.
+# Read by: grafana, mounted read-only.
+# Applies: at grafana's start; the dashboards themselves are re-read every 60 seconds.
 apiVersion: 1
 providers:
   - name: default

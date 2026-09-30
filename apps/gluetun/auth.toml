@@ -2,6 +2,8 @@
 # read-only and without credentials: the forwarded port, which Uptime Kuma checks
 # so a lost port raises an alert. Port 8000 isn't published; only containers on
 # the arr network can ask.
+# Read by: gluetun, mounted read-only as /gluetun/auth/config.toml.
+# Applies: when gluetun restarts, which pauses torrents and Soulseek (ask first).
 [[roles]]
 name = "port-monitor"
 routes = ["GET /v1/portforward"]

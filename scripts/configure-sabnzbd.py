@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 """Configure SABnzbd: the Usenet server from .env, download folders on the
-media drive, and one category per app. Idempotent.
+media drive, and one category per app.
+
+Runs: by hand, before configure-arr.py when you use Usenet.
+Changes: writes SABNZBD_API_KEY into .env; writes local_ranges (LAN_CIDR, 100.64.0.0/10,
+  172.16.0.0/12, 127.0.0.0/8) straight into sabnzbd.ini with SABnzbd stopped, then starts it again;
+  everything else through SABnzbd's API.
+Idempotent: yes.
 """
 import json
 import subprocess

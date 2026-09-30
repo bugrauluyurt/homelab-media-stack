@@ -1,5 +1,8 @@
 """Accounts for SFTPGo, the read-only games download page.
 
+Used by: configure-sftpgo.py (your account) and viewer-add.py (everyone else's).
+Changes: SFTPGo accounts, through its admin API.
+
 Used by configure-sftpgo.py (your account) and viewer-add.py (everyone else's).
 """
 import base64

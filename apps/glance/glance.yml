@@ -1,3 +1,6 @@
+# Glance's pages, widgets and YouTube rows.
+# Read by: glance, from apps/glance mounted read-only at /app/config.
+# Applies: Glance reloads it on save; a missing environment variable stops the reload.
 server:
   port: 8080
   assets-path: /app/config/assets

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Verify qBittorrent's traffic exits via Proton and that it listens on Proton's forwarded port.
 # Exits 1 on a leak, 2 when inconclusive.
+# Runs: by hand (the leaktest alias); the vpn-check skill.
+# Changes: nothing.
 
 set -uo pipefail
 . "$(dirname "$0")/stack-env.sh"

@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 # Install the host side of the stack: systemd units and udev rules from host/systemd/ (with .env values
 # filled into their @PLACEHOLDERS@), plus the SSH hardening and Docker defaults from host/.
-# Checks prerequisites first and prints the package command for anything missing. Safe to re-run.
+# Checks prerequisites first and prints the package command for anything missing.
+# Runs: by hand, first; again after changing STACK_USER, STORAGE_MOUNT, STORAGE_UUID or any file in
+#   host/systemd/.
+# Changes: the units, timers and udev rule (then daemon-reload); the SSH hardening drop-in;
+#   /etc/docker/daemon.json when it differs; masks rpcbind. It never enables or starts a unit.
+# Idempotent: yes.
 
 set -euo pipefail
 . "$(dirname "$0")/stack-env.sh"

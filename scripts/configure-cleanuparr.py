@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """Configure Cleanuparr: stalled, failed and fake/malicious downloads.
 
-Idempotent. Pass --dry-run to leave (or put) it in dry-run mode, where every
+Runs: by hand, after configure-arr.py.
+Changes: Cleanuparr API. It refuses to go live while the download cleaner is on.
+Idempotent: yes.
+
+Pass --dry-run to leave (or put) it in dry-run mode, where every
 destructive action is skipped and only logged; without it, it ends live.
 """
 import copy

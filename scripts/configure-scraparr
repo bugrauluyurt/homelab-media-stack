@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Render scraparr's config from the template, substituting API keys from .env.
 # scraparr can't read env vars, so the output holds live keys: keep it outside the repo.
+# Runs: by hand, once the four keys are in .env, and after any of them changes; then docker compose
+#   restart scraparr so Scraparr reads the new file.
+# Changes: that one file.
+# Idempotent: yes.
 
 set -euo pipefail
 . "$(dirname "$0")/stack-env.sh"

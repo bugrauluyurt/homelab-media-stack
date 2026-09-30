@@ -1,4 +1,6 @@
 # Media stack shortcuts. Source it from ~/.zshrc or ~/.bashrc; MEDIA_STACK_DIR overrides the repo path.
+# Used by: your shell, sourced from ~/.zshrc or ~/.bashrc.
+# Changes: nothing.
 MEDIA_STACK_DIR=${MEDIA_STACK_DIR:-$HOME/homelab-media-stack}
 alias arr='managarr'                                    # Radarr + Sonarr + Lidarr TUI
 alias qbt='qbt-tui'                                     # qBittorrent TUI

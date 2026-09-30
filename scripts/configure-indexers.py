@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 """Add indexers to Prowlarr and report which actually work.
 
-Idempotent: public ones always, account-based ones in ACCOUNTS once their API key is in .env.
+Runs: by hand, after configure-arr.py so Prowlarr syncs the new indexers to the apps.
+Changes: Prowlarr API (new indexers at priority 25; the RSS only app profile, which the account
+  trackers use).
+Idempotent: yes; indexers already present are skipped, except that account trackers are moved to RSS
+  only. The test searches run every time.
+
+Adds the public indexers always, and those in ACCOUNTS once their API key is in .env.
 Cloudflare-protected sites commonly fail here; that is expected, not a configuration error.
 """
 import json

@@ -2,6 +2,12 @@
 # One-shot status of the whole stack. Safe to run any time, but not read-only:
 # it writes a hardlink test file on the drive and starts throwaway curl containers.
 # --notify: also push the failures to ntfy (the arr-health timer uses this).
+# Runs: arr-health.timer every 6 hours with --notify; stack-update after recreating containers; by
+#   hand (the health alias); the operational skills in ai/homelab-plugin/skills/.
+# Changes: not read-only: it creates and removes a hardlink test file in $DATA_ROOT/torrents/movies
+#   and $DATA_ROOT/media/movies, and starts throwaway curlimages/curl containers on the arr network.
+#   Don't run it during a look-only investigation.
+# Idempotent: yes.
 
 . "$(dirname "$0")/stack-env.sh"
 cd "$REPO" || exit 1

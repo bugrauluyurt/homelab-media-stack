@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Idempotently connect Bazarr to Radarr/Sonarr and enable subtitle providers.
+"""Connect Bazarr to Radarr/Sonarr and enable subtitle providers.
+
+Runs: by hand, after configure-arr.py; again after setting OPENSUBTITLES_* or SUBSOURCE_API_KEY.
+Changes: Bazarr settings and language profiles through its API.
+Idempotent: yes.
 
 Providers needing no account are enabled automatically. Those in ACCOUNTS
 are enabled only when their .env keys are filled.

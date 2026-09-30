@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 # Safely stop the media stack and unmount the media drive before cutting its power.
+# Runs: by hand (the drive-off alias); the stack-power skill, which asks first.
+# Changes: stops every container of the stack, unmounts and spins down the drive.
+# Idempotent: yes; it exits 0 when the drive is already unmounted.
 
 set -euo pipefail
 . "$(dirname "$0")/stack-env.sh"

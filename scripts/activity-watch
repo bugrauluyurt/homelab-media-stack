@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Push alerts that need someone watching all the time; run every minute by arr-watch.timer.
 
+Runs: arr-watch.timer every minute, from 3 minutes after boot.
+Changes: its state file; ntfy.
+Idempotent: yes; an alert is not repeated.
+
 Alerts once each (reported ones live in STATE/watch-activity.json) on software-transcoded streams, new
 Jellyfin devices, failed Jellyfin logins and Seerr requests approved over STUCK_HOURS ago
 that are out but still have nothing downloaded. The first run only records what exists.
