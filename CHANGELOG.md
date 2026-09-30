@@ -7,6 +7,20 @@ a minor version adds features, and a patch fixes bugs. A change records its entr
 next version, and merging the release pull request writes the entries here and publishes it
 ([how releases work](docs/operations/releasing.md)).
 
+## 2.7.0 - 2026-09-30
+
+### Changed
+- French series (tagged `french` in Sonarr) grab torrents without the 60-minute wait for Usenet,
+  so new episodes reach the ratio trackers' swarms early, when seeding them earns ratio. Re-run
+  `configure-arr.py` to apply it.
+- The ratio-based trackers (Draupnirr, TR4KER) now serve new releases only: the apps grab from their
+  RSS feeds and interactive search, never from a backlog search, whose old releases cost ratio that
+  seeding can't earn back. Re-run `add-indexers.py` to apply it.
+
+### Fixed
+- `add-indexers.py` no longer stops when a site times out while being added (TorrentProject2 is
+  down); it reports that one as failed and carries on.
+
 ## 2.6.0 - 2026-09-30
 
 ### Added
