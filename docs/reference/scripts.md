@@ -686,3 +686,31 @@ What the scripts keep between runs. `$STATE` is the `state` folder next to `CONF
 | `$STORAGE_MOUNT/backups/RESTIC_PASSWORD` | `stack-backup` | `stack-update --rollback`, `stack-health` |
 | `/var/backups/arr-stack/restic` | `stack-backup` | `stack-health` |
 | `/var/lib/arr-backup/last-success` | `stack-backup` | `stack-health` |
+
+## downloads-meeting
+
+**Run by:** `arr-meeting.service`. **Root:** no. **Changes:** qBittorrent transfer state,
+its default add-stopped preference, and an atomic journal in the stack state directory.
+**Idempotent:** yes.
+
+Serves the Glance Meeting mode iframe on the configured Tailscale IPv4 address, port 4536.
+Enable the service after installing its template. Only allowed hostnames and same-origin,
+CSRF-token-protected POST requests can change mode; GET requests never change mode.
+No API credentials are sent to the browser.
+
+Meeting mode stops all torrents and repeats the check every two seconds. New torrents
+explicitly started by an API client can briefly transfer before the next check. The UI
+confirms pause only after checking every torrent; unreachable qBittorrent shows an error.
+The service retries automatically and persists intent through a reboot. It does not stop
+Soulseek, Usenet, streaming or other devices' traffic, and is not a VPN kill switch.
+
+Turning mode off restores only transfers recorded as active before this controller stopped
+them. Torrents already stopped before enabling, and newly added torrents that arrive stopped,
+stay stopped. A one-hour duration expires using UTC wall time; manual mode never expires.
+The original add-stopped preference is restored. Do not remove the journal while mode is on.
+
+The widget is at the bottom of Glance's Lab right column, after Releases.
+`apps/glance/meeting.html` contains the controls, spinner, accessible status messages and
+three-second status polling. `apps/glance/assets/meeting-theme.js` sends resolved Glance
+colours to the iframe through origin-checked messages, including when the theme changes.
+The iframe accepts messages only from its parent page. Neither asset receives app API keys.

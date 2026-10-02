@@ -5,6 +5,10 @@ server:
   port: 8080
   assets-path: /app/config/assets
 
+document:
+  head: |
+    <script src="/assets/meeting-theme.js" defer></script>
+
 branding:
   hide-footer: true
 
@@ -266,6 +270,11 @@ pages:
               - slskd/slskd
               - navidrome/navidrome
               - gethomepage/homepage
+
+          - type: iframe
+            title: Meeting mode
+            source: http://${HOST_NAME}:4536/
+            height: 200
 
   - name: Home
     columns:

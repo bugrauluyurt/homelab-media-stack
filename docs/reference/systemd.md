@@ -277,3 +277,11 @@ A template unit that pushes a failed unit's last log lines to ntfy through [`sta
 ## Not in host/systemd/
 
 The Telegram agent's user unit, `arr-agent.service`, is a template in `ai/agent/` and is installed into `~/.config/systemd/user/` by [`agent-install`](scripts.md#agent-install), not by `host-install`. [AI agent](../flows/ai-agent.md) covers it.
+
+## arr-meeting.service
+
+Optional persistent controller for the Glance Meeting mode iframe. Runs `downloads-meeting`
+as the stack user, restarts on failure, and listens only on the configured Tailscale IP.
+Install the template with `host-install`, then enable with
+`sudo systemctl enable --now arr-meeting.service`. Mode remains off until explicitly enabled
+in the dashboard. Existing containers do not need a restart.
