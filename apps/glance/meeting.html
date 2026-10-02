@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<title>Meeting mode</title>
+<style>
+:root {
+    --color-primary: #e5d6ac;
+    --color-positive: #a9c98c;
+    --color-negative: #e89999;
+    --color-widget-background: #18181c;
+    --color-widget-background-highlight: #25252b;
+    --color-widget-content-border: #303036;
+    --color-text-base: #b6b6c0;
+    --color-text-subdue: #8a8a99;
+}
+html { background: var(--color-widget-background); color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; background: transparent; color: var(--color-text-base); font: 13px/1.6 'JetBrains Mono', monospace; }
+section { min-height: 200px; padding: 16px; border: 1px solid var(--color-widget-content-border); border-radius: 5px; background: var(--color-widget-background); }
+.status { display: flex; gap: 8px; align-items: center; min-height: 42px; margin: 0 0 12px; }
+#status { color: var(--color-text-base); }
+#status[data-state="on"] { color: var(--color-positive); }
+#status[data-state="error"] { color: var(--color-negative); }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; }
+button, select { min-height: 36px; border-radius: 5px; border: 1px solid var(--color-widget-content-border); padding: 7px; font: inherit; color: var(--color-text-base); background: var(--color-widget-background-highlight); }
+select { flex: 1; min-width: 0; }
+button { cursor: pointer; color: var(--color-primary); }
+button:disabled { cursor: wait; opacity: .6; }
+button:focus-visible, select:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.note, #expiry { font-size: 11px; color: var(--color-text-subdue); margin: 12px 0 0; }
+.spinner { width: 14px; height: 14px; flex-shrink: 0; border: 2px solid var(--color-widget-content-border); border-top-color: var(--color-primary); border-radius: 50%; animation: spin .8s linear infinite; }
+[hidden] { display: none !important; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+</style>
+</head>
+<body>
+<section id="panel" aria-busy="true">
+    <div class="status" role="status" aria-live="polite">
+        <span id="spinner" class="spinner" aria-hidden="true"></span>
+        <span id="status">Loading torrent status...</span>
+    </div>
+    <div class="controls">
+        <select id="duration" aria-label="Meeting duration">
+            <option value="0">Until turned off</option>
+            <option value="3600">For one hour</option>
+        </select>
+        <button id="toggle" disabled>Loading...</button>
+    </div>
+    <p id="expiry" hidden></p>
+    <p class="note">Pauses torrents. Manually stopped torrents stay stopped. Other apps can still use bandwidth.</p>
+</section>
+<script>
+let enabled = false;
+let busy = false;
+let refreshController = null;
+let revision = 0;
+const button = document.getElementById('toggle');
+const status = document.getElementById('status');
+const duration = document.getElementById('duration');
+const spinner = document.getElementById('spinner');
+const panel = document.getElementById('panel');
+const expiry = document.getElementById('expiry');
+
+function loading(active) {
+    spinner.hidden = !active;
+    panel.setAttribute('aria-busy', String(active));
+}
+
+function render(state) {
+    enabled = state.enabled;
+    const pending = !state.confirmed && !state.error;
+    loading(busy || pending);
+    status.dataset.state = state.error ? 'error' : enabled && state.confirmed ? 'on' : 'off';
+    status.textContent = state.error || (pending ? 'Waiting for confirmation...' : enabled ? 'On | torrents paused' : 'Off | normal torrent activity');
+    button.textContent = busy ? enabled ? 'Resuming...' : 'Pausing...' : enabled ? 'Turn off' : 'Turn on';
+    button.disabled = busy;
+    duration.disabled = busy || enabled;
+    expiry.hidden = !enabled || !state.until;
+    if (!expiry.hidden) expiry.textContent = 'Until ' + new Date(state.until * 1000).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+}
+
+async function refresh() {
+    if (busy || refreshController) return;
+    const controller = new AbortController();
+    const currentRevision = revision;
+    refreshController = controller;
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    try {
+        const response = await fetch('/status', {signal: controller.signal});
+        if (!response.ok) throw new Error();
+        const state = await response.json();
+        if (!busy && currentRevision === revision) render(state);
+    } catch {
+        if (busy || currentRevision !== revision) return;
+        loading(false);
+        status.dataset.state = 'error';
+        status.textContent = 'Controller unavailable. Torrent state is unconfirmed.';
+        button.textContent = 'Unavailable';
+        button.disabled = true;
+        duration.disabled = true;
+        expiry.hidden = true;
+    } finally {
+        clearTimeout(timeout);
+        if (refreshController === controller) refreshController = null;
+    }
+}
+
+button.onclick = async () => {
+    busy = true;
+    revision += 1;
+    refreshController?.abort();
+    let result = null;
+    button.disabled = true;
+    duration.disabled = true;
+    loading(true);
+    status.textContent = enabled ? 'Resuming torrents...' : 'Pausing torrents...';
+    button.textContent = enabled ? 'Resuming...' : 'Pausing...';
+    try {
+        const response = await fetch('/mode', {
+            method: 'POST',
+            signal: AbortSignal.timeout(30000),
+            headers: {'Content-Type': 'application/json', 'X-Meeting-Token': '@TOKEN@'},
+            body: JSON.stringify({mode: enabled ? 'off' : 'on', seconds: Number(duration.value)}),
+        });
+        if (!response.ok) throw new Error();
+        result = await response.json();
+    } catch {
+        status.textContent = 'Could not confirm the change. Checking again...';
+    } finally {
+        busy = false;
+        if (result) render(result);
+        await refresh();
+    }
+};
+
+if (parent !== window && document.referrer) {
+    const parentOrigin = new URL(document.referrer).origin;
+    window.addEventListener('message', event => {
+        if (event.source !== parent || event.origin !== parentOrigin || event.data?.type !== 'meeting-theme') return;
+        if (['light', 'dark'].includes(event.data.scheme)) document.documentElement.style.colorScheme = event.data.scheme;
+        for (const [property, value] of Object.entries(event.data.colors || {})) {
+            if (property.startsWith('--color-') && typeof value === 'string' && CSS.supports('color', value)) {
+                document.documentElement.style.setProperty(property, value);
+            }
+        }
+    });
+    parent.postMessage({type: 'meeting-theme-ready'}, parentOrigin);
+}
+
+refresh();
+setInterval(() => { if (!busy) refresh(); }, 3000);
+</script>
+</body>
+</html>

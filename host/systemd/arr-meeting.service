@@ -1,0 +1,16 @@
+[Unit]
+Description=Persistent torrent Meeting mode for Glance
+After=network-online.target tailscaled.service arr-stack.service
+Wants=network-online.target
+
+[Service]
+User=@STACK_USER@
+Group=@STACK_GROUP@
+ExecStart=@REPO@/scripts/downloads-meeting
+Restart=always
+RestartSec=2
+NoNewPrivileges=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
