@@ -7,6 +7,13 @@ a minor version adds features, and a patch fixes bugs. A change records its entr
 next version, and merging the release pull request writes the entries here and publishes it
 ([how releases work](docs/operations/releasing.md)).
 
+## 3.1.0 - 2026-10-02
+
+### Added
+- Glance gets a persistent Meeting mode control to pause torrents, optionally for one hour,
+  preserving manually stopped transfers and retrying after qBittorrent outages.
+  The control sits below Releases, follows the Glance theme, and shows loading and confirmation states.
+
 ## 3.0.0 - 2026-09-30
 
 ### Breaking
