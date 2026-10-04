@@ -78,10 +78,14 @@ compose_configs() {
   local profiles
 
   for profiles in '*' ''; do
-    COMPOSE_PROFILES=$profiles docker compose --env-file .env.example config -q || return 1
+    COMPOSE_PROFILES=$profiles docker compose --env-file .env.example -f docker-compose.yml config -q || return 1
+    COMPOSE_PROFILES=$profiles VPN_COUNTRIES=Netherlands VPN_SERVER_NAMES='NL#1,NL#2' \
+      docker compose --env-file .env.example -f docker-compose.yml -f compose.vpn-failover.yml config -q || return 1
   done
 
-  docker compose --env-file .env.example -f docker-compose.yml -f compose.gpu.yml config -q
+  docker compose --env-file .env.example -f docker-compose.yml -f compose.gpu.yml config -q || return 1
+  VPN_COUNTRIES=Netherlands VPN_SERVER_NAMES='NL#1,NL#2' \
+    docker compose --env-file .env.example -f docker-compose.yml -f compose.gpu.yml -f compose.vpn-failover.yml config -q
 }
 
 secrets() { in_docker "$GITLEAKS" dir /repo --no-banner --redact; }

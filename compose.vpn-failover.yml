@@ -1,0 +1,33 @@
+services:
+  gluetun:
+    image: qmcgaw/gluetun@sha256:2733bb22b27e3efa7a9f2cef9057ec12791b8b225793fcd3dbfd0508404dfc25
+    entrypoint: [/bin/sh, /gluetun/start-failover.sh]
+    environment:
+      VPN_SERVICE_PROVIDER: protonvpn
+      SERVER_COUNTRIES: ${VPN_COUNTRIES:?Set VPN_COUNTRIES to the imported server country}
+      SERVER_NAMES: ${VPN_SERVER_NAMES:?Set VPN_SERVER_NAMES to the imported server names}
+      SERVER_SELECTION_MODE: ordered
+      PORT_FORWARD_ONLY: "on"
+      SECURE_CORE_ONLY: "off"
+      FREE_ONLY: "off"
+      UPDATER_PERIOD: "0"
+      STORAGE_SERVERS_DIRECTORY_PATH: /gluetun/verified-servers
+    volumes:
+      - type: bind
+        source: ./apps/gluetun/failover-wg0.conf
+        target: /gluetun/wireguard/wg0.conf
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./apps/gluetun/start-failover.sh
+        target: /gluetun/start-failover.sh
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${CONFIG_ROOT}/gluetun/verified-servers
+        target: /gluetun/verified-servers
+        read_only: false
+        bind:
+          create_host_path: false

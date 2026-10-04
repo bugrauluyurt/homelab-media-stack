@@ -36,6 +36,7 @@ Every file in [`scripts/`](https://github.com/bugrauluyurt/homelab-media-stack/t
 | [`configure-scraparr`](#configure-scraparr) | by hand | no | Scraparr's config file |
 | [`stack-up`](#stack-up) | `arr-stack.service` | no | starts containers; may recreate qBittorrent and slskd, restart Dozzle |
 | [`vpn-port-sync`](#vpn-port-sync) | `arr-port-sync.timer`, `stack-up`, `stack-update` | no | qBittorrent settings; may restart gluetun |
+| [`vpn-import-servers`](#vpn-import-servers) | by hand | no | verified Proton server files outside the repository |
 | [`host-firewall`](#host-firewall) | `arr-firewall.service` and `.timer` | yes | iptables and ip6tables rules |
 | [`stack-backup`](#stack-backup) | `arr-backup.timer`, `stack-update` | yes | restic repositories, key file, metrics |
 | [`stack-update-check`](#stack-update-check) | `arr-updates.timer` | no | state file, metrics, ntfy |
@@ -376,6 +377,23 @@ A compose error with every library service up is only a warning (the VPN is prob
 - **Why:** a VPN-only failure must not fail the unit, or systemd marks it failed and the `BindsTo=` drive binding stops working; gluetun retries on its own. After a boot, qBittorrent starts on its saved (stale) forwarded port, and syncing here closes the gap before the timer's next run. Dozzle lists containers once at start and never retries.
 - **Idempotent:** yes.
 
+### vpn-import-servers
+
+Imports a verified Proton server pool from downloaded WireGuard configurations without making
+network requests. It requires at least two distinct public IPv4 endpoints in the same country,
+standard Proton server names matching each configuration's `[Peer]` comment, NAT-PMP on,
+Moderate NAT off, the standard `10.2.0.2/32` address and port `51820`, and valid peer public keys.
+Free servers, Secure Core, United States pools, and preshared keys are unsupported. Input client
+private keys are never written to the output. The supplied country label still needs live exit
+verification. [VPN and ports](../flows/vpn-and-ports.md#verified-proton-server-pool) covers rollout.
+
+- **File:** [`scripts/vpn-import-servers`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/vpn-import-servers)
+- **Runs:** by hand, with gluetun and its downloaders stopped before changing existing pool files.
+- **Usage:** `vpn-import-servers --country Netherlands --output-dir "$CONFIG_ROOT/gluetun/verified-servers" --server 'NL#1=/path/first.conf' --server 'NL#2=/path/second.conf'`.
+- **Root:** no, when the output directory is writable by the stack user.
+- **Changes:** `manifest.json` and `protonvpn.json` in the chosen directory, replaced atomically after validating every input. Does not edit `.env` or contact Proton.
+- **Idempotent:** unchanged records keep their existing files. After changed records are imported, recreate gluetun to apply the pool and current Compose settings, validate the VPN, then run `vpn-port-sync`.
+
 ### vpn-port-sync
 
 Reconciles qBittorrent with the live VPN tunnel. It reads the tunnel address (`tun0` in gluetun) and Proton's forwarded port (gluetun's `/tmp/gluetun/forwarded_port`), then changes in qBittorrent only what differs:
@@ -419,7 +437,7 @@ The rules are rebuilt only when the wanted rules change (for example a new IPv6 
 
 Backs up the stack's settings (never media) with restic. It stages:
 
-- `$CONFIG_ROOT`, skipping what the apps rebuild or fetch again (logs, caches, transcodes, the apps' own backup folders, crash reports, codecs, media metadata and artwork, Python venvs, Grafana plugins, Recyclarr resources, Scrutiny's InfluxDB, gluetun's server list, Jellystat's Postgres folder, Jellyfin's extracted subtitles), sockets, log files and live database side files, and copying every SQLite database through SQLite's online backup API;
+- `$CONFIG_ROOT`, including the imported `gluetun/verified-servers` pool, skipping what the apps rebuild or fetch again (logs, caches, transcodes, the apps' own backup folders, crash reports, codecs, media metadata and artwork, Python venvs, Grafana plugins, Recyclarr resources, Scrutiny's InfluxDB, gluetun's default `servers` cache, Jellystat's Postgres folder, Jellyfin's extracted subtitles), sockets, log files and live database side files, and copying every SQLite database through SQLite's online backup API;
 - `.env`, the stack user's `~/.config/managarr` and `~/.config/qbt-tui`, and `$STATE`;
 - a `pg_dump` of Jellystat's database when the stats module is on;
 - the hand-made host files `/etc/fstab`, `/boot/firmware/cmdline.txt`, `/etc/docker/daemon.json`, `/etc/avahi/avahi-daemon.conf` and the stack user's `~/.ssh/authorized_keys`.
@@ -437,6 +455,9 @@ It backs this up to `$STORAGE_MOUNT/backups/restic` (tag `arr-stack`, host `HOST
 ### stack-update-check
 
 Checks every image the stack's containers run for a newer build upstream for this machine's architecture. It writes the result to `$STATE/updates` (read by [`stack-health`](#stack-health) and [`stack-update`](#stack-update)) and the metrics `arr_image_updates_available` and `arr_image_updates_checked_timestamp_seconds`, and pushes each update not seen before to ntfy once, flagging a major version change. It never pulls or restarts anything. [Updates](../flows/updates.md) covers the whole cycle.
+
+Images pinned with `@sha256:` are immutable and reported as current without registry requests.
+Changing such a pin is a manual configuration change, including the gluetun failover preset.
 
 - **File:** [`scripts/stack-update-check`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/stack-update-check)
 - **Runs:** [`arr-updates.timer`](systemd.md#arr-updatestimer) daily at 06:00; by hand.
