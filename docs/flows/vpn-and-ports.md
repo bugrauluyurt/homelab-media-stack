@@ -24,7 +24,7 @@ flowchart LR
 The VPN runs inside the `gluetun` container, not on the server itself. The server, Tailscale,
 Jellyfin, Plex and the arr apps are untouched by it, so your own streams stay direct.
 
-- **Custom WireGuard.** gluetun runs with `VPN_SERVICE_PROVIDER=custom` and
+- **Custom WireGuard by default.** gluetun runs with `VPN_SERVICE_PROVIDER=custom` and
   `VPN_TYPE=wireguard`. The client private key lives only in `.env` (`WIREGUARD_PRIVATE_KEY`); the
   Proton server's endpoint and public key are in `$CONFIG_ROOT/gluetun/wireguard/wg0.conf`
   (mode `0600`), without a `PrivateKey` line, because values in that file override the environment.
@@ -32,7 +32,7 @@ Jellyfin, Plex and the arr apps are untouched by it, so your own streams stay di
   conflict). Custom mode has no automatic server failover: changing the endpoint or key, and
   recreating gluetun with its downloaders, is a deliberate step.
 - **Exit country.** `VPN_COUNTRIES` lists the countries the exit may be in. It doesn't choose a
-  server (the endpoint in `wg0.conf` does); `stack-health` reads the country from gluetun's log and
+  server in custom mode (the endpoint in `wg0.conf` does); `stack-health` reads the country from gluetun's log and
   fails if it isn't listed, and always fails for the United States.
 - **Port forwarding.** `VPN_PORT_FORWARDING=on` with Proton's provider. gluetun asks the server for
   a port over NAT-PMP and writes it to `/tmp/gluetun/forwarded_port` inside the container.
@@ -58,6 +58,125 @@ Jellyfin, Plex and the arr apps are untouched by it, so your own streams stay di
 - **SABnzbd stays outside.** Usenet is SSL and download only, nothing is shared, so SABnzbd runs on
   the normal Docker network at full line speed. Adding Usenet changed nothing about the torrents'
   VPN. See [Media requests](media-requests.md).
+
+## Verified Proton server pool
+
+The optional `compose.vpn-failover.yml` preset enables Proton's provider mode with an ordered
+pool of P2P servers. It leaves the base custom-mode setup unchanged. When gluetun's health
+recovery reconnects, ordered selection advances through the eligible servers. Failover can take
+several minutes because health checks and NAT-PMP retries have their own delays. A simulated
+gateway outage on the pinned build recovered in about 5 minutes 13 seconds; this is an
+observation, not a recovery deadline. An outage affecting every endpoint still needs intervention.
+
+The preset keeps the existing firewall, IPv6 policy, published ports, and downloader namespace.
+It requires both `VPN_COUNTRIES` and `VPN_SERVER_NAMES`, filters to port-forwarding servers,
+and disables the automatic server-list updater. The importer accepts standard server names
+and rejects free and Secure Core configurations.
+Imported records are preferred over the bundled catalog in the pinned gluetun build. The
+importer checks downloaded configuration data offline; it does not prove that a server is
+reachable or currently grants a forwarded port.
+
+### Import and enable
+
+1. Download configurations for at least two different Proton P2P servers in the same allowed
+   country from [Proton's downloads page](https://account.protonvpn.com/downloads). Enable
+   **NAT-PMP** and disable **Moderate NAT**. Use the standard IPv4 address `10.2.0.2/32` and
+   endpoint port `51820`; the importer rejects other layouts. Keep these secret-bearing files
+   outside the repository. Each server name must match its `# NL#1` style label in `[Peer]`.
+2. Back up `.env` and `$CONFIG_ROOT/gluetun`. Before importing into an existing installation,
+   stop qBittorrent, slskd when its module is enabled, and gluetun. Coordinate with any running
+   recovery or update job so it cannot restart them during this operation.
+3. Import the endpoint and public-key records. Replace the example names and paths with your
+   downloaded files. Loading `.env` supplies `CONFIG_ROOT` to this shell; the importer itself
+   neither loads nor edits `.env`:
+
+   ```bash
+   set -a; . ./.env; set +a
+   ./scripts/vpn-import-servers --country Netherlands \
+     --output-dir "$CONFIG_ROOT/gluetun/verified-servers" \
+     --server 'NL#1=/path/to/first.conf' \
+     --server 'NL#2=/path/to/second.conf'
+   ```
+
+   This writes `manifest.json` and `protonvpn.json`, containing public peer records and no
+   client private key. Every input is validated before either file changes. The country is
+   the label you provide, so verify the actual exit country after connecting.
+4. Copy the client `PrivateKey` from one of those configurations into `WIREGUARD_PRIVATE_KEY`
+   in `.env`. Set `VPN_COUNTRIES` to the imported country and `VPN_SERVER_NAMES` to the
+   comma-separated names printed by the importer. Set:
+
+   ```dotenv
+   COMPOSE_FILE=docker-compose.yml:compose.vpn-failover.yml
+   ```
+
+   If GPU transcoding is enabled, include both presets:
+
+   ```dotenv
+   COMPOSE_FILE=docker-compose.yml:compose.gpu.yml:compose.vpn-failover.yml
+   ```
+
+5. Validate the Compose configuration and recreate gluetun by itself:
+
+   ```bash
+   set -a; . ./.env; set +a
+   docker compose config -q
+   docker compose up -d --no-deps --force-recreate gluetun
+   docker inspect -f '{{.State.Health.Status}}' gluetun
+   docker compose logs --tail 100 gluetun
+   docker exec gluetun cat /tmp/gluetun/forwarded_port
+   ```
+
+   Wait for healthy status and a valid forwarded port, and confirm the connection logs name
+   an imported server and an allowed exit country. Check every imported endpoint individually
+   before relying on it, temporarily selecting its name, recreating gluetun, and checking health,
+   country and NAT-PMP each time. Restore the complete `VPN_SERVER_NAMES` pool and recreate
+   gluetun once more before starting downloaders. Reload `.env` in this shell after every
+   selector change; exported values otherwise override edits to the file.
+6. After the VPN is ready, the existing recovery script recreates enabled downloaders in
+   gluetun's current namespace and synchronizes qBittorrent's port:
+
+   ```bash
+   ./scripts/vpn-port-sync
+   ./scripts/vpn-leak-test
+   ./scripts/stack-health
+   ```
+
+The repository's `apps/gluetun/failover-wg0.conf` mounts read-only over
+`/gluetun/wireguard/wg0.conf`. It contains only the standard address, allowed IPs, and keepalive.
+This prevents a previously installed fixed `Endpoint`, `PublicKey`, or `PrivateKey` from
+overriding pool selection or `.env`. The old host file is preserved for rollback. The seed and
+`apps/gluetun/start-failover.sh` wrapper mount read-only. The imported server directory mounts
+read-write because gluetun updates its storage manifest and caches during startup even with
+the automatic updater disabled. Every mount uses `create_host_path: false`, so a missing source
+directory or repository file fails container creation. The wrapper requires both imported JSON
+files to be readable, nonempty regular files before starting gluetun. It does not validate JSON
+content or guarantee that gluetun will accept a corrupt or incompatible catalog.
+
+### Refresh, restore, and upgrade
+
+When Proton changes an endpoint, download replacement configurations and repeat the stopped
+import and validation sequence above. The importer atomically replaces changed files.
+**Recreate gluetun after each refresh** to apply the current pool, selectors, and Compose settings
+together. Recreate the downloaders through `vpn-port-sync`
+after gluetun is healthy and has a port. A private key remains valid until revoked or otherwise
+rejected by Proton; an endpoint failure alone does not establish that the key needs rotating.
+
+`stack-backup` includes `$CONFIG_ROOT/gluetun/verified-servers` and `.env`; it excludes the
+regenerable default `gluetun/servers` cache. A full restore needs both imported JSON files,
+the matching `.env` selectors and private key, and this repository's Compose preset, seed, and wrapper.
+Confirm the files exist before recreating gluetun, then validate the VPN before its clients.
+To return to custom mode, remove `compose.vpn-failover.yml` from `COMPOSE_FILE`, retain any GPU
+preset, and confirm the preserved host `wg0.conf` and `.env` key still work together before
+recreating gluetun and its clients.
+
+The preset pins a gluetun multi-platform image digest for amd64 and arm64 because the imported
+server schema and `preferred` behavior depend on that build. `stack-update-check` reports
+digest-pinned images as current without registry comparisons. Upgrading this image is a manual
+repository change: validate the provider JSON schema, ordered selection, country and name
+filters, file precedence, NAT-PMP, failover, and leak protection against the new build first.
+The preferred server file is not a fail-closed boundary: a corrupt file, incompatible schema,
+or changed image can cause gluetun to fall back to its bundled catalog. The explicit filters
+still constrain selection, but verify the selected endpoint in startup logs after changes.
 
 ## qBittorrent's side
 

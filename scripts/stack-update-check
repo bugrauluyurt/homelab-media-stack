@@ -51,6 +51,14 @@ print(v)' 2>/dev/null || echo "?"
 
 check() {
   local img=$1 repo local_idx mine now
+
+  case "$img" in
+    *@sha256:*)
+      echo "current $img"
+      return
+      ;;
+  esac
+
   repo=${img%:*}
   local_idx=$(docker image inspect -f '{{range .RepoDigests}}{{println .}}{{end}}' "$img" 2>/dev/null \
               | grep -m1 @ | cut -d@ -f2)

@@ -11,6 +11,7 @@
 !host/sshd_config.d/*.conf
 *.crt
 wg*.conf
+!apps/gluetun/failover-wg0.conf
 secrets/
 
 # ---- Runtime data (lives outside the repo, but belt-and-braces) ----

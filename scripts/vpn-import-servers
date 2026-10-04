@@ -1,0 +1,179 @@
+#!/usr/bin/env python3
+"""
+Runs: manually before enabling or refreshing the Proton failover preset.
+Changes: private server metadata only; Idempotent: yes for an unchanged pool.
+"""
+
+import argparse
+import base64
+import configparser
+import ipaddress
+import json
+import os
+from pathlib import Path
+import re
+import sys
+import tempfile
+import time
+
+
+def get_server(server_reference, country):
+    server_name, separator, config_filename = server_reference.partition("=")
+
+    if not separator or not re.fullmatch(r"[A-Z]{2}#[1-9][0-9]*", server_name):
+        raise ValueError("each --server must be NAME=FILE for a standard Proton server such as NL#1")
+
+    if server_name.startswith("US#"):
+        raise ValueError("United States servers are not permitted")
+
+    config_path = Path(config_filename).expanduser()
+
+    try:
+        config_text = config_path.read_text()
+        wireguard_config = configparser.ConfigParser(interpolation=None)
+        wireguard_config.read_string(config_text)
+    except (OSError, UnicodeError, configparser.Error):
+        raise ValueError(f"{server_name}: cannot read a valid WireGuard configuration") from None
+
+    if wireguard_config.sections() != ["Interface", "Peer"] or wireguard_config.defaults():
+        raise ValueError(f"{server_name}: exactly one Interface and one Peer section are required")
+
+    peer_text = config_text.split("[Peer]", 1)[1]
+    peer_names = re.findall(r"(?m)^\s*#\s*([A-Z]{2}#[1-9][0-9]*)\s*$", peer_text)
+
+    if peer_names != [server_name]:
+        raise ValueError(f"{server_name}: the Peer server label must match the requested name")
+
+    for option_name, option_value in [("NAT-PMP (Port Forwarding)", "on"), ("Moderate NAT", "off")]:
+        option_pattern = rf"(?m)^\s*#\s*{re.escape(option_name)}\s*=\s*{option_value}\s*$"
+
+        if not re.search(option_pattern, config_text):
+            raise ValueError(f"{server_name}: generate the config with {option_name} set to {option_value}")
+
+    interface_addresses = wireguard_config["Interface"].get("Address", "").split(",")
+
+    try:
+        ipv4_addresses = [str(ipaddress.ip_interface(address.strip())) for address in interface_addresses
+                          if ipaddress.ip_interface(address.strip()).version == 4]
+    except ValueError:
+        raise ValueError(f"{server_name}: invalid interface address") from None
+
+    if ipv4_addresses != ["10.2.0.2/32"]:
+        raise ValueError(f"{server_name}: the preset requires the Proton IPv4 address 10.2.0.2/32")
+
+    peer_config = wireguard_config["Peer"]
+    peer_public_key = peer_config.get("PublicKey", "").strip()
+
+    try:
+        public_key_bytes = base64.b64decode(peer_public_key, validate=True)
+    except ValueError:
+        raise ValueError(f"{server_name}: invalid peer public key") from None
+
+    if len(public_key_bytes) != 32:
+        raise ValueError(f"{server_name}: the peer public key must contain 32 bytes")
+
+    endpoint_address, endpoint_separator, endpoint_port = peer_config.get("Endpoint", "").rpartition(":")
+
+    try:
+        endpoint_ip = ipaddress.IPv4Address(endpoint_address.strip())
+    except ipaddress.AddressValueError:
+        raise ValueError(f"{server_name}: a public IPv4 endpoint is required") from None
+
+    if (not endpoint_separator or endpoint_port.strip() != "51820"
+            or not endpoint_ip.is_global or endpoint_ip.is_multicast):
+        raise ValueError(f"{server_name}: a public IPv4 endpoint on port 51820 is required")
+
+    allowed_networks = [network.strip() for network in peer_config.get("AllowedIPs", "").split(",")]
+
+    if "0.0.0.0/0" not in allowed_networks or peer_config.get("PresharedKey", "").strip():
+        raise ValueError(f"{server_name}: an IPv4 default route and no preshared key are required")
+
+    return {"vpn": "wireguard", "country": country, "server_name": server_name,
+            "wgpubkey": peer_public_key, "port_forward": True, "ips": [str(endpoint_ip)]}
+
+
+def write_server_pool(output_dir, servers):
+    provider_path = output_dir / "protonvpn.json"
+    provider_metadata = {"version": 4, "preferred": True, "servers": servers}
+
+    try:
+        previous_provider = json.loads(provider_path.read_text())
+    except (OSError, ValueError):
+        previous_provider = {}
+
+    if not isinstance(previous_provider, dict):
+        previous_provider = {}
+
+    previous_metadata = {field_name: field_value for field_name, field_value in previous_provider.items()
+                         if field_name != "timestamp"}
+    previous_timestamp = previous_provider.get("timestamp")
+    provider_timestamp = (previous_timestamp if previous_metadata == provider_metadata
+                          and type(previous_timestamp) is int and previous_timestamp > 0 else int(time.time()))
+    provider_metadata["timestamp"] = provider_timestamp
+    manifest_metadata = {"version": 1,
+                         "protonvpn": {"filepath": "/gluetun/verified-servers/protonvpn.json"}}
+
+    output_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    output_dir.chmod(0o700)
+    pending_files = []
+
+    try:
+        for filename, file_metadata in [("protonvpn.json", provider_metadata), ("manifest.json", manifest_metadata)]:
+            output_path = output_dir / filename
+            file_text = json.dumps(file_metadata, indent=2) + "\n"
+
+            if output_path.is_file() and output_path.read_text() == file_text:
+                output_path.chmod(0o600)
+                print(f"= {output_path}")
+                continue
+
+            with tempfile.NamedTemporaryFile(mode="w", dir=output_dir, prefix=f".{filename}.",
+                                             delete=False) as staging_file:
+                staging_path = Path(staging_file.name)
+                pending_files.append((staging_path, output_path))
+                staging_file.write(file_text)
+                staging_file.flush()
+                os.fsync(staging_file.fileno())
+
+        for staging_path, output_path in pending_files:
+            staging_path.replace(output_path)
+            print(f"+ {output_path}")
+    finally:
+        for staging_path, output_path in pending_files:
+            staging_path.unlink(missing_ok=True)
+
+
+def main():
+    argument_parser = argparse.ArgumentParser(description="Import public Proton WireGuard peers for VPN failover.")
+    argument_parser.add_argument("--country", required=True, help="Gluetun country name for every selected server")
+    argument_parser.add_argument("--output-dir", required=True, type=Path,
+                                 help="CONFIG_ROOT/gluetun/verified-servers on this installation")
+    argument_parser.add_argument("--server", action="append", required=True, metavar="NAME=FILE",
+                                 help="repeat for at least two different standard P2P gateways")
+    arguments = argument_parser.parse_args()
+    country = arguments.country.strip()
+
+    try:
+        if not country or country.casefold() in {"united states", "united states of america", "us", "usa"}:
+            raise ValueError("choose a permitted country outside the United States")
+
+        servers = [get_server(server_reference, country) for server_reference in arguments.server]
+        server_names = [server["server_name"] for server in servers]
+        endpoint_ips = [server["ips"][0] for server in servers]
+
+        if len(servers) < 2 or len(set(server_names)) != len(servers) or len(set(endpoint_ips)) != len(servers):
+            raise ValueError("at least two different server names and endpoint IPs are required")
+
+        if len({server_name[:2] for server_name in server_names}) != 1:
+            raise ValueError("all servers must belong to the same country")
+
+        write_server_pool(arguments.output_dir.expanduser(), servers)
+    except (OSError, ValueError) as import_error:
+        argument_parser.exit(1, f"Import failed: {import_error}\n")
+
+    print(f"VPN_SERVER_NAMES={','.join(server_names)}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

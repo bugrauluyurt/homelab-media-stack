@@ -38,6 +38,10 @@ these into `/var/tmp/arr-backup`, a private folder deleted after every run:
 | Hand-edited host files, when present | `/etc/fstab`, `/boot/firmware/cmdline.txt`, `/etc/docker/daemon.json`, `/etc/avahi/avahi-daemon.conf`, `~/.ssh/authorized_keys` | A reinstall would lose them ([host changes](../operations/host.md)) |
 | Jellystat's watch history | `pg_dump -Fc` of the `jfstat` database in `jellystat-db` | Only while the `stats` module is on |
 
+The optional VPN failover pool in `$CONFIG_ROOT/gluetun/verified-servers` is included. Restore
+both JSON files together with `.env` and the repository's failover preset, seed, and startup wrapper before
+recreating gluetun. See [VPN pool restore](vpn-and-ports.md#refresh-restore-and-upgrade).
+
 ## What never is
 
 - **Media and downloads.** They can be downloaded again.
@@ -45,7 +49,7 @@ these into `/var/tmp/arr-backup`, a private folder deleted after every run:
   (the apps' own backup folders), `Crash Reports`, `Codecs`, `Media`, `Metadata`, `MediaCover` and
   `venv`; `*.log` files and `logs.db`; sockets and FIFOs (qBittorrent's `ipc-socket`, for example).
 - **These paths:** Grafana's plugins, Recyclarr's copy of the TRaSH guides, Scrutiny's SMART
-  history database, gluetun's server list, Jellyfin's extracted subtitles, and Jellystat's raw
+  history database, gluetun's default `servers` cache, Jellyfin's extracted subtitles, and Jellystat's raw
   Postgres files (the dump covers them).
 - **What the repository reinstalls:** systemd units, the firewall and SSH hardening
   (`scripts/host-install`), the Docker images, and Tailscale's login.

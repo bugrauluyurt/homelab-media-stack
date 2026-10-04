@@ -293,6 +293,11 @@ Custom mode has no automatic failover to another server, and `VPN_COUNTRIES` sel
 nothing: the health check verifies the exit against it, and always fails for the United
 States.
 
+For automatic failover between verified Proton P2P servers, use the optional
+[`compose.vpn-failover.yml` preset](flows/vpn-and-ports.md#verified-proton-server-pool).
+It requires at least two downloaded configurations, an offline import, and explicit country
+and server-name selectors. Follow that section before enabling it or starting downloaders.
+
 **Other VPN providers.** gluetun supports many providers, and you can change
 `VPN_SERVICE_PROVIDER` and its settings in `docker-compose.yml`. Port forwarding here is
 Proton-specific, though: `VPN_PORT_FORWARDING_PROVIDER` is `protonvpn`, and `vpn-port-sync`,

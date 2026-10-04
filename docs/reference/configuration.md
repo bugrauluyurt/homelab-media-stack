@@ -55,7 +55,7 @@ In the tables below, **Required** is *yes* when the core stack or a core script 
 | <a id="qbit_port"></a>`QBIT_PORT` | yes | none (`8080`) | qBittorrent's web UI port, published by gluetun; every app and script reaches qBittorrent on it. | gluetun, qbittorrent, homepage, glance; `stack-env.sh`, `vpn-port-sync`, `stack-health`, [`downloads-throttle`](scripts.md#downloads-throttle), [`configure-arr.py`](scripts.md#configure-arrpy) |
 | <a id="compose_profiles"></a>`COMPOSE_PROFILES` | no | `*` for the scripts | Which optional modules run: `*` for all, or a list such as `music,monitoring`. See [compose profiles](#compose-profiles). | Docker Compose; `stack-env.sh`, `stack_env.py` and every script that skips a module |
 | <a id="media_cpus"></a>`MEDIA_CPUS` | no | `3` | CPU cores Jellyfin, Plex and Byparr may each use. See [below](#cpu-limit). | jellyfin, plex, byparr |
-| <a id="compose_file"></a>`COMPOSE_FILE` | no | `docker-compose.yml` | Commented out in the example. Set it to `docker-compose.yml:compose.gpu.yml` for hardware transcoding. See [below](#composegpuyml-and-compose_file). | Docker Compose |
+| <a id="compose_file"></a>`COMPOSE_FILE` | no | `docker-compose.yml` | Commented out in the example. Add `compose.gpu.yml` for hardware transcoding or `compose.vpn-failover.yml` for a verified Proton server pool, separated by colons. Both overrides can be combined. See [below](#composegpuyml-and-compose_file) and [VPN failover](../flows/vpn-and-ports.md#verified-proton-server-pool). | Docker Compose |
 | <a id="hwaccel"></a>`HWACCEL` | no | empty | Hardware transcoding type: `vaapi` (Intel or AMD) or `qsv` (Intel). Commented out in the example. | `configure-jellyfin-plugins.py` |
 
 ### Proton VPN
@@ -63,7 +63,8 @@ In the tables below, **Required** is *yes* when the core stack or a core script 
 | Key | Required | Default | What it does | Read by |
 |---|---|---|---|---|
 | <a id="wireguard_private_key"></a>`WIREGUARD_PRIVATE_KEY` | yes | none | The `PrivateKey` of a dedicated Proton WireGuard configuration (a P2P server, NAT-PMP on, Moderate NAT off). Its endpoint configuration is installed separately; see [VPN and ports](../flows/vpn-and-ports.md). The pre-commit hook blocks committing it. | gluetun |
-| <a id="vpn_countries"></a>`VPN_COUNTRIES` | yes | none | Comma-separated countries the VPN may exit in, spelled as gluetun logs them. `stack-health` fails when the exit country isn't listed or is the United States. gluetun's custom mode doesn't pick servers by country; your WireGuard configuration decides. | `stack-health`, the vpn-check skill |
+| <a id="vpn_countries"></a>`VPN_COUNTRIES` | yes | none | Comma-separated countries the VPN may exit in, spelled as gluetun logs them. `stack-health` fails when the exit country isn't listed or is the United States. Custom mode uses the endpoint in your WireGuard configuration. The failover preset also passes this as gluetun's `SERVER_COUNTRIES` filter and refuses an empty value. | gluetun in failover mode, `stack-health`, the vpn-check skill |
+| <a id="vpn_server_names"></a>`VPN_SERVER_NAMES` | with failover preset | empty | Comma-separated server names printed by `vpn-import-servers`. Limits failover to those imported servers; the preset refuses an empty value. Ignored in custom mode. | gluetun in failover mode |
 
 ### Plex
 
@@ -278,6 +279,9 @@ From then on the scripts skip the module (they print `~ <service> is off (COMPOS
 3. Run [`configure-jellyfin-plugins.py`](scripts.md#configure-jellyfin-pluginspy). With `HWACCEL` set, it sets Jellyfin's hardware acceleration to that type with the device `/dev/dri/renderD128`, turns on hardware encoding and 10-bit HEVC decoding, and decodes H.264, HEVC and VP9 in hardware.
 
 Docker Compose reads `COMPOSE_FILE` from `.env`, so every `docker compose` command in the repository, the scripts' included, uses both files. No script changes Plex's transcoder settings. [`activity-watch`](scripts.md#activity-watch) alerts only on software transcodes, so hardware ones stay quiet.
+
+When using the VPN failover preset too, preserve it with
+`COMPOSE_FILE=docker-compose.yml:compose.gpu.yml:compose.vpn-failover.yml`.
 
 ### CPU limit
 
