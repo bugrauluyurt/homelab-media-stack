@@ -1,6 +1,8 @@
 import base64
+from contextlib import redirect_stdout
 import importlib.machinery
 import importlib.util
+import io
 import json
 from pathlib import Path
 import stat
@@ -60,6 +62,12 @@ class VpnImportTests(unittest.TestCase):
         self.assertEqual(self._run_import().returncode, 0)
         previous_files = {output_path.name: (output_path.read_bytes(), output_path.stat().st_ino)
                           for output_path in self.output_dir.iterdir()}
+        provider_metadata = json.loads((self.output_dir / "protonvpn.json").read_text())
+        importer_module = self._get_importer_module()
+
+        with patch.object(importer_module.time, "time", return_value=provider_metadata["timestamp"] + 3600):
+            with redirect_stdout(io.StringIO()):
+                importer_module.write_server_pool(self.output_dir, provider_metadata["servers"])
 
         import_result = self._run_import()
 
@@ -132,10 +140,7 @@ class VpnImportTests(unittest.TestCase):
     def test_staging_failure_keeps_previous_files_and_cleans_temporary_files(self):
         self.assertEqual(self._run_import().returncode, 0)
         previous_files = {output_path.name: output_path.read_bytes() for output_path in self.output_dir.iterdir()}
-        importer_loader = importlib.machinery.SourceFileLoader("vpn_import_under_test", str(IMPORTER))
-        importer_spec = importlib.util.spec_from_loader(importer_loader.name, importer_loader)
-        importer_module = importlib.util.module_from_spec(importer_spec)
-        importer_loader.exec_module(importer_module)
+        importer_module = self._get_importer_module()
         replacement_servers = json.loads((self.output_dir / "protonvpn.json").read_text())["servers"]
         replacement_servers[1]["ips"] = ["8.8.8.8"]
 
@@ -146,6 +151,15 @@ class VpnImportTests(unittest.TestCase):
         self.assertEqual(previous_files, {
             output_path.name: output_path.read_bytes() for output_path in self.output_dir.iterdir()
         })
+
+    @staticmethod
+    def _get_importer_module():
+        importer_loader = importlib.machinery.SourceFileLoader("vpn_import_under_test", str(IMPORTER))
+        importer_spec = importlib.util.spec_from_loader(importer_loader.name, importer_loader)
+        importer_module = importlib.util.module_from_spec(importer_spec)
+        importer_loader.exec_module(importer_module)
+
+        return importer_module
 
     def _write_config(self, server_name, endpoint_ip):
         config_path = self.config_root / (server_name.replace("#", "-") + ".conf")
