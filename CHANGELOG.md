@@ -7,6 +7,13 @@ a minor version adds features, and a patch fixes bugs. A change records its entr
 next version, and merging the release pull request writes the entries here and publishes it
 ([how releases work](docs/operations/releasing.md)).
 
+## 3.2.0 - 2026-10-04
+
+### Added
+- Add an optional Proton VPN failover preset with an offline importer for verified P2P server
+  configurations, an explicit server pool, and setup, refresh and restore instructions.
+- Treat digest-pinned images as current during update checks without malformed registry requests.
+
 ## 3.1.0 - 2026-10-02
 
 ### Added
