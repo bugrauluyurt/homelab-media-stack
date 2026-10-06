@@ -1,1 +1,0 @@
-- Jellyfin viewers can search and download Open Subtitles for playback or save an SRT file to their device from the browser without installing an extension.
