@@ -7,6 +7,11 @@ a minor version adds features, and a patch fixes bugs. A change records its entr
 next version, and merging the release pull request writes the entries here and publishes it
 ([how releases work](docs/operations/releasing.md)).
 
+## 3.3.0 - 2026-10-06
+
+### Added
+- Jellyfin viewers can search and download Open Subtitles for playback or save an SRT file to their device from the browser without installing an extension.
+
 ## 3.2.0 - 2026-10-04
 
 ### Added
