@@ -24,6 +24,7 @@ Every file in [`scripts/`](https://github.com/bugrauluyurt/homelab-media-stack/t
 | [`configure-plex.py`](#configure-plexpy) | by hand | sudo | Plex `Preferences.xml` (restarts Plex) |
 | [`configure-seerr.py`](#configure-seerrpy) | by hand | sudo if needed | Seerr API |
 | [`configure-jellyfin-plugins.py`](#configure-jellyfin-pluginspy) | by hand | no | Jellyfin API (restarts Jellyfin) |
+| [`subtitle-downloads.sh`](#subtitle-downloadssh) | Jellyfin container startup | yes, in container | Jellyfin web assets and subtitle download loader |
 | [`configure-cleanuparr.py`](#configure-cleanuparrpy) | by hand | sudo if needed | Cleanuparr API |
 | [`configure-questarr.py`](#configure-questarrpy) | by hand | sudo if needed | Questarr API and database |
 | [`configure-sftpgo.py`](#configure-sftpgopy) | by hand | no | folders, starts SFTPGo, SFTPGo API |
@@ -111,7 +112,7 @@ flowchart LR
   confsftpgo --> games
 ```
 
-The Python scripts import [`stack_env.py`](#stack_envpy) and the bash scripts source [`stack-env.sh`](#stack-envsh) (all but `agent-install`, `changelog.py` and `repo-check`); those links are left out of the diagram.
+The Python scripts import [`stack_env.py`](#stack_envpy) and the bash scripts source [`stack-env.sh`](#stack-envsh) (all but `agent-install`, `changelog.py`, `repo-check` and the Jellyfin container hooks); those links are left out of the diagram.
 
 ## Setup
 
@@ -229,13 +230,34 @@ Points Seerr at Jellyfin (signing in as `JELLYFIN_USER`), enables every library,
 
 Sets up Jellyfin's plugins and look. It adds the plugin repositories (IAmParadox27, n00bcodr, Neptune, Jellyfin Stable) and installs File Transformation, Plugin Pages, Home Screen Sections, Jellyfin Enhanced, Neptune Indexers, Neptune MDM, TMDb Box Sets, Fanart and Trakt; uninstalls SeerrFin and Intro Skipper and drops their repositories; sets the Abyss theme CSS and the server name (`JELLYFIN_SERVER_NAME`, default `Home Media`); configures the home screen rows and Jellyfin Enhanced (Seerr requests, arr links, quality and rating tags, `TMDB_API_KEY`, `MDBLIST_API_KEY`); starts the TMDb Box Sets scan once on a fresh install. With `HWACCEL` set it also turns on hardware transcoding (see [compose.gpu.yml](configuration.md#composegpuyml-and-compose_file)). Abyss's Spotlight banner comes from `apps/jellyfin/custom-cont-init.d` on every container start, not from this script.
 
+With both `OPENSUBTITLES_USER` and `OPENSUBTITLES_PASS` set, it installs and configures the official
+Open Subtitles plugin. It enables subtitle management for active non-admin viewers while preserving
+their other permissions; they can search, download and upload subtitles. Deletion still requires an
+administrator. [`subtitle-downloads.sh`](#subtitle-downloadssh) adds the browser's **Save to device**
+button separately.
+
 - **File:** [`scripts/configure-jellyfin-plugins.py`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/configure-jellyfin-plugins.py)
-- **Runs:** by hand, after [`configure-seerr.py`](#configure-seerrpy); again after changing `TMDB_API_KEY`, `MDBLIST_API_KEY` or `HWACCEL`.
+- **Runs:** by hand, after [`configure-seerr.py`](#configure-seerrpy); again after changing `TMDB_API_KEY`, `MDBLIST_API_KEY`, `HWACCEL` or `OPENSUBTITLES_*`.
 - **Needs:** `JELLYFIN_API_KEY`, `SEERR_API_KEY`, `TAILSCALE_IP` (external arr links), `HOMEPAGE_ALLOWED_HOSTS` (one Seerr link per host Jellyfin is opened on, so links point where the browser already is).
 - **Root:** no.
 - **Changes:** Jellyfin API; `docker restart jellyfin` only when a plugin was added or removed or is not yet active.
 - **Why:** the home rows' `OrderIndex` has no gaps because Home Screen Sections 3.0.2 returns an empty home screen when index 0 is followed by anything but 1.
 - **Idempotent:** yes.
+
+### subtitle-downloads.sh
+
+Adds **Save to device** beside Open Subtitles search results in Jellyfin's web interface. It copies
+the repository's JavaScript asset into the web root and adds its loader on every container start,
+so image replacement keeps the customization. The browser uses the signed-in viewer's Jellyfin
+session to fetch an SRT file; users install no extension. Changes to Jellyfin's UI or API can require
+an update; unsupported screens omit or disable the button.
+
+- **File:** [`apps/jellyfin/custom-cont-init.d/subtitle-downloads.sh`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/apps/jellyfin/custom-cont-init.d/subtitle-downloads.sh)
+- **Runs:** Jellyfin's `/custom-cont-init.d` startup hooks.
+- **Usage:** `subtitle-downloads.sh [WEB_ROOT]`; defaults to `/usr/share/jellyfin/web`. The optional path is for isolated tests.
+- **Root:** yes, inside the container.
+- **Changes:** Jellyfin's web assets and loader; no credentials.
+- **Idempotent:** yes; repeated starts keep one loader and refresh the JavaScript asset.
 
 ### configure-cleanuparr.py
 
@@ -597,7 +619,7 @@ Prints Cleanuparr's safety-relevant state on one line: `live|dryrun downloadclea
 
 ### viewer-add.py
 
-Gives someone their own accounts, all with one password: a Jellyfin user (watches everything, can't administer or delete), a Seerr user imported from Jellyfin that can request (requests wait for your approval unless `--auto-approve`), a read-only login to the games download page, and a Navidrome user for Needle, named after `NAME` up to any `@`. [Viewers](../flows/viewers.md) covers the Tailscale side, which is a separate step.
+Gives someone their own accounts, all with one password: a Jellyfin user (watches everything and can search, download and upload subtitles; can't administer or delete), a Seerr user imported from Jellyfin that can request (requests wait for your approval unless `--auto-approve`), a read-only login to the games download page, and a Navidrome user for Needle, named after `NAME` up to any `@`. [Viewers](../flows/viewers.md) covers the Tailscale side, which is a separate step.
 
 - **File:** [`scripts/viewer-add.py`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/viewer-add.py)
 - **Usage:** `viewer-add.py NAME [--auto-approve] [--music-requests] [--spotify]`. It asks for the password, or reads it from stdin when that isn't a terminal. `--music-requests` lets the account get albums and songs in Needle and `--spotify` lets it connect Spotify (both shown and changeable in Needle, Settings, People).
@@ -681,7 +703,7 @@ Release tooling for this repository, not part of the server. Every change adds i
 
 ### repo-check
 
-Every check CI and releases run, each tool from a pinned container, so it needs only Docker and Python 3: Python syntax, shell syntax, shellcheck (warnings and up), ruff, the unit tests (`tests/` and the agent's), `docker compose config` against `.env.example` with every module, with none and with the GPU override, a gitleaks secret scan, a heading in these reference pages for every file in `scripts/` and `host/systemd/`, no em or en dashes in tracked files (the vendored Grafana dashboard excepted), every Mermaid diagram rendering, and a strict build of the documentation site. It prints the failed steps and exits 1 when any fails.
+Every check CI and releases run, each tool from a pinned container, so it needs only Docker and Python 3: Python syntax, shell syntax, shellcheck (warnings and up), ruff, the Python unit tests (`tests/` and the agent's), JavaScript unit tests through Node's built-in runner, `docker compose config` against `.env.example` with every module, with none and with the GPU override, a gitleaks secret scan, a heading in these reference pages for every file in `scripts/` and `host/systemd/`, no em or en dashes in tracked files (the vendored Grafana dashboard excepted), every Mermaid diagram rendering, and a strict build of the documentation site. It prints the failed steps and exits 1 when any fails.
 
 - **File:** [`scripts/repo-check`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/repo-check)
 - **Flags:** `--fast` skips rendering the diagrams and building the documentation site.

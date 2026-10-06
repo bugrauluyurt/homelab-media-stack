@@ -65,6 +65,7 @@ display, which looks worse and drains the battery.
 | **TMDb Box Sets** | Automatic collections once you own two or more films of a series. The script runs its first scan once on a fresh install |
 | **Fanart** | Clear logos and extra backdrops, used by the Spotlight banner and TV apps |
 | **Trakt** | Watch-history sync with Trakt. Idle until you link an account: Dashboard → Plugins → Trakt |
+| **Open Subtitles** | Subtitle search and downloads when `OPENSUBTITLES_USER` and `OPENSUBTITLES_PASS` are set |
 
 The home rows, top to bottom: Continue Watching, Next Up, Top 10, Because You Watched (up to
 three rows), Discover (with request buttons), Recently Added Movies, Recently Added Shows, Genre
@@ -107,8 +108,19 @@ them as separate `.srt` files next to the video, on purpose:
 - Image subtitles (PGS, VOBSUB) have to be burned into the picture, which is a full transcode.
   Text subtitles (SubRip, ASS) can be switched on without touching the video.
 
-If a subtitle is missing, open Bazarr (`:6767`), find the title and search manually with the
-magnifying glass. To see which subtitle formats a file carries:
+To find a subtitle yourself in Jellyfin's browser interface:
+
+1. Open a movie or episode's **⋯** menu, then **Edit subtitles**.
+2. Choose the language and search.
+3. Use **Download** to add the subtitle to the server for playback, or **Save to device** beside
+   an Open Subtitles result to save an `.srt` file through your browser.
+
+No browser extension is needed. Viewers can also upload subtitles; deleting subtitles requires
+an administrator. **Save to device** is added to the server's web interface and does not appear
+in native TV apps. Bazarr still handles automatic downloads.
+
+The owner can also open Bazarr (`:6767`), find the title and search with the magnifying glass.
+To see which subtitle formats a file carries:
 
 ```bash
 docker exec jellyfin /usr/lib/jellyfin-ffmpeg/ffprobe -v error \
@@ -119,11 +131,18 @@ docker exec jellyfin /usr/lib/jellyfin-ffmpeg/ffprobe -v error \
 If it reports `pgs` or `dvd_subtitle`, let Bazarr fetch an external `.srt` for that title and pick
 that track instead.
 
-A free **OpenSubtitles.com** account noticeably improves hit rates: it is the biggest source. Put
-it in `.env` as `OPENSUBTITLES_USER` / `OPENSUBTITLES_PASS` (and optionally `SUBSOURCE_API_KEY`),
-then re-run `configure-bazarr.py`. Series whose original language is French are tagged `french`
-in Sonarr, which gives them Bazarr's French subtitle profile, since English subtitles for French
-TV rarely exist.
+Set **OpenSubtitles.com** credentials in `.env` as `OPENSUBTITLES_USER` / `OPENSUBTITLES_PASS`,
+then re-run `configure-bazarr.py` and `configure-jellyfin-plugins.py`. The latter installs and
+configures the official Open Subtitles plugin and enables subtitle management for existing active
+viewers; new viewers get that permission from `viewer-add.py`. Bazarr and Jellyfin share the
+account's download limits. `SUBSOURCE_API_KEY` optionally adds another source to Bazarr.
+
+`apps/jellyfin/custom-cont-init.d/subtitle-downloads.sh` reloads **Save to device** on every
+container start, including after image replacement. Jellyfin updates can change the subtitle
+screen or API; an unsupported screen omits or disables the button while Jellyfin stays usable.
+
+Series whose original language is French are tagged `french` in Sonarr, which gives them Bazarr's
+French subtitle profile, since English subtitles for French TV rarely exist.
 
 ## Watching away from home
 
@@ -182,6 +201,6 @@ In each Plex app, set quality to **Original** and switch **off** "Automatically 
 | Works at home, not away | Tailscale isn't connected on that device |
 | A show has no poster or description | See the [known issue](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/ai/homelab-plugin/skills/stack-logs/references/known-issues.md#a-show-is-in-jellyfin-but-has-no-poster-or-description) |
 | "Account disabled" | Jellyfin locks a non-admin account after 3 wrong passwords; the owner re-enables it in Jellyfin → Users |
-| Subtitles missing | Search for them in Bazarr (`:6767`), as above |
+| Subtitles missing | Open the title's **⋯ → Edit subtitles** in Jellyfin and search, as above |
 
 More in [Troubleshooting](../troubleshooting.md).
