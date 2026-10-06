@@ -39,7 +39,7 @@ SEERR_REQUEST, SEERR_AUTO_APPROVE = 32, 128
 
 VIEWER_POLICY = {"IsAdministrator": False, "IsDisabled": False, "EnableAllFolders": True,
                  "EnableMediaPlayback": True, "EnableRemoteAccess": True, "EnableContentDeletion": False,
-                 "EnableCollectionManagement": False, "EnableSubtitleManagement": False,
+                 "EnableCollectionManagement": False, "EnableSubtitleManagement": True,
                  "EnableLiveTvManagement": False}
 
 

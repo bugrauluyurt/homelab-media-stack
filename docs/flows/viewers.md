@@ -105,7 +105,7 @@ It asks for a password (or reads one line from stdin) and uses that one password
 
 | App | What it creates | When |
 |---|---|---|
-| **Jellyfin** | A user named exactly as given. Watches every library, may play remotely; not an administrator; can't delete media or manage collections, subtitles or live TV. Their own watch history and *Continue watching* | Always |
+| **Jellyfin** | A user named exactly as given. Watches every library, may play remotely; can search, download and upload subtitles; not an administrator; can't delete media or subtitles or manage collections or live TV. Their own watch history and *Continue watching* | Always |
 | **Seerr** | The same user imported from Jellyfin (they sign in with the Jellyfin login), allowed to request. Requests **wait for your approval** in Seerr's *Requests* unless you pass `--auto-approve` | Always |
 | **Games page (SFTPGo)** | A login with the same name: list and download only, over the web page or SFTP; no uploads, no share links, no FTP or WebDAV, and no two-factor (a lost phone would lock them out) | Only with the `games` module on |
 | **Navidrome, for Needle** | A non-admin Navidrome user named after the part before "@" (`their@example.com` signs in to Needle as `their`). Their own likes, playlists, stats and mixes; the whole library; not Navidrome's settings | Only with the `music` module on |
@@ -115,6 +115,11 @@ It is idempotent: an account that exists keeps its password, and the flags only 
 To switch one off, use Seerr's *Users* page, or Needle's **Settings, People** (they appear there
 after their first sign-in). Spotify's development mode also needs their Spotify email under *User
 Management* in the Spotify developer dashboard ([Music](music.md)).
+
+For existing active Jellyfin viewers, `configure-jellyfin-plugins.py` enables subtitle management
+without changing their other permissions. In the browser, **⋯ → Edit subtitles** offers search
+and **Download** for playback; Open Subtitles results also have **Save to device** for an `.srt`
+file. Viewers need no browser extension ([Subtitles](../using/watching.md#subtitles)).
 
 Games accounts are managed only through
 [`scripts/games_accounts.py`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/games_accounts.py),

@@ -15,6 +15,7 @@ RUFF=ghcr.io/astral-sh/ruff:0.16.9
 GITLEAKS=zricethezav/gitleaks:v8.30.1
 MERMAID=minlag/mermaid-cli:12.0.0
 PYTHON=python:3.13-slim
+NODE=node:24.14.1-bookworm-slim
 
 fast=false
 [ "${1:-}" = --fast ] && fast=true
@@ -72,6 +73,10 @@ ruff() {
 unit_tests() {
   python3 -m unittest discover -s tests -q &&
     (cd ai/agent && python3 -m unittest -q test_gateway)
+}
+
+javascript_tests() {
+  in_docker "$NODE" node --test tests/test_jellyfin_subtitle_downloads.mjs
 }
 
 compose_configs() {
@@ -218,6 +223,7 @@ step "shell syntax" shell_syntax
 step "shellcheck" shellcheck
 step "ruff" ruff
 step "unit tests" unit_tests
+step "JavaScript tests" javascript_tests
 step "changelog entries" python3 scripts/changelog.py next ai/homelab-plugin/plugin.json
 step "compose configs (every profile, none, GPU overlay)" compose_configs
 step "secrets (gitleaks)" secrets

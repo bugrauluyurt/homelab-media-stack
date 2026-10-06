@@ -210,14 +210,17 @@ In the tables below, **Required** is *yes* when the core stack or a core script 
 | <a id="sabnzbd_password"></a>`SABNZBD_PASSWORD` | no | empty | Its password. | `configure-sabnzbd.py` |
 | <a id="sabnzbd_api_key"></a>`SABNZBD_API_KEY` | filled by a script | empty | SABnzbd's API key, copied by `configure-sabnzbd.py`. | homepage, glance; `configure-questarr.py`, `configure-jellydash.py` |
 
-### Subtitle providers (Bazarr)
+### Subtitle providers (Bazarr and Jellyfin)
 
-Each provider is enabled only when its keys are filled; re-run `configure-bazarr.py` after changing them.
+Each provider is enabled only when its keys are filled. Re-run `configure-bazarr.py` after changing
+them, and `configure-jellyfin-plugins.py` after changing `OPENSUBTITLES_USER` or `OPENSUBTITLES_PASS`.
+Both Open Subtitles credentials are needed for Jellyfin's plugin; Bazarr and Jellyfin share the
+account's download limits.
 
 | Key | Required | Default | What it does | Read by |
 |---|---|---|---|---|
-| <a id="opensubtitles_user"></a>`OPENSUBTITLES_USER` | no | empty | opensubtitles.com account (the free tier is enough), the biggest subtitle source. | `configure-bazarr.py` |
-| <a id="opensubtitles_pass"></a>`OPENSUBTITLES_PASS` | no | empty | Its password. | `configure-bazarr.py` |
+| <a id="opensubtitles_user"></a>`OPENSUBTITLES_USER` | no | empty | opensubtitles.com account for Bazarr and Jellyfin's official Open Subtitles plugin. | `configure-bazarr.py`, `configure-jellyfin-plugins.py` |
+| <a id="opensubtitles_pass"></a>`OPENSUBTITLES_PASS` | no | empty | Its password, shared by Bazarr and Jellyfin. | `configure-bazarr.py`, `configure-jellyfin-plugins.py` |
 | <a id="subsource_api_key"></a>`SUBSOURCE_API_KEY` | no | empty | SubSource API key (subsource.net, profile). | `configure-bazarr.py` |
 
 ### Jellyfin Enhanced extras

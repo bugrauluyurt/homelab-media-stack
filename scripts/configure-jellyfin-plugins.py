@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Set up Jellyfin's plugins and look: the Abyss theme, Home Screen Sections and
-Jellyfin Enhanced. Abyss's Spotlight banner comes from apps/jellyfin/custom-cont-init.d.
+"""Set up Jellyfin's plugins and look: the Abyss theme, Home Screen Sections,
+Jellyfin Enhanced and Open Subtitles. Abyss's Spotlight banner comes from apps/jellyfin/custom-cont-init.d.
 With HWACCEL in .env (and compose.gpu.yml), also hardware transcoding.
 
-Runs: by hand, after configure-seerr.py; again after changing TMDB_API_KEY, MDBLIST_API_KEY or
-  HWACCEL.
-Changes: Jellyfin API; docker restart jellyfin only when a plugin was added or removed or is not yet
-  active.
+Runs: by hand, after configure-seerr.py; again after changing TMDB_API_KEY, MDBLIST_API_KEY,
+  OPENSUBTITLES_USER, OPENSUBTITLES_PASS or HWACCEL.
+Changes: Jellyfin API and viewer subtitle permissions; docker restart jellyfin only when a plugin
+  was added or removed or is not yet active.
 Idempotent: yes.
 """
 import subprocess
@@ -36,6 +36,13 @@ PLUGINS = {"File Transformation": ("5e87cc92-571a-4d8d-8d98-d2d4147f9f90", "IAmP
            "TMDb Box Sets": ("bc4aad2e-d3d0-4725-a5e2-fd07949e5b42", "Jellyfin Stable"),
            "Fanart": ("170a157f-ac6c-437a-abdd-ca9c25cebd39", "Jellyfin Stable"),
            "Trakt": ("4fe3201e-d6ae-4f2e-8917-e12bda571281", "Jellyfin Stable")}
+
+SUBTITLE_CREDENTIALS = {"Username": ENV.get("OPENSUBTITLES_USER", ""),
+                        "Password": ENV.get("OPENSUBTITLES_PASS", "")}
+
+if all(SUBTITLE_CREDENTIALS.values()):
+    PLUGINS["Open Subtitles"] = ("4b9ed42f-5185-48b5-9803-6ff2989014c4", "Jellyfin Stable")
+
 UNWANTED = {"SeerrFin": "c8e4f2a19b3d4e7fa6c21d5e8f0a3b7c", "Intro Skipper": "c83d86bba1e04c35a113e2101cf4ee6b"}
 UNWANTED_REPOS = {"https://raw.githubusercontent.com/varunaditya-plus/SeerrFin/main/manifest.json",
                   "https://intro-skipper.org/manifest.json"}
@@ -143,11 +150,33 @@ def configure(name, overrides):
     cfg = req(path)
     wanted = {**cfg, **{k: {**cfg[k], **v} if isinstance(v, dict) else v for k, v in overrides.items()}}
 
+    if name == "Open Subtitles" and any(cfg.get(credential_name) != credential_value
+                                        for credential_name, credential_value in overrides.items()):
+        wanted["CredentialsInvalid"] = False
+
     if wanted == cfg:
         print(f"  = {name} already configured")
     else:
         req(path, wanted)
         print(f"  + configured {name}")
+
+
+if "Open Subtitles" in PLUGINS:
+    configure("Open Subtitles", SUBTITLE_CREDENTIALS)
+
+    for viewer_user in req("/Users"):
+        viewer_policy = viewer_user["Policy"]
+
+        if viewer_policy.get("IsAdministrator") or viewer_policy.get("IsDisabled"):
+            continue
+
+        if viewer_policy.get("EnableSubtitleManagement"):
+            print(f"  = subtitle permissions for '{viewer_user['Name']}'")
+        else:
+            req(f"/Users/{viewer_user['Id']}/Policy", {**viewer_policy, "EnableSubtitleManagement": True})
+            print(f"  + subtitle permissions for '{viewer_user['Name']}'")
+else:
+    print("  ~ Open Subtitles skipped (set OPENSUBTITLES_USER and OPENSUBTITLES_PASS in .env)")
 
 
 libraries = {f["CollectionType"]: f["ItemId"] for f in req("/Library/VirtualFolders")}

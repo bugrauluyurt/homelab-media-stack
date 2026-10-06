@@ -226,7 +226,8 @@ the script named here.
 | Key | Enables | Script |
 |---|---|---|
 | [`USENET_HOST`](reference/configuration.md#usenet_host) and the other `USENET_*`, [`NZBGEEK_API_KEY`](reference/configuration.md#nzbgeek_api_key) or [`NZBFINDER_API_KEY`](reference/configuration.md#nzbfinder_api_key) | A Usenet provider and indexer, preferred over torrents | `configure-sabnzbd.py`, `configure-arr.py` |
-| [`OPENSUBTITLES_USER`](reference/configuration.md#opensubtitles_user) and `_PASS`, [`SUBSOURCE_API_KEY`](reference/configuration.md#subsource_api_key) | Subtitle sources for Bazarr (OpenSubtitles' free tier allows about 20 downloads a day) | `configure-bazarr.py` |
+| [`OPENSUBTITLES_USER`](reference/configuration.md#opensubtitles_user) and `_PASS` | Open Subtitles for Bazarr's automatic downloads and Jellyfin's viewer search and downloads; both share the account's limits | `configure-bazarr.py`, `configure-jellyfin-plugins.py` |
+| [`SUBSOURCE_API_KEY`](reference/configuration.md#subsource_api_key) | Another subtitle source for Bazarr | `configure-bazarr.py` |
 | [`TMDB_API_KEY`](reference/configuration.md#tmdb_api_key), [`MDBLIST_API_KEY`](reference/configuration.md#mdblist_api_key) | Reviews, "where to stream" and ratings in Jellyfin | `configure-jellyfin-plugins.py` |
 | [`IGDB_CLIENT_ID`](reference/configuration.md#igdb_client_id) and `_SECRET` | Game search and covers in Questarr | `configure-questarr.py` |
 | [`SPOTIFY_CLIENT_ID`](reference/configuration.md#spotify_client_id) and `_SECRET`, [`NEEDLE_PUBLIC_URL`](reference/configuration.md#needle_public_url) | Spotify in Needle | recreate `needle` |
