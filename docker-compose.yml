@@ -396,6 +396,63 @@ services:
       - ${DATA_ROOT}/soulseek/downloads:/soulseek
       - ${DATA_ROOT}/media/singles:/singles
 
+  # ---- books profile: search/request and a separately owned ebook library ----
+
+  shelfmark:
+    <<: *common
+    image: ghcr.io/calibrain/shelfmark:v1.4.0
+    container_name: shelfmark
+    profiles: [books]
+    mem_limit: 2g
+    ports: ["127.0.0.1:8084:8084"]
+    environment:
+      <<: *common-env
+      AUTH_METHOD: builtin
+      OPENLIBRARY_ENABLED: "true"
+      METADATA_PROVIDER: openlibrary
+      INGEST_DIR: /books
+      PROWLARR_ENABLED: "true"
+      PROWLARR_URL: http://prowlarr:9696
+      PROWLARR_API_KEY: ${PROWLARR_API_KEY:-}
+      PROWLARR_TORRENT_CLIENT: qbittorrent
+      QBITTORRENT_URL: http://gluetun:8080
+      QBITTORRENT_CATEGORY: books
+      QBITTORRENT_DOWNLOAD_DIR: /data/torrents/books
+      PROWLARR_TORRENT_ACTION: keep
+      HARDLINK_TORRENTS: "false"
+      PROWLARR_USENET_CLIENT: sabnzbd
+      SABNZBD_URL: http://sabnzbd:8080
+      SABNZBD_API_KEY: ${SABNZBD_API_KEY:-}
+      SABNZBD_CATEGORY: books
+      PROWLARR_USENET_ACTION: copy
+      LIBRARY_CHECK_CALIBRE_ENABLED: "true"
+      CALIBRE_LIBRARY_DB_PATH: /calibre-library/metadata.db
+    healthcheck:
+      <<: *hc
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8084/api/health"]
+    volumes:
+      - ${CONFIG_ROOT}/shelfmark:/config
+      - {type: bind, source: "${DATA_ROOT}/books/ingest", target: /books, bind: {create_host_path: false}}
+      - {type: bind, source: "${DATA_ROOT}/torrents/books", target: /data/torrents/books, read_only: true, bind: {create_host_path: false}}
+      - {type: bind, source: "${DATA_ROOT}/usenet/complete/books", target: /data/usenet/complete/books, read_only: true, bind: {create_host_path: false}}
+      - {type: bind, source: "${DATA_ROOT}/media/books", target: /calibre-library, read_only: true, bind: {create_host_path: false}}
+
+  calibre-web-automated:
+    <<: *common
+    image: crocodilestick/calibre-web-automated:v4.0.8
+    container_name: calibre-web-automated
+    profiles: [books]
+    mem_limit: 2g
+    ports: ["127.0.0.1:8083:8083"]
+    environment: *common-env
+    healthcheck:
+      <<: *hc
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8083/login"]
+    volumes:
+      - ${CONFIG_ROOT}/calibre-web-automated:/config
+      - {type: bind, source: "${DATA_ROOT}/books/ingest", target: /cwa-book-ingest, bind: {create_host_path: false}}
+      - {type: bind, source: "${DATA_ROOT}/media/books", target: /calibre-library, bind: {create_host_path: false}}
+
   # ---- games profile: Questarr and the read-only SFTPGo download page ----
 
   questarr:

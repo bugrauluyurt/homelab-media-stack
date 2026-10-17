@@ -240,6 +240,7 @@ The stack is a core plus optional modules, each a Docker Compose profile. `COMPO
 |---|---|---|
 | core (always on) | gluetun, qbittorrent, sabnzbd, prowlarr, radarr, sonarr, bazarr, seerr, recyclarr, byparr, jellyfin, cleanuparr, socket-proxy | nothing |
 | `music` | slskd, lidarr, navidrome, needle | `configure-lidarr.py`, `configure-navidrome.py`, the Lidarr steps of `configure-arr.py`, the Navidrome and Needle steps of `viewer-add.py` |
+| `books` | shelfmark, calibre-web-automated | Manual first-run setup; see [books](../flows/books.md). |
 | `games` | questarr, sftpgo | `configure-questarr.py`, `configure-sftpgo.py`, the games login in `viewer-add.py` |
 | `dashboards` | homepage, glance, changedetection | `configure-glance.py`, `youtube-sync.py` (so `arr-youtube.timer` does nothing) |
 | `monitoring` | prometheus, node-exporter, scraparr, grafana, dozzle, uptime-kuma, scrutiny | `configure-dozzle.py`, `configure-uptime-kuma.py`, `configure-grafana-watch.py`, `configure-scraparr` |
