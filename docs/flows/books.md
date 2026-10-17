@@ -8,7 +8,7 @@ Both selected images publish arm64 and amd64 variants.
 ## Boundaries
 
 - Shelfmark searches existing Prowlarr indexers. It sends torrents to
-  `gluetun:8080` and Usenet jobs to `sabnzbd:8085`. Do not add an embedded torrent
+  `gluetun:8080` and Usenet jobs to `sabnzbd:8080`. Do not add an embedded torrent
   client or bypass gluetun. No second VPN is needed.
 - Both web ports bind to loopback only: Shelfmark 8084, CWA 8083. First configure
   authentication over an SSH tunnel. Publish through Tailscale Serve only after

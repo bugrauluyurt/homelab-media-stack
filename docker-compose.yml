@@ -408,6 +408,8 @@ services:
     environment:
       <<: *common-env
       AUTH_METHOD: builtin
+      OPENLIBRARY_ENABLED: "true"
+      METADATA_PROVIDER: openlibrary
       INGEST_DIR: /books
       PROWLARR_ENABLED: "true"
       PROWLARR_URL: http://prowlarr:9696
@@ -419,7 +421,7 @@ services:
       PROWLARR_TORRENT_ACTION: keep
       HARDLINK_TORRENTS: "false"
       PROWLARR_USENET_CLIENT: sabnzbd
-      SABNZBD_URL: http://sabnzbd:8085
+      SABNZBD_URL: http://sabnzbd:8080
       SABNZBD_API_KEY: ${SABNZBD_API_KEY:-}
       SABNZBD_CATEGORY: books
       PROWLARR_USENET_ACTION: copy

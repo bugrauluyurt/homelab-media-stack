@@ -33,10 +33,13 @@ class BooksComposeTests(unittest.TestCase):
             self.assertTrue(all(p['host_ip'] == '127.0.0.1' for p in service['ports']))
             self.assertNotIn(':latest', service['image'])
         self.assertEqual(self.services['shelfmark']['environment']['AUTH_METHOD'], 'builtin')
+        self.assertEqual(self.services['shelfmark']['environment']['OPENLIBRARY_ENABLED'], 'true')
+        self.assertEqual(self.services['shelfmark']['environment']['METADATA_PROVIDER'], 'openlibrary')
 
     def test_downloader_boundary_and_non_destructive_import(self):
         env = self.services['shelfmark']['environment']
         self.assertEqual(env['QBITTORRENT_URL'], 'http://gluetun:8080')
+        self.assertEqual(env['SABNZBD_URL'], 'http://sabnzbd:8080')
         self.assertEqual(env['PROWLARR_TORRENT_ACTION'], 'keep')
         self.assertEqual(env['PROWLARR_USENET_ACTION'], 'copy')
         self.assertEqual(env['HARDLINK_TORRENTS'], 'false')
