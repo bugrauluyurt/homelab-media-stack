@@ -126,7 +126,7 @@ chk "backup key copy on the media drive" "! mountpoint -q '$STORAGE_MOUNT' || su
 chk "backup copy on the NVMe"          "sudo test -s /var/backups/arr-stack/restic/config"
 
 echo "SERVICES"
-for s in "prowlarr 9696" "radarr 7878" "sonarr 8989" "lidarr 8686" "bazarr 6767" "seerr 5055" "questarr 5000/api/health" "jellyfin 8096" "plex 32400" "navidrome 4533/ping" "needle 4535/api/health" "slskd 5030/health" "uptime-kuma 3003" "dozzle 8888/healthcheck" "jellydash 3004/healthz.php" "sabnzbd 8085" "sftpgo 8090/healthz" "scrutiny 3006/api/health" "changedetection 3007"; do
+for s in "prowlarr 9696" "radarr 7878" "sonarr 8989" "lidarr 8686" "bazarr 6767" "seerr 5055" "questarr 5000/api/health" "jellyfin 8096" "plex 32400" "navidrome 4533/ping" "needle 4535/api/health" "slskd 5030/health" "uptime-kuma 3003" "dozzle 8888/healthcheck" "jellydash 3004/healthz.php" "sabnzbd 8085" "sftpgo 8090/healthz" "scrutiny 3006/api/health" "changedetection 3007" "shelfmark 8084/api/health" "calibre-web-automated 8083/login"; do
   set -- $s
   service_enabled "$1" || continue
   chk "$1 responding on $2" "curl -sf -o /dev/null --max-time 8 http://127.0.0.1:$2"

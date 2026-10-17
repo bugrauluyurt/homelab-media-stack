@@ -1,0 +1,1 @@
+- Add an optional ebooks profile with Shelfmark Lite and Calibre-Web Automated, loopback-only setup, existing Prowlarr/download-client integration, isolated ingest and library mounts, endpoint health checks, and consistent Calibre catalogue backups. First-run accounts and Tailscale publication require explicit setup.

@@ -126,6 +126,14 @@ flowchart TB
   without credentials, `GET /v1/portforward`, so Uptime Kuma can alert on a lost forwarded
   port.
 
+## Books module
+
+The optional `books` profile adds Shelfmark Lite for search/requests and Calibre-Web
+Automated for the library and reader. Both publish loopback-only ports until configured
+behind Tailscale Serve. Shelfmark reuses Prowlarr, SABnzbd and VPN-bound qBittorrent;
+only completed copies enter CWA's consuming ingest folder. See [books](flows/books.md)
+for first-run authentication, storage ownership, backups and deployment checks.
+
 ## The VPN boundary
 
 The boundary is a network namespace, not a setting inside each app. gluetun owns the
