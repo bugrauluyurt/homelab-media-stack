@@ -1,3 +1,4 @@
+import copy
 import json
 import os
 import runpy
@@ -47,11 +48,28 @@ class BooksComposeTests(unittest.TestCase):
         mounts = {v['target']: v for v in self.services['shelfmark']['volumes']}
         for target in ['/data/torrents/books', '/data/usenet/complete/books', '/calibre-library']:
             self.assertTrue(mounts[target]['read_only'])
-            self.assertFalse(mounts[target]['bind']['create_host_path'])
+            self.assertFalse(mounts[target]['bind'].get('create_host_path', False))
         cwa = {v['target']: v for v in self.services['calibre-web-automated']['volumes']}
         self.assertEqual(cwa['/cwa-book-ingest']['source'], mounts['/books']['source'])
         self.assertNotEqual(cwa['/cwa-book-ingest']['source'], mounts['/data/torrents/books']['source'])
         self.assertEqual(set(cwa), {'/config', '/cwa-book-ingest', '/calibre-library'})
+
+    def test_bind_serialization_preserves_fail_closed_assertion(self):
+        for value in [False, None, True]:
+            with self.subTest(create_host_path=value):
+                services = copy.deepcopy(self.services)
+                for mount in services['shelfmark']['volumes']:
+                    if mount['target'] in ['/data/torrents/books', '/data/usenet/complete/books', '/calibre-library']:
+                        if value is None:
+                            mount['bind'].pop('create_host_path', None)
+                        else:
+                            mount['bind']['create_host_path'] = value
+                with patch.object(self, 'services', services):
+                    if value is True:
+                        with self.assertRaises(AssertionError):
+                            self.test_downloader_boundary_and_non_destructive_import()
+                    else:
+                        self.test_downloader_boundary_and_non_destructive_import()
 
 
 class BooksBackupTests(unittest.TestCase):
