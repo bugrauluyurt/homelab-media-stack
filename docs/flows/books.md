@@ -1,6 +1,6 @@
 # Books
 
-The optional `books` profile pairs Shelfmark Lite (search and requests) with
+The optional `books` profile pairs Shelfmark (search and requests) with
 Calibre-Web Automated (CWA, library and reader). Images are pinned to explicit
 release versions, not floating `latest`; validate a new version before changing the pins.
 Both selected images publish arm64 and amd64 variants.
@@ -20,9 +20,10 @@ Both selected images publish arm64 and amd64 variants.
 - CWA owns the library and consumes/deletes ingest files after processing. Never
   mount original downloads as its ingest folder. Neither app can modify movies,
   music, games or other download categories.
-- Shelfmark Lite omits its bundled browser. Prowlarr uses the stack's existing
-  indexer/proxy configuration. Direct sources requiring a browser are not part
-  of this setup. Availability depends on the configured indexers.
+- The standard Shelfmark image includes its bundled browser and has a 2 GiB
+  memory limit. Prowlarr still uses the stack's existing indexer/proxy
+  configuration. Direct sources are optional and require separate configuration;
+  switching images does not enable them. Availability depends on configured sources.
 
 ## Storage
 

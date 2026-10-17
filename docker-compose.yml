@@ -400,10 +400,10 @@ services:
 
   shelfmark:
     <<: *common
-    image: ghcr.io/calibrain/shelfmark-lite:v1.4.0
+    image: ghcr.io/calibrain/shelfmark:v1.4.0
     container_name: shelfmark
     profiles: [books]
-    mem_limit: 1g
+    mem_limit: 2g
     ports: ["127.0.0.1:8084:8084"]
     environment:
       <<: *common-env

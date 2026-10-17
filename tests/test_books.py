@@ -37,6 +37,11 @@ class BooksComposeTests(unittest.TestCase):
         self.assertEqual(self.services['shelfmark']['environment']['OPENLIBRARY_ENABLED'], 'true')
         self.assertEqual(self.services['shelfmark']['environment']['METADATA_PROVIDER'], 'openlibrary')
 
+    def test_standard_image_has_browser_memory_budget(self):
+        service = self.services['shelfmark']
+        self.assertEqual(service['image'], 'ghcr.io/calibrain/shelfmark:v1.4.0')
+        self.assertGreaterEqual(int(service['mem_limit']), 2 * 1024 ** 3)
+
     def test_downloader_boundary_and_non_destructive_import(self):
         env = self.services['shelfmark']['environment']
         self.assertEqual(env['QBITTORRENT_URL'], 'http://gluetun:8080')

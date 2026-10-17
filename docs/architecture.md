@@ -128,7 +128,7 @@ flowchart TB
 
 ## Books module
 
-The optional `books` profile adds Shelfmark Lite for search/requests and Calibre-Web
+The optional `books` profile adds Shelfmark for search/requests and Calibre-Web
 Automated for the library and reader. Both publish loopback-only ports until configured
 behind Tailscale Serve. Shelfmark reuses Prowlarr, SABnzbd and VPN-bound qBittorrent;
 only completed copies enter CWA's consuming ingest folder. See [books](flows/books.md)
