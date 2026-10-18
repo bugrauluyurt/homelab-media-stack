@@ -499,14 +499,14 @@ One-shot status of the whole stack, grouped as STORAGE, HARDWARE (only where `vc
 | Media drive SMART | health not passed, any reallocated, pending or uncorrectable sector (NVMe: media errors), or 55 C or hotter |
 | Raspberry Pi | under-voltage, frequency cap, throttling or soft temperature limit right now, or the SoC at 80 C or hotter |
 | Backups | the last backup is 48 hours old or more, or a restic copy or the key file is missing (drive checks pass while the drive is off) |
-| Units | a timer or `arr-stack.service` isn't enabled, or any systemd unit has failed |
+| Units | a timer or `arr-stack.service` isn't enabled, or any systemd unit other than `arr-health.service` has failed (the checker evaluates current conditions instead of counting its own retained failure) |
 | Firewall | a chain isn't hooked, a port other than the firewall's `home-ports` is open to the home network, or SSH is |
 | VPN | the exit country isn't in `VPN_COUNTRIES` or is the United States, or qBittorrent isn't bound to the tunnel on the forwarded port |
 | qBittorrent | the alternative download limit is under 1,000,000 bytes/s, or the upload cap differs from `downloads-throttle --upload-cap` |
 
 - **File:** [`scripts/stack-health`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/stack-health)
 - **Runs:** [`arr-health.timer`](systemd.md#arr-healthtimer) every 6 hours with `--notify`; [`stack-update`](#stack-update) after recreating containers; by hand (the `health` alias); the operational skills in `ai/homelab-plugin/skills/`.
-- **Flags:** `--notify` also pushes the names of the failing checks to ntfy.
+- **Flags:** `--notify` pushes failing checks to ntfy and remembers the incident in `$STATE/health-failed`. The next successful notifying run sends one recovered message and clears the marker. Failed delivery retains the marker for the next notifying run; no topic configured means notifications are disabled. Notification state updates are locked. Manual checks without `--notify` neither create nor consume this state. The systemd service retries failed checks after five minutes, bounded to four starts per hour; the six-hour timer remains the fallback.
 - **Calls:** [`host-firewall`](#host-firewall) `home-ports`, [`downloads-throttle`](#downloads-throttle) `--upload-cap`, [`cleanuparr-state`](#cleanuparr-state), [`indexers-check`](#indexers-check).
 - **Root:** sudo (smartctl, iptables, `sshd -T`, the backup files).
 - **Changes:** not read-only: it creates and removes a hardlink test file in `$DATA_ROOT/torrents/movies` and `$DATA_ROOT/media/movies`, and starts throwaway `curlimages/curl` containers on the `arr` network. Don't run it during a look-only investigation.

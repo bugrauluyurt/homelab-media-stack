@@ -13,8 +13,33 @@ STATE_ROOT="$(dirname "$CONFIG_ROOT")/state"
 # notify TITLE TAGS BODY: push to the ntfy channel, if one is configured.
 notify() {
   [ -n "${NTFY_TOPIC:-}" ] || return 0
-  curl -s -o /dev/null --max-time 15 -H "Title: $1" -H "Tags: $2" -d "$3" "${NTFY_SERVER:-https://ntfy.sh}/$NTFY_TOPIC"
+  curl -fsS -o /dev/null --max-time 15 -H "Title: $1" -H "Tags: $2" -d "$3" "${NTFY_SERVER:-https://ntfy.sh}/$NTFY_TOPIC"
 }
+
+# Ignore only our checker's retained failure, never failures from the apps or other jobs.
+health_units_ok() {
+  local units
+  units=$(systemctl --failed --plain --no-legend --no-pager) || return 1
+  awk 'NF && $1 != "arr-health.service" { bad=1 } END { exit bad }' <<< "$units"
+}
+
+# Persist a failed check until a notifying run confirms recovery; manual checks do not consume it.
+health_notify() (
+  local failures=$1 passed=$2 marker="$STATE_ROOT/health-failed"
+  shift 2
+  mkdir -p "$STATE_ROOT" || return 1
+  exec 9>"$STATE_ROOT/health-notify.lock"
+  flock -x 9 || return 1
+  if [ "$failures" -gt 0 ]; then
+    touch "$marker" || return 1
+    notify "media stack: $failures health check(s) failing" warning "$(printf '%s\n' "$@")
+
+Run scripts/stack-health for details."
+  elif [ -f "$marker" ]; then
+    notify "media stack: recovered" white_check_mark "$passed health checks passed; no failures remain." || return 1
+    rm -f "$marker"
+  fi
+)
 
 # Pending image updates for node-exporter's textfile collector, renamed into place so a scrape never sees half a file.
 write_update_metrics() {
