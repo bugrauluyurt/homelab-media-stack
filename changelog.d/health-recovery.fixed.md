@@ -1,1 +1,0 @@
-- Retry failed scheduled health checks after five minutes with a bounded retry budget, ignore the checker's own retained failed status without hiding other unit failures, and send a recovery notification when a subsequent notifying check passes.

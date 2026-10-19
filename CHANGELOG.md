@@ -7,6 +7,12 @@ a minor version adds features, and a patch fixes bugs. A change records its entr
 next version, and merging the release pull request writes the entries here and publishes it
 ([how releases work](docs/operations/releasing.md)).
 
+## 3.4.1 - 2026-10-19
+
+### Fixed
+- Retry failed scheduled health checks after five minutes with a bounded retry budget, ignore the checker's own retained failed status without hiding other unit failures, and send a recovery notification when a subsequent notifying check passes.
+- Let Meeting mode confirm stopped transfers when qBittorrent retains missing-file entries with zero transfer speeds, without resuming those entries or hiding active transfers and API errors.
+
 ## 3.4.0 - 2026-10-17
 
 ### Added
