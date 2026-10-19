@@ -7,6 +7,11 @@ a minor version adds features, and a patch fixes bugs. A change records its entr
 next version, and merging the release pull request writes the entries here and publishes it
 ([how releases work](docs/operations/releasing.md)).
 
+## 3.4.0 - 2026-10-17
+
+### Added
+- Add an optional ebooks profile with standard Shelfmark (including its bundled browser) and Calibre-Web Automated, loopback-only setup, existing Prowlarr/download-client integration, isolated ingest and library mounts, endpoint health checks, and consistent Calibre catalogue backups. First-run accounts and Tailscale publication require explicit setup.
+
 ## 3.3.0 - 2026-10-06
 
 ### Added

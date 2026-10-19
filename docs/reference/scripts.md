@@ -462,6 +462,7 @@ Backs up the stack's settings (never media) with restic. It stages:
 - `$CONFIG_ROOT`, including the imported `gluetun/verified-servers` pool, skipping what the apps rebuild or fetch again (logs, caches, transcodes, the apps' own backup folders, crash reports, codecs, media metadata and artwork, Python venvs, Grafana plugins, Recyclarr resources, Scrutiny's InfluxDB, gluetun's default `servers` cache, Jellystat's Postgres folder, Jellyfin's extracted subtitles), sockets, log files and live database side files, and copying every SQLite database through SQLite's online backup API;
 - `.env`, the stack user's `~/.config/managarr` and `~/.config/qbt-tui`, and `$STATE`;
 - a `pg_dump` of Jellystat's database when the stats module is on;
+- the Calibre catalogue at `$DATA_ROOT/media/books/metadata.db` through SQLite's online backup API when the books module is on (book files remain excluded);
 - the hand-made host files `/etc/fstab`, `/boot/firmware/cmdline.txt`, `/etc/docker/daemon.json`, `/etc/avahi/avahi-daemon.conf` and the stack user's `~/.ssh/authorized_keys`.
 
 It backs this up to `$STORAGE_MOUNT/backups/restic` (tag `arr-stack`, host `HOST_NAME`), prunes it (7 daily, 4 weekly, 6 monthly; the last 5 `pre-update` snapshots kept apart), copies it to a second repository on the system disk (`/var/backups/arr-stack/restic`), on Sundays reads back 5% of the data in both repositories, copies it offsite when `RESTIC_OFFSITE_REPO` is set, and records the time in `/var/lib/arr-backup/last-success` and the Prometheus metric `arr_backup_last_success_timestamp_seconds`. It also keeps `RESTIC_PASSWORD` in `$STORAGE_MOUNT/backups/RESTIC_PASSWORD` (mode 600). It does nothing when the drive isn't mounted. [Backups](../flows/backups.md) covers restoring.
@@ -498,14 +499,14 @@ One-shot status of the whole stack, grouped as STORAGE, HARDWARE (only where `vc
 | Media drive SMART | health not passed, any reallocated, pending or uncorrectable sector (NVMe: media errors), or 55 C or hotter |
 | Raspberry Pi | under-voltage, frequency cap, throttling or soft temperature limit right now, or the SoC at 80 C or hotter |
 | Backups | the last backup is 48 hours old or more, or a restic copy or the key file is missing (drive checks pass while the drive is off) |
-| Units | a timer or `arr-stack.service` isn't enabled, or any systemd unit has failed |
+| Units | a timer or `arr-stack.service` isn't enabled, or any systemd unit other than `arr-health.service` has failed (the checker evaluates current conditions instead of counting its own retained failure) |
 | Firewall | a chain isn't hooked, a port other than the firewall's `home-ports` is open to the home network, or SSH is |
 | VPN | the exit country isn't in `VPN_COUNTRIES` or is the United States, or qBittorrent isn't bound to the tunnel on the forwarded port |
 | qBittorrent | the alternative download limit is under 1,000,000 bytes/s, or the upload cap differs from `downloads-throttle --upload-cap` |
 
 - **File:** [`scripts/stack-health`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/stack-health)
 - **Runs:** [`arr-health.timer`](systemd.md#arr-healthtimer) every 6 hours with `--notify`; [`stack-update`](#stack-update) after recreating containers; by hand (the `health` alias); the operational skills in `ai/homelab-plugin/skills/`.
-- **Flags:** `--notify` also pushes the names of the failing checks to ntfy.
+- **Flags:** `--notify` pushes failing checks to ntfy and remembers the incident in `$STATE/health-failed`. The next successful notifying run sends one recovered message and clears the marker. Failed delivery retains the marker for the next notifying run; no topic configured means notifications are disabled. Notification state updates are locked. Manual checks without `--notify` neither create nor consume this state. The systemd service retries failed checks after five minutes, bounded to four starts per hour; the six-hour timer remains the fallback.
 - **Calls:** [`host-firewall`](#host-firewall) `home-ports`, [`downloads-throttle`](#downloads-throttle) `--upload-cap`, [`cleanuparr-state`](#cleanuparr-state), [`indexers-check`](#indexers-check).
 - **Root:** sudo (smartctl, iptables, `sshd -T`, the backup files).
 - **Changes:** not read-only: it creates and removes a hardlink test file in `$DATA_ROOT/torrents/movies` and `$DATA_ROOT/media/movies`, and starts throwaway `curlimages/curl` containers on the `arr` network. Don't run it during a look-only investigation.
@@ -744,6 +745,11 @@ No API credentials are sent to the browser.
 Meeting mode stops all torrents and repeats the check every two seconds. New torrents
 explicitly started by an API client can briefly transfer before the next check. The UI
 confirms pause only after checking every torrent; unreachable qBittorrent shows an error.
+A `missingFiles` torrent counts as inactive only when both reported transfer speeds are
+zero. Missing or nonzero speed data stays unconfirmed; other active or unknown states
+are not treated as stopped merely because their speeds are zero. Missing-file torrents
+are removed from the resume journal (including older journals) and excluded when resuming,
+so toggling Meeting mode does not start broken entries.
 The service retries automatically and persists intent through a reboot. It does not stop
 Soulseek, Usenet, streaming or other devices' traffic, and is not a VPN kill switch.
 

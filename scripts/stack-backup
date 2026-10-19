@@ -178,6 +178,12 @@ def main(extra_tags):
     try:
         dbs = stage_tree(CONFIG, STAGE / "config")
 
+        # Calibre keeps its catalogue beside books, outside CONFIG_ROOT.
+        catalogue = Path(ENV["DATA_ROOT"]) / "media/books/metadata.db"
+        if "calibre-web-automated" in enabled_services() and catalogue.is_file():
+            snapshot_db(catalogue, STAGE / "books/metadata.db")
+            dbs += 1
+
         for extra in EXTRA:
             if extra.is_dir():
                 dbs += stage_tree(extra, STAGE / "home" / extra.name)

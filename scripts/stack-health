@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # One-shot status of the whole stack. Safe to run any time, but not read-only:
 # it writes a hardlink test file on the drive and starts throwaway curl containers.
-# --notify: also push the failures to ntfy (the arr-health timer uses this).
+# --notify: push failures and subsequent recovery to ntfy (the arr-health timer uses this).
 # Runs: arr-health.timer every 6 hours with --notify; stack-update after recreating containers; by
 #   hand (the health alias); the operational skills in ai/homelab-plugin/skills/.
 # Changes: not read-only: it creates and removes a hardlink test file in $DATA_ROOT/torrents/movies
 #   and $DATA_ROOT/media/movies, and starts throwaway curlimages/curl containers on the arr network.
+#   With --notify, also persists recovery state in $STATE_ROOT/health-failed.
 #   Don't run it during a look-only investigation.
 # Idempotent: yes.
 
@@ -65,7 +66,7 @@ for t in arr-backup arr-updates arr-port-sync arr-health arr-watch arr-throttle 
   [ "$t" = arr-youtube ] && ! service_enabled glance && continue
   chk "$t.timer enabled"               "systemctl is-enabled -q $t.timer"
 done
-chk "no failed systemd units"            "[ -z \"\$(systemctl --failed --no-legend)\" ]"
+chk "no failed systemd units"            "health_units_ok"
 # After a script rename the installed units keep the old path until host-install re-runs.
 chk "installed units run existing scripts" "! sed -n 's/^ExecStart=//p' /etc/systemd/system/arr-*.service | awk '{print \$1}' | grep '^/' | xargs -r -n1 sh -c 'test -x \"\$0\" || echo \"\$0\"' | grep -q ."
 # Docker creates a missing bind source as an empty root-owned folder, and the app starts unconfigured.
@@ -126,7 +127,7 @@ chk "backup key copy on the media drive" "! mountpoint -q '$STORAGE_MOUNT' || su
 chk "backup copy on the NVMe"          "sudo test -s /var/backups/arr-stack/restic/config"
 
 echo "SERVICES"
-for s in "prowlarr 9696" "radarr 7878" "sonarr 8989" "lidarr 8686" "bazarr 6767" "seerr 5055" "questarr 5000/api/health" "jellyfin 8096" "plex 32400" "navidrome 4533/ping" "needle 4535/api/health" "slskd 5030/health" "uptime-kuma 3003" "dozzle 8888/healthcheck" "jellydash 3004/healthz.php" "sabnzbd 8085" "sftpgo 8090/healthz" "scrutiny 3006/api/health" "changedetection 3007"; do
+for s in "prowlarr 9696" "radarr 7878" "sonarr 8989" "lidarr 8686" "bazarr 6767" "seerr 5055" "questarr 5000/api/health" "jellyfin 8096" "plex 32400" "navidrome 4533/ping" "needle 4535/api/health" "slskd 5030/health" "uptime-kuma 3003" "dozzle 8888/healthcheck" "jellydash 3004/healthz.php" "sabnzbd 8085" "sftpgo 8090/healthz" "scrutiny 3006/api/health" "changedetection 3007" "shelfmark 8084/api/health" "calibre-web-automated 8083/login"; do
   set -- $s
   service_enabled "$1" || continue
   chk "$1 responding on $2" "curl -sf -o /dev/null --max-time 8 http://127.0.0.1:$2"
@@ -239,10 +240,8 @@ fi
 
 echo "  $pass passed, $fail failed"
 
-if [ "$fail" -gt 0 ] && [ "${1:-}" = "--notify" ]; then
-  notify "media stack: $fail health check(s) failing" warning "$(printf '%s\n' "${failed[@]}")
-
-Run scripts/stack-health for details."
+if [ "${1:-}" = "--notify" ]; then
+  health_notify "$fail" "$pass" "${failed[@]}" || echo "WARN: health notification/state update failed; retained recovery state will be retried."
 fi
 
 [ "$fail" -eq 0 ]
