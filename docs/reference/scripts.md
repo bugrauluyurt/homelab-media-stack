@@ -745,6 +745,11 @@ No API credentials are sent to the browser.
 Meeting mode stops all torrents and repeats the check every two seconds. New torrents
 explicitly started by an API client can briefly transfer before the next check. The UI
 confirms pause only after checking every torrent; unreachable qBittorrent shows an error.
+A `missingFiles` torrent counts as inactive only when both reported transfer speeds are
+zero. Missing or nonzero speed data stays unconfirmed; other active or unknown states
+are not treated as stopped merely because their speeds are zero. Missing-file torrents
+are removed from the resume journal (including older journals) and excluded when resuming,
+so toggling Meeting mode does not start broken entries.
 The service retries automatically and persists intent through a reboot. It does not stop
 Soulseek, Usenet, streaming or other devices' traffic, and is not a VPN kill switch.
 
