@@ -24,9 +24,11 @@ class MeetingTests(unittest.TestCase):
         self.pref = False
         self.now = 1000
         self.fail_stop = False
+        self.calls = []
         self.controller = module.Meeting(self.path, self.api, lambda: self.now)
 
     def api(self, path, form=None):
+        self.calls.append((path, form))
         if path == '/torrents/info':
             return [dict(t) for t in self.torrents]
         if path == '/app/preferences':
@@ -37,7 +39,7 @@ class MeetingTests(unittest.TestCase):
             if self.fail_stop:
                 raise OSError('offline')
             for torrent in self.torrents:
-                if not module.Meeting.stopped(torrent):
+                if not module.Meeting.stopped(torrent) and torrent['state'] != 'missingFiles':
                     torrent['state'] = 'stoppedUP'
         if path == '/torrents/start':
             for torrent in self.torrents:
@@ -108,6 +110,56 @@ class MeetingTests(unittest.TestCase):
         self.controller.reconcile()
         self.controller.change('off')
         self.assertEqual(self.torrents[-1]['state'], 'stoppedDL')
+
+    def test_missing_files_confirm_without_resuming_or_repeated_stops(self):
+        self.torrents.append({'hash': 'missing', 'state': 'missingFiles', 'dlspeed': 0, 'upspeed': 0})
+        self.controller.change('on')
+        self.assertTrue(self.controller.status()['confirmed'])
+        self.assertIsNone(self.controller.status()['error'])
+        self.assertEqual(self.controller.state['resume'], ['active'])
+        stops = sum(path == '/torrents/stop' for path, _ in self.calls)
+        self.controller.reconcile()
+        self.assertEqual(sum(path == '/torrents/stop' for path, _ in self.calls), stops)
+        self.controller.change('off')
+        self.assertEqual(self.torrents[-1]['state'], 'missingFiles')
+        self.assertEqual([form['hashes'] for path, form in self.calls if path == '/torrents/start'], ['active'])
+
+    def test_legacy_journal_drops_missing_files_and_keeps_mode_on(self):
+        self.controller.change('on')
+        self.torrents.append({'hash': 'missing', 'state': 'missingFiles', 'dlspeed': 0, 'upspeed': 0})
+        self.controller.state['resume'].append('missing')
+        self.controller.save()
+        restarted = module.Meeting(self.path, self.api, lambda: self.now)
+        restarted.reconcile()
+        self.assertTrue(restarted.status()['enabled'])
+        self.assertTrue(restarted.status()['confirmed'])
+        self.assertEqual(json.loads(self.path.read_text())['resume'], ['active'])
+        self.assertFalse(any(path == '/torrents/start' for path, _ in self.calls))
+
+    def test_legacy_off_phase_does_not_start_missing_files(self):
+        self.controller.change('on')
+        self.torrents.append({'hash': 'missing', 'state': 'missingFiles', 'dlspeed': 0, 'upspeed': 0})
+        self.controller.state['resume'].append('missing')
+        self.controller.state['phase'] = 'off'
+        self.controller.save()
+        restarted = module.Meeting(self.path, self.api, lambda: self.now)
+        restarted.reconcile()
+        self.assertIsNone(restarted.state)
+        self.assertEqual(self.torrents[-1]['state'], 'missingFiles')
+        self.assertEqual([form['hashes'] for path, form in self.calls if path == '/torrents/start'], ['active'])
+
+    def test_missing_files_with_unknown_or_nonzero_speed_remain_unconfirmed(self):
+        for rates in [{}, {'dlspeed': 1, 'upspeed': 0}, {'dlspeed': 0, 'upspeed': 1}]:
+            with self.subTest(rates=rates):
+                self.torrents = [{'hash': 'missing', 'state': 'missingFiles', **rates}]
+                self.controller.change('on')
+                self.assertFalse(self.controller.status()['confirmed'])
+                self.assertIsNotNone(self.controller.status()['error'])
+
+    def test_zero_speed_does_not_make_other_active_states_stopped(self):
+        for state in ['stalledUP', 'stalledDL', 'queuedDL', 'checkingDL', 'error', 'unknown']:
+            with self.subTest(state=state):
+                self.assertFalse(module.Meeting.stopped({'state': state, 'dlspeed': 0, 'upspeed': 0}))
 
 
 class ControlSecurityTests(unittest.TestCase):

@@ -48,7 +48,9 @@ class Meeting:
 
     @staticmethod
     def stopped(torrent):
-        return torrent['state'].startswith(('stopped', 'paused'))
+        return (torrent['state'].startswith(('stopped', 'paused'))
+                or (torrent['state'] == 'missingFiles'
+                    and torrent.get('dlspeed') == 0 and torrent.get('upspeed') == 0))
 
     def reconcile(self):
         with self.lock:
@@ -64,7 +66,9 @@ class Meeting:
                 if self.state['phase'] == 'on':
                     torrents = self.api('/torrents/info')
                     active = [t['hash'] for t in torrents if not self.stopped(t)]
-                    restore = set(self.state['resume']) | (set(active) - set(self.state['original_stopped']))
+                    unavailable = {t['hash'] for t in torrents if t['state'] == 'missingFiles'}
+                    # Also remove missing-file entries journaled by older controllers.
+                    restore = (set(self.state['resume']) | (set(active) - set(self.state['original_stopped']))) - unavailable
                     if self.state['resume'] != sorted(restore):
                         self.state['resume'] = sorted(restore)
                         self.save()
@@ -79,7 +83,10 @@ class Meeting:
                 else:
                     self.api('/app/setPreferences', {'json': json.dumps({'add_stopped_enabled': self.state['add_stopped']})})
                     if self.state['resume']:
-                        self.api('/torrents/start', {'hashes': '|'.join(self.state['resume'])})
+                        unavailable = {t['hash'] for t in self.api('/torrents/info') if t['state'] == 'missingFiles'}
+                        resume = [h for h in self.state['resume'] if h not in unavailable]
+                        if resume:
+                            self.api('/torrents/start', {'hashes': '|'.join(resume)})
                     self.state = None
                     self.save()
                     self.confirmed = True
