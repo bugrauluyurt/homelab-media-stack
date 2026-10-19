@@ -3,9 +3,14 @@ Description=Run the stack health check and push failures to ntfy
 # The whole stack is down while the drive is off; nothing to check then.
 ConditionPathIsMountPoint=@STORAGE_MOUNT@
 After=arr-stack.service
+# Initial check plus at most three retries; the six-hour timer starts a new window.
+StartLimitIntervalSec=1h
+StartLimitBurst=4
 
 [Service]
 Type=oneshot
+Restart=on-failure
+RestartSec=5min
 User=@STACK_USER@
 Group=@STACK_GROUP@
 ExecStart=@REPO@/scripts/stack-health --notify

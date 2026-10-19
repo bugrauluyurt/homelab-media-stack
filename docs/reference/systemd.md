@@ -160,7 +160,7 @@ Runs [`vpn-port-sync`](scripts.md#vpn-port-sync), which keeps qBittorrent on the
 
 ### arr-health.service
 
-Runs [`stack-health --notify`](scripts.md#stack-health), which pushes the names of failing checks to ntfy.
+Runs [`stack-health --notify`](scripts.md#stack-health), which pushes failing checks and a subsequent recovery to ntfy. Failed runs retry after five minutes, with at most four starts in one hour (initial run plus three retries). After that budget is exhausted, the next six-hour timer slot can try again. This retries diagnosis only; it does not restart apps or change VPN settings. A successful run clears systemd's failed status; an unmounted drive skips the run rather than claiming recovery.
 
 - **File:** [`host/systemd/arr-health.service`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/arr-health.service)
 - **Runs:** `@REPO@/scripts/stack-health --notify`, `Type=oneshot`.

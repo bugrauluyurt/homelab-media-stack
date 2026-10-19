@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # One-shot status of the whole stack. Safe to run any time, but not read-only:
 # it writes a hardlink test file on the drive and starts throwaway curl containers.
-# --notify: also push the failures to ntfy (the arr-health timer uses this).
+# --notify: push failures and subsequent recovery to ntfy (the arr-health timer uses this).
 # Runs: arr-health.timer every 6 hours with --notify; stack-update after recreating containers; by
 #   hand (the health alias); the operational skills in ai/homelab-plugin/skills/.
 # Changes: not read-only: it creates and removes a hardlink test file in $DATA_ROOT/torrents/movies
 #   and $DATA_ROOT/media/movies, and starts throwaway curlimages/curl containers on the arr network.
+#   With --notify, also persists recovery state in $STATE_ROOT/health-failed.
 #   Don't run it during a look-only investigation.
 # Idempotent: yes.
 
@@ -65,7 +66,7 @@ for t in arr-backup arr-updates arr-port-sync arr-health arr-watch arr-throttle 
   [ "$t" = arr-youtube ] && ! service_enabled glance && continue
   chk "$t.timer enabled"               "systemctl is-enabled -q $t.timer"
 done
-chk "no failed systemd units"            "[ -z \"\$(systemctl --failed --no-legend)\" ]"
+chk "no failed systemd units"            "health_units_ok"
 # After a script rename the installed units keep the old path until host-install re-runs.
 chk "installed units run existing scripts" "! sed -n 's/^ExecStart=//p' /etc/systemd/system/arr-*.service | awk '{print \$1}' | grep '^/' | xargs -r -n1 sh -c 'test -x \"\$0\" || echo \"\$0\"' | grep -q ."
 # Docker creates a missing bind source as an empty root-owned folder, and the app starts unconfigured.
@@ -239,10 +240,8 @@ fi
 
 echo "  $pass passed, $fail failed"
 
-if [ "$fail" -gt 0 ] && [ "${1:-}" = "--notify" ]; then
-  notify "media stack: $fail health check(s) failing" warning "$(printf '%s\n' "${failed[@]}")
-
-Run scripts/stack-health for details."
+if [ "${1:-}" = "--notify" ]; then
+  health_notify "$fail" "$pass" "${failed[@]}" || echo "WARN: health notification/state update failed; retained recovery state will be retried."
 fi
 
 [ "$fail" -eq 0 ]
