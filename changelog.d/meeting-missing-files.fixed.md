@@ -1,1 +1,0 @@
-- Let Meeting mode confirm stopped transfers when qBittorrent retains missing-file entries with zero transfer speeds, without resuming those entries or hiding active transfers and API errors.
