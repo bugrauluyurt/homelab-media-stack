@@ -400,7 +400,7 @@ services:
 
   shelfmark:
     <<: *common
-    image: ghcr.io/calibrain/shelfmark:v1.4.0
+    image: ghcr.io/calibrain/shelfmark:v1.5.0
     container_name: shelfmark
     profiles: [books]
     mem_limit: 2g
