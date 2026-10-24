@@ -39,7 +39,7 @@ class BooksComposeTests(unittest.TestCase):
 
     def test_standard_image_has_browser_memory_budget(self):
         service = self.services['shelfmark']
-        self.assertEqual(service['image'], 'ghcr.io/calibrain/shelfmark:v1.5.0')
+        self.assertEqual(service['image'], 'ghcr.io/calibrain/shelfmark:v1.5.1')
         self.assertGreaterEqual(int(service['mem_limit']), 2 * 1024 ** 3)
 
     def test_downloader_boundary_and_non_destructive_import(self):
