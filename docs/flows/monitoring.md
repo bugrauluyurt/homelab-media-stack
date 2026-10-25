@@ -49,9 +49,11 @@ flowchart LR
    | `updates.prom` | `arr_image_updates_available`, `arr_image_updates_checked_timestamp_seconds` | `stack-update-check` and `stack-update` ([Updates](updates.md)) |
    | `backup.prom` | `arr_backup_last_success_timestamp_seconds` | `stack-backup` ([Backups](backups.md)) |
    | `youtube.prom` | `arr_youtube_sync_timestamp_seconds` | `youtube-sync.py` (Glance's YouTube rows) |
+   | `mirror.prom` | `arr_mirror_last_success_timestamp_seconds` | `storage-mirror`, with a backup drive ([Backups](backups.md#the-media-mirror)) |
+   | `ups.prom` | `arr_ups_*`: power state, charge, runtime, load, voltages, transfers, thresholds | `ups-metrics`, with a UPS ([Power](power.md)) |
 
-   The update and backup files are written whole and renamed into place, so a scrape never sees
-   half a file.
+   The update, backup, mirror and UPS files are written whole and renamed into place, so a scrape
+   never sees half a file.
 2. **scraparr** reads Radarr, Sonarr, Prowlarr and Bazarr from one container. It cannot read
    environment variables in its YAML, so `scripts/configure-scraparr` fills the API keys from
    `.env` into `$CONFIG_ROOT/scraparr/config.yaml` (mode 600). The rendered file holds live keys,
@@ -62,12 +64,12 @@ flowchart LR
    network, and node-exporter, which runs on the host network so it sees the server's own
    traffic, at `host.docker.internal:9100`. Check collection at `http://<tailscale-ip>:9090/targets`: every row
    should be `UP`.
-4. **Grafana** gets its Prometheus datasource and six dashboards from `apps/grafana/` in the repository,
+4. **Grafana** gets its Prometheus datasource and seven dashboards from `apps/grafana/` in the repository,
    in the **Media Stack** folder. It re-reads `apps/grafana/dashboards/` every 60 seconds, so a new
    dashboard JSON appears without a restart. Edits made in the UI are allowed and survive, but for
    anything permanent export the JSON into `apps/grafana/dashboards/`.
-5. **Glance** queries Prometheus for its Lab page: disk space and growth, pending updates and the
-   age of the last backup.
+5. **Glance** queries Prometheus for its Lab page: disk space and growth, pending updates, the
+   age of the last backup and media mirror, and the UPS.
 
 ### The watching dashboard
 
@@ -149,7 +151,10 @@ module that is switched off are skipped. A few of the less obvious ones, and why
 | STORAGE | SMART health, no bad sectors, under 55 °C | Any reallocated, pending or uncorrectable sector means failure is approaching. A drive behind a USB bridge needs `smartctl -d sat` |
 | HARDWARE | Not throttled or under-voltage, SoC under 80 °C | Only where `vcgencmd` exists (a Raspberry Pi). The low four bits of `get_throttled` mean under-voltage, frequency capped, throttled or soft temperature limit, right now |
 | SYSTEMD | Every container has a memory limit | A container created while the memory cgroup was unavailable silently loses its limit, and compose won't recreate it later because its config is unchanged |
+| STORAGE | Backup drive mounted, read-only between mirrors | Only with `BACKUP_UUID` set. Read-only, nothing but `storage-mirror` can change the copy |
 | BACKUPS | Last backup under 48 hours old | Only while the drive is on, since it is powered by hand |
+| BACKUPS | Media mirrored in the last 48 hours | Only with `BACKUP_UUID` set, and while the media drive is on |
+| POWER | apcupsd running, the UPS answering it, on mains power | Only where `/etc/apcupsd/apcupsd.conf` exists. `COMMLOST` means a power cut would not shut the server down ([Power](power.md)) |
 | SERVICES | Jellyfin plugins all Active | A Jellyfin update can disable plugins built for an older version without anything else failing |
 | SERVICES | Radarr, Sonarr, Lidarr, Prowlarr report no errors | Errors each app raises about itself: unreachable indexers or download clients, missing root folders |
 | MONITORING | Homepage sees container status; the socket proxy refuses writes but allows log reads | Homepage's status dots go through the proxy; if it breaks, every tile shows "API error". Dozzle needs log reads |
@@ -207,6 +212,7 @@ and the `journalctl` command for the rest.
 | Unit | Job |
 |---|---|
 | `arr-backup.service` | The nightly backup ([Backups](backups.md)) |
+| `arr-mirror.service` | The nightly media mirror ([Backups](backups.md#the-media-mirror)) |
 | `arr-updates.service` | The daily update check ([Updates](updates.md)) |
 | `arr-firewall.service` | The host firewall ([Security](../security.md)) |
 | `arr-stack.service` | Starting the stack ([Storage and boot](storage-and-boot.md)) |
@@ -222,7 +228,8 @@ flowchart LR
     HC["stack-health --notify, every 6 h"] --> TOPIC
     WA["activity-watch, every minute"] --> TOPIC
     SP["vpn-port-sync, every 15 min"] --> TOPIC
-    UNITS["arr-backup, arr-updates, arr-firewall, arr-stack, arr-youtube"] -->|"OnFailure"| NF["stack-failure-notify"]
+    UE["ups-event, on power events"] --> TOPIC
+    UNITS["arr-backup, arr-mirror, arr-updates, arr-firewall, arr-stack, arr-youtube"] -->|"OnFailure"| NF["stack-failure-notify"]
     NF --> TOPIC
     ARR["Radarr, Sonarr, Lidarr, Prowlarr"] --> TOPIC
     SEERR["Seerr"] --> TOPIC
@@ -240,6 +247,7 @@ flowchart LR
 | Software transcode, new Jellyfin device, failed Jellyfin login, request stuck 48 hours | `activity-watch` (`arr-watch.timer`) | This page |
 | "VPN forwarded port restored", "VPN still has no forwarded port" | `vpn-port-sync` (`arr-port-sync.timer`) | [VPN and ports](vpn-and-ports.md) |
 | "*unit* failed", with its last log lines | `stack-failure-notify` | This page |
+| On battery, power restored, shutting down, UPS not responding or responding again, replace the battery | `ups-event` (apcupsd) | [Power](power.md) |
 | Health errors, a download that needs a manual import, failed downloads or imports | Radarr, Sonarr, Lidarr, Prowlarr | `configure-arr.py` |
 | A request is available to watch, or failed to reach Sonarr or Radarr | Seerr | `configure-seerr.py` |
 | Someone starts watching (any user), a new Seerr request | JellyDash (`NTFY_URL` and `NTFY_TOPIC` in compose) | [Dashboards](../using/dashboards.md) |
@@ -276,6 +284,8 @@ change the topic in their notification settings by hand.
 | `arr-throttle.timer` / `.service` | Every minute, with the drive mounted | [systemd](../reference/systemd.md#arr-throttletimer) |
 | `stack-failure-notify` | Pushes a failed unit's last log lines | [scripts](../reference/scripts.md#stack-failure-notify) |
 | `arr-notify-failure@.service` | The `OnFailure=` handler | [systemd](../reference/systemd.md#arr-notify-failureservice) |
+| `ups-metrics` | The UPS readings for Grafana and Glance | [scripts](../reference/scripts.md#ups-metrics) |
+| `ups-event` | Pushes apcupsd's power events | [scripts](../reference/scripts.md#ups-event) |
 | `stack-env.sh` / `stack_env.py` | The shared `notify` helpers and `write_update_metrics` | [scripts](../reference/scripts.md#stack-envsh) |
 
 ## When it goes wrong

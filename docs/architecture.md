@@ -175,7 +175,9 @@ leak test are in [VPN and ports](flows/vpn-and-ports.md).
 
 Two places hold data. The media disk, mounted at `STORAGE_MOUNT`, holds downloads, the
 library and the backup repository. The system disk holds the OS, Docker, the repository and
-every app's settings, so the stack's state survives the media disk being switched off.
+every app's settings, so the stack's state survives the media disk being switched off. An
+optional backup disk, at `BACKUP_MOUNT`, holds a nightly copy of the whole media disk; the stack
+never depends on it.
 
 ```mermaid
 flowchart TD
@@ -196,11 +198,17 @@ flowchart TD
     mirror["/var/backups/arr-stack/restic"]
   end
 
+  subgraph backupdisk["Backup disk: BACKUP_MOUNT, optional, read-only"]
+    copy["an exact copy of the media disk"]
+    trash[".trash/: 30 days of deleted and replaced files"]
+  end
+
   torrents -.->|"hardlink on import"| lib
   usenetdir -.->|"move on import"| lib
   soulseek -.->|"import"| lib
   config -->|"nightly restic"| backups
   backups -->|"copy"| mirror
+  data -.->|"nightly mirror of the whole disk"| copy
 ```
 
 | Path | Holds |
@@ -213,6 +221,7 @@ flowchart TD
 | `CONFIG_ROOT/<app>/` | Each app's database, settings and API keys |
 | `state/` (beside `CONFIG_ROOT`) | Update results, rollback records, metrics for node-exporter, a small Python venv, timers' state |
 | `/var/backups/arr-stack/restic` | A second copy of the backups on the system disk (root-only) |
+| `BACKUP_MOUNT/` | With a backup drive: a copy of the whole media disk as of the last night, and `.trash/<date>/` with 30 days of deleted or replaced files |
 
 Every container sees the same paths, so they all agree on where a file is:
 
@@ -352,8 +361,8 @@ quietly filling the system disk. So the stack refuses to run without it at every
   instead of Docker creating an empty one.
 - The empty mount point is made immutable (`chattr +i`) while unmounted, so nothing can write
   there in the disk's place.
-- The timers that need the disk (`arr-backup`, `arr-health`, `arr-watch`, `arr-throttle`)
-  skip their run while it is not mounted.
+- The timers that need the disk (`arr-backup`, `arr-mirror`, `arr-health`, `arr-watch`,
+  `arr-throttle`) skip their run while it is not mounted.
 
 On a machine with one disk, a bind mount onto `STORAGE_MOUNT` passes the same gate. The power
 cycle itself is in [Storage and boot](flows/storage-and-boot.md).

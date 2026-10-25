@@ -8,7 +8,7 @@ applies most of them; the rest are a few manual steps, listed here with the comm
 
 | Change | Why | Applied by | Checked by `stack-health` |
 |---|---|---|---|
-| [systemd units and the udev rule](#systemd-units-and-the-udev-rule) | Start the stack with the drive, run the timers | `host-install` (enable by hand) | Yes |
+| [systemd units and the udev rules](#systemd-units-and-the-udev-rules) | Start the stack with the drive, run the timers | `host-install` (enable by hand) | Yes |
 | [SSH: keys only, no root](#ssh-keys-only-no-root-login) | No password guessing | `host-install` | Yes |
 | [SSH keys pinned with `from=`](#ssh-keys-pinned-to-where-they-are-used) | A leaked key is useless elsewhere | By hand | Yes |
 | [Docker log rotation](#docker-log-rotation) | Logs can't fill the system disk | `host-install` (restart Docker by hand) | No |
@@ -16,6 +16,9 @@ applies most of them; the rest are a few manual steps, listed here with the comm
 | [mDNS on real interfaces only](#mdns-only-on-real-network-interfaces) | `<host>.local` never resolves to a Docker address | By hand | Yes |
 | [Memory cgroup](#memory-cgroup-raspberry-pi-os) | Container memory limits work | By hand, Raspberry Pi OS only | Yes |
 | [Media drive in fstab, immutable mount point](#the-media-drive) | The drive mounts in one place; nothing writes to the system disk in its place | By hand | Yes (mounted) |
+| [Backup drive in fstab, read-only](#the-backup-drive) | A nightly copy of the media drive that nothing else can change | By hand; `host-install` installs its udev rule | Yes, with `BACKUP_UUID` |
+| [UPS settings](#ups-apcupsd) | A clean shutdown before the battery runs out, and a restart when power returns | `apt-get` by hand; `host-install` installs the settings | Yes, with apcupsd |
+| [Persistent journal](#persistent-journal) | The log of a shutdown survives the reboot | By hand, Raspberry Pi OS | No |
 | [Firewall](#firewall) | The home network reaches only what it should | `host-install` installs its units | Yes |
 | [HTTPS for Needle](#https-for-needle-tailscale-serve) | Needle's only address, with a certificate | By hand (`tailscale serve`) | Needle answers |
 | [Tailscale access policy](#tailscale-access-policy) | Who reaches which port | Tailscale's admin console | No |
@@ -33,7 +36,8 @@ The nightly backup keeps a copy of the hand-edited files (`/etc/fstab`,
 2. Enable the units, as in [Getting started](../getting-started.md#enable-the-timers).
 3. Restart Docker once for log rotation: `sudo systemctl restart docker`.
 4. Put back the manual changes: `authorized_keys` with its `from=` pins, the avahi interfaces, the
-   memory cgroup on a Raspberry Pi, the fstab line and the immutable mount point.
+   memory cgroup on a Raspberry Pi, the fstab lines and the immutable mount points, apcupsd and the
+   persistent journal.
 5. Sign the server in to Tailscale again, re-apply `tag:media` in the admin console, and run the
    `tailscale serve` command for Needle.
 6. Run `health` and fix anything it reports.
@@ -53,14 +57,20 @@ It is safe to re-run. In order, it:
    their own apt repositories on Debian and Ubuntu.
 2. **Renders the templates** in `host/systemd/`, filling in `@REPO@`, `@STACK_USER@`, `@STACK_GROUP@`,
    `@STORAGE_UUID@`, `@STORAGE_MOUNT@` and `@STORAGE_UNIT@` from `.env`, and installs units to
-   `/etc/systemd/system` and the udev rule to `/etc/udev/rules.d`. Without a `STORAGE_UUID` it
-   skips (and removes) the udev rule: an always-mounted disk has nothing to hot-plug.
+   `/etc/systemd/system` and the udev rules to `/etc/udev/rules.d`. Without a `STORAGE_UUID` it
+   skips (and removes) the media drive's udev rule: an always-mounted disk has nothing to
+   hot-plug. Without a `BACKUP_UUID` it does the same with the backup drive's. The backup
+   placeholders `@BACKUP_UUID@`, `@BACKUP_MOUNT@` and `@BACKUP_UNIT@` are filled in too.
 3. **Installs the SSH hardening** from `host/sshd_config.d/`, tests the configuration and reloads
    sshd.
 4. **Installs Docker's log settings** from `host/docker/daemon.json` when they differ.
 5. **Disables and masks rpcbind.**
+6. **Installs the UPS settings** when apcupsd is installed (`/etc/apcupsd` exists):
+   `host/apcupsd/apcupsd.conf` to `/etc/apcupsd/apcupsd.conf` when it differs, and the event links
+   to `scripts/ups-event`. Without apcupsd it skips them.
 
-It enables nothing: each unit needs `sudo systemctl enable --now <unit>` once.
+It enables, starts and restarts nothing: each unit needs `sudo systemctl enable --now <unit>` once,
+and new UPS settings need `sudo systemctl restart apcupsd`.
 
 ## Prerequisites
 
@@ -78,11 +88,11 @@ That makes any SSH key for this account effectively root, which is why every key
 On Arch, after installing `nss-mdns`, add `mdns_minimal [NOTFOUND=return]` before `resolve` on
 the `hosts` line of `/etc/nsswitch.conf`; `host-install` reminds you.
 
-## systemd units and the udev rule
+## systemd units and the udev rules
 
 The units start the stack when the media drive mounts and stop it when the drive goes, and run
-the timers: backups, update checks, the VPN port sync, the health check, the firewall, the
-download throttle, activity alerts and the weekly YouTube sync. Every unit, timer and the boot
+the timers: backups, the media mirror, update checks, the VPN port sync, the health check, the
+firewall, the download throttle, activity alerts, the UPS readings and the hourly YouTube sync. Every unit, timer and the boot
 timeline are in [systemd reference](../reference/systemd.md); the drive and boot story is in
 [Storage and boot](../flows/storage-and-boot.md).
 
@@ -197,6 +207,81 @@ While the drive is off, nothing can then write into `/mnt/storage` and quietly f
 in its place. The stack adds two more guards: `arr-stack.service` refuses to start without the
 mount, and the compose bind mounts refuse to create a missing media folder. Use your
 `STORAGE_MOUNT` if it isn't `/mnt/storage`.
+
+## The backup drive
+
+An optional second drive, at least as large as the media drive, holds a nightly mirror of it
+([Backups](../flows/backups.md#the-media-mirror)). With two USB drives, `/dev/sda` and `/dev/sdb`
+can swap at boot, so address both disks by their stable names (`ls -l /dev/disk/by-id/`) and set
+`STORAGE_DEVICE` to the media drive's.
+
+Partition and format the new disk by its stable name. This erases it:
+
+```bash
+sudo sgdisk --zap-all /dev/disk/by-id/<disk>
+sudo sgdisk -n1:0:0 -t1:8300 -c1:backup /dev/disk/by-id/<disk>
+sudo mkfs.ext4 -L backup -m 0 /dev/disk/by-id/<disk>-part1
+```
+
+`-m 0` reserves no space for root: no system files live on this drive, and the space goes to the
+copy and its trash.
+
+Make the empty mount point immutable, as for the media drive, and mount the drive read-only by its
+filesystem UUID (`lsblk -f`):
+
+```bash
+sudo mkdir /mnt/backup && sudo chattr +i /mnt/backup
+echo 'UUID=<uuid>  /mnt/backup  ext4  ro,noatime,nofail,x-systemd.device-timeout=60  0  2' | sudo tee -a /etc/fstab
+sudo systemctl daemon-reload
+sudo mount /mnt/backup
+```
+
+Then switch the mirror on:
+
+1. Put the same UUID in `BACKUP_UUID` in `.env` (and set `BACKUP_MOUNT` if it isn't
+   `/mnt/backup`).
+2. Re-run `scripts/host-install`: it installs `99-arr-backup.rules`, which mounts the drive when it
+   appears, and fills the backup mount into `arr-mirror.service`.
+3. `sudo systemctl enable --now arr-mirror.timer`.
+4. Review what the first run would do, without touching the drive:
+   `sudo scripts/storage-mirror --dry-run | less`.
+5. Start the first copy: `sudo systemctl start --no-block arr-mirror.service`, and follow it with
+   `journalctl -fu arr-mirror`. It can take hours: about 3.3 TB took 5 to 6 hours over one USB 3
+   dock. The nightly runs after it copy only what changed.
+
+`stack-health` checks the drive and the mirror from then on.
+
+## UPS (apcupsd)
+
+An APC UPS on USB, with apcupsd, shuts the server down cleanly before its battery runs out and
+brings it back when mains returns. [Power](../flows/power.md) has the whole sequence, the
+thresholds, the tests and what the hardware needs. apcupsd is optional: without it,
+`host-install` skips the UPS settings and `stack-health` its POWER section.
+
+```bash
+sudo apt-get install apcupsd
+scripts/host-install                              # /etc/apcupsd/apcupsd.conf and the event links
+sudo systemctl restart apcupsd                    # host-install never restarts it
+sudo systemctl enable --now arr-ups-metrics.timer
+/usr/sbin/apcaccess status                        # STATUS ONLINE, then the battery readings
+```
+
+Change the settings in `host/apcupsd/apcupsd.conf`, not in `/etc`: the next `host-install` run
+replaces a copy that differs.
+
+## Persistent journal
+
+Raspberry Pi OS keeps the journal in RAM
+(`/usr/lib/systemd/journald.conf.d/40-rpi-volatile-storage.conf`), so the log of a shutdown,
+after a power cut for example, is gone once the server is back. Keep it on disk, capped at 500 MB:
+
+```bash
+sudo mkdir -p /etc/systemd/journald.conf.d
+printf '[Journal]\nStorage=persistent\nSystemMaxUse=500M\n' | sudo tee /etc/systemd/journald.conf.d/50-persistent.conf
+sudo systemctl restart systemd-journald
+```
+
+From the next boot on, `journalctl -b -1` shows the previous boot, its shutdown included.
 
 ## Firewall
 

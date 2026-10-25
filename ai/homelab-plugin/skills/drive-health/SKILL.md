@@ -1,12 +1,24 @@
 ---
 name: drive-health
-description: Check the media drive's SMART health, temperature and, in a USB enclosure, its link. Use when asked about the hard drive, disk failure risk, disk temperature, or slow disk performance.
+description: Check the SMART health, temperature and, in a USB enclosure, the link of the media drive and of the backup drive when there is one. Use when asked about the hard drives, disk failure risk, disk temperature, or slow disk performance.
 ---
 
-# Media drive health
+# Drive health
 
-Read-only. The media drive is mounted at `STORAGE_MOUNT` (`.env`, default `/mnt/storage`); `smartctl` needs `sudo`.
-A drive in a USB enclosure needs `-d sat`; internal SATA and NVMe drives don't.
+Read-only. The media drive is mounted at `STORAGE_MOUNT` (`.env`, default `/mnt/storage`). With
+`BACKUP_UUID` set there is a second drive, the backup drive, at `BACKUP_MOUNT` (default
+`/mnt/backup`, read-only); check it the same way with `MOUNT` set to that path. `smartctl` needs
+`sudo`. A drive in a USB enclosure needs `-d sat`; internal SATA and NVMe drives don't.
+
+With two USB drives, `/dev/sda` and `/dev/sdb` can swap at boot, so name a disk by its stable
+path when you check it directly:
+
+```bash
+ls -l /dev/disk/by-id/ | grep -v part
+sudo smartctl -a -d sat /dev/disk/by-id/<disk>
+```
+
+`stack-health` checks SMART health, bad sectors and temperature on both drives.
 
 ```bash
 STACK=${MEDIA_STACK_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}; [ -x "$STACK/scripts/stack-health" ] || STACK=~/homelab-media-stack
@@ -41,5 +53,6 @@ same attributes as history, so a trend is visible without sudo.
   Many simultaneous downloads saturate the disk (look at the `%util`-style busy
   figure in `/proc/diskstats`).
 
-If the drive dies, only media is lost, and that can be re-downloaded. Settings live on the
-system disk and are backed up nightly to this drive.
+If the media drive dies, only media is lost, and that can be re-downloaded; with a backup drive
+it holds last night's copy, which can take the media drive's place (`docs/flows/backups.md`).
+Settings live on the system disk and are backed up nightly to the media drive.

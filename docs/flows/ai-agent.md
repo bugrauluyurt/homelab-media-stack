@@ -32,11 +32,11 @@ them on the server.
 |---|---|---|
 | `stack-health` | Is everything OK? Runs `stack-health` and explains each FAIL | Safe, but says so first when you asked for a look only (the check writes a test file and starts throwaway containers) |
 | `vpn-check` | Is P2P traffic confined to the VPN, with a working kill switch? | Read-only |
-| `drive-health` | SMART status, temperature and USB link of the media drive | Read-only |
+| `drive-health` | SMART status, temperature and USB link of the media and backup drives | Read-only |
 | `stack-logs` | Diagnose a service from its logs and the known issues | Read-only; proposes fixes, applies none |
 | `stack-update` | Check, apply and roll back image updates ([Updates](updates.md)) | Checking is safe; **applying or rolling back needs your yes, every time** |
-| `stack-backup` | Backup status, back up now, restore ([Backups](backups.md)) | Status and backing up are safe; **restoring asks first** |
-| `stack-power` | Stop the stack or unmount the drive, and start it again | **Asks first**, and checks nothing is playing |
+| `stack-backup` | Backup and mirror status, back up now, mirror now, restore ([Backups](backups.md)) | Status and backing up are safe; **mirroring and restoring ask first** |
+| `stack-power` | Stop the stack or unmount the drive, and start it again; UPS status and tests ([Power](power.md)) | **Asks first**, and checks nothing is playing |
 
 `stack-logs` ships the
 [known issues](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/ai/homelab-plugin/skills/stack-logs/references/known-issues.md),

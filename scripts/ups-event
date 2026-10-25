@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Push an apcupsd power event to ntfy. host-install links /etc/apcupsd/<event> to this file and
+# apccontrol runs the link without naming the event, so the link's name is the event.
+# Runs: apcupsd through apccontrol, as root, on onbattery, offbattery, doshutdown, commfailure,
+#   commok and changeme.
+# Changes: nothing; sends one ntfy push.
+# Idempotent: yes.
+
+. "$(dirname "$(readlink -f "$0")")/stack-env.sh"
+
+event=$(basename "$0")
+
+charge=$(ups_field BCHARGE)
+minutes=$(ups_field TIMELEFT)
+battery=""
+[ -n "$charge" ] && battery="Battery ${charge%.*}%, about ${minutes%.*} min left."
+
+case "$event" in
+  onbattery)
+    notify "media stack: on battery" warning \
+      "Mains power is out. $battery The server shuts down at $(ups_field MINTIMEL) min or $(ups_field MBATTCHG)% left." ;;
+  offbattery)
+    notify "media stack: power restored" white_check_mark "Mains power is back. $battery" ;;
+  doshutdown)
+    notify "media stack: shutting down" rotating_light \
+      "The UPS battery is nearly empty. $battery The server shuts down now and starts again when power returns." ;;
+  commfailure)
+    notify "media stack: UPS not responding" warning \
+      "apcupsd lost the UPS on USB. Until it is back, a power cut would not shut the server down cleanly." ;;
+  commok)
+    notify "media stack: UPS responding again" white_check_mark "apcupsd reaches the UPS again." ;;
+  changeme)
+    notify "media stack: replace the UPS battery" warning "The UPS reports that its battery needs replacing. $battery" ;;
+esac
+
+# Exit 99 would cancel apccontrol's own action for the event, the shutdown included.
+exit 0

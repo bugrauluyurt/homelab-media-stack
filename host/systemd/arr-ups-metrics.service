@@ -1,0 +1,9 @@
+[Unit]
+Description=Write UPS readings for Prometheus
+ConditionPathExists=/etc/apcupsd/apcupsd.conf
+
+[Service]
+Type=oneshot
+User=@STACK_USER@
+Group=@STACK_GROUP@
+ExecStart=@REPO@/scripts/ups-metrics

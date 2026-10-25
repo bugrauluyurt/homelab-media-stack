@@ -9,6 +9,7 @@
 *.pem
 *.conf
 !host/sshd_config.d/*.conf
+!host/apcupsd/apcupsd.conf
 *.crt
 wg*.conf
 !apps/gluetun/failover-wg0.conf

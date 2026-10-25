@@ -1,0 +1,12 @@
+[Unit]
+Description=Mirror the media drive onto the backup drive (rsync, 30-day trash)
+# The media drive is powered by hand; skip rather than fail when it's off. A missing backup drive fails loudly.
+ConditionPathIsMountPoint=@STORAGE_MOUNT@
+After=@STORAGE_UNIT@ @BACKUP_UNIT@
+OnFailure=arr-notify-failure@%n.service
+
+[Service]
+Type=oneshot
+ExecStart=@REPO@/scripts/storage-mirror
+Nice=19
+IOSchedulingClass=idle

@@ -1,12 +1,15 @@
 # Backups
 
 This page explains how the stack backs up its settings every night, where the copies go, and how
-to restore from them after anything from one broken setting to a dead disk. It is for whoever
-looks after the server.
+to restore from them after anything from one broken setting to a dead disk. It also covers the
+optional mirror of the whole media drive onto a second drive. It is for whoever looks after the
+server.
 
 Every night the stack's **settings** (never media) are backed up with [restic](https://restic.net)
 to the media drive, then copied to the system disk. Each disk holds a full, encrypted, independent
-copy, so either one can die without losing the history. An offsite copy is optional.
+copy, so either one can die without losing the history. An offsite copy is optional. With a
+second drive, a nightly [media mirror](#the-media-mirror) also copies the whole media drive,
+media included.
 
 ```mermaid
 flowchart TD
@@ -44,7 +47,8 @@ recreating gluetun. See [VPN pool restore](vpn-and-ports.md#refresh-restore-and-
 
 ## What never is
 
-- **Media and downloads.** They can be downloaded again.
+- **Media and downloads.** They can be downloaded again. The optional
+  [media mirror](#the-media-mirror) copies them to a second drive instead.
 - **What the apps rebuild themselves:** folders named `logs`, `cache`, `transcodes`, `Backups`
   (the apps' own backup folders), `Crash Reports`, `Codecs`, `Media`, `Metadata`, `MediaCover` and
   `venv`; `*.log` files and `logs.db`; sockets and FIFOs (qBittorrent's `ipc-socket`, for example).
@@ -148,12 +152,15 @@ command line, where `ps` would show it.
 
 ## What survives what
 
-| What fails | Live settings | Media drive backups | System disk copy | Restore from |
-|---|---|---|---|---|
-| The system disk | lost | kept | lost | [the media drive, with its key file](#a-dead-system-disk) |
-| The media drive | kept | lost | kept | [nothing to restore; history is on the system disk](#a-dead-media-drive) |
-| A setting you broke | kept | kept | kept | [any snapshot from either disk](#one-apps-settings) |
-| Theft, fire, a power surge | lost | lost | lost | only an [offsite copy](#offsite) |
+| What fails | Live settings | Media drive backups | System disk copy | Backup drive mirror | Restore from |
+|---|---|---|---|---|---|
+| The system disk | lost | kept | lost | kept | [the media drive, with its key file](#a-dead-system-disk) |
+| The media drive | kept | lost | kept | kept, media too | settings: [nothing to restore](#a-dead-media-drive); media: [the backup drive](#swapping-the-backup-drive-in) |
+| A setting you broke | kept | kept | kept | kept | [any snapshot from either disk](#one-apps-settings) |
+| A media file deleted or replaced | not applicable | not applicable | not applicable | in its trash for 30 days | [the backup drive's trash](#restoring-files-from-the-mirror) |
+| Theft, fire, a power surge | lost | lost | lost | lost | only an [offsite copy](#offsite) |
+
+The mirror column applies only with a backup drive (`BACKUP_UUID` set).
 
 ## Restoring
 
@@ -252,7 +259,8 @@ sudo -E restic -r /var/backups/arr-stack/restic snapshots
 
 Once a new drive is mounted ([Storage and boot](storage-and-boot.md)), the next nightly run
 creates a fresh repository and key file on it. The system disk copy keeps the older snapshots and
-receives the new ones.
+receives the new ones. With a backup drive, the media survived too:
+[swap it in](#swapping-the-backup-drive-in) instead of starting from an empty drive.
 
 ### Jellystat's history
 
@@ -280,22 +288,121 @@ run then copies its new snapshots there, encrypted with the same `RESTIC_PASSWOR
 same way; the first run creates the repository. A failure shows in `journalctl -u arr-backup` and
 is pushed to ntfy.
 
+## The media mirror
+
+With a second drive (set up in [Host setup](../operations/host.md#the-backup-drive), `BACKUP_UUID`
+in `.env`), [`storage-mirror`](../reference/scripts.md#storage-mirror) copies the whole media drive
+onto it every night: media, downloads, the restic repository and its key file. It runs at 05:30,
+after the 04:30 settings backup, so the copy carries that night's snapshot too.
+
+```mermaid
+flowchart TD
+    TIMER["arr-mirror.timer, daily 05:30"] -->|"only while the media drive is mounted"| GUARD{"Both drives mounted, UUIDs match, DATA_ROOT not empty?"}
+    GUARD -->|No| FAIL["FATAL, exit 1, pushed to ntfy"]
+    GUARD -->|Yes| RW["Remount the backup drive read-write"]
+    RW --> SYNC["rsync -aHAX --delete, STORAGE_MOUNT to BACKUP_MOUNT"]
+    SYNC -->|"deleted and overwritten files"| TRASH["BACKUP_MOUNT/.trash/today"]
+    SYNC -->|"rsync failed"| FAIL
+    SYNC --> PRUNE["Remove trash days older than 30 days"]
+    PRUNE --> METRIC["Record arr_mirror_last_success_timestamp_seconds"]
+    METRIC --> RO["Remount read-only, which also happens on a failure"]
+```
+
+- **An exact copy.** `rsync -aHAX --numeric-ids --delete` from `$STORAGE_MOUNT/` to
+  `$BACKUP_MOUNT/` keeps owners, permissions, ACLs, extended attributes and hardlinks, so a torrent
+  and its library copy share the space on the backup drive too. Left out are `lost+found/`, the
+  trash itself, and `$DATA_ROOT/usenet/incomplete/` and `$DATA_ROOT/soulseek/incomplete/`:
+  unfinished downloads change all night and are fetched again anyway.
+- **A 30-day trash.** A file deleted or overwritten on the media drive is not simply dropped from
+  the copy: rsync moves it to `$BACKUP_MOUNT/.trash/<YYYY-MM-DD>/` under its original path, a
+  rename on the same drive. The date is the night the mirror noticed, so a file deleted during the
+  day is in the next night's folder. Trash days older than 30 days are removed after each
+  successful run. The trash is pruned by age only; if it ever fills the drive, rsync fails and
+  the failure reaches ntfy.
+- **Read-only between runs.** The fstab line mounts the backup drive `ro`. The script remounts it
+  read-write for the copy and back to read-only when it exits, whether the copy worked or not, so
+  no container and no stray command can change it. `stack-health` fails when it finds the drive
+  writable while no mirror runs.
+- **Guards.** The run stops with `FATAL` unless `BACKUP_UUID` is set, both mounts are mount points,
+  the backup mount holds the drive `BACKUP_UUID` names (and the media mount the one `STORAGE_UUID`
+  names, when set), and `DATA_ROOT` is not empty. Mirroring from a missing or wrong media drive
+  would delete the copy; mirroring onto an empty mount point would fill the system disk.
+- **Vanished files are fine.** rsync's exit 24 (files vanished during the copy, normal while
+  downloads run) counts as success.
+- **The first copy takes hours:** about 3.3 TB took 5 to 6 hours over one USB 3 dock. Later runs
+  copy only what changed.
+
+| When | How |
+|---|---|
+| Daily at 05:30 | [`arr-mirror.timer`](../reference/systemd.md#arr-mirrortimer), up to 10 minutes of random delay, `Persistent=true`. Lowest CPU and idle I/O priority. Skipped, not failed, while the media drive is off; a missing backup drive fails the run. |
+| By hand | `sudo systemctl start --no-block arr-mirror.service`, followed with `journalctl -fu arr-mirror`. `sudo scripts/storage-mirror --dry-run` lists what the next run would change and touches nothing. |
+
+A successful run writes `arr_mirror_last_success_timestamp_seconds` to
+`$STATE_ROOT/metrics/mirror.prom`. Glance's Lab page shows "Media mirrored N ago", in red after 48
+hours. `stack-health` checks that the backup drive is mounted, read-only, under 90% full and
+healthy (SMART, sectors, temperature), that `arr-mirror.timer` is enabled, and that the last mirror
+is under 48 hours old (while the media drive is mounted). A failed run pushes its last log lines to
+ntfy.
+
+### Restoring files from the mirror
+
+The backup drive is read-only, so read from it and copy back with `sudo`. `-a` keeps each file's
+owner and permissions. Use your own `STORAGE_MOUNT`, `BACKUP_MOUNT` and `DATA_ROOT` if they
+differ:
+
+```bash
+# A file or folder as it was at the last mirror
+sudo cp -a /mnt/backup/data/media/movies/<film>/ /mnt/storage/data/media/movies/
+
+# Something deleted or replaced: find the night, then copy it back
+ls /mnt/backup/.trash/
+sudo rsync -aH /mnt/backup/.trash/<date>/data/media/tv/<show>/ /mnt/storage/data/media/tv/<show>/
+```
+
+A restored file is a new copy: it no longer shares its space with a hardlink in `torrents/`.
+
+### Swapping the backup drive in
+
+The mirror is an exact copy of the media drive's root, so after the media drive dies the backup
+drive can take its place as it is:
+
+1. In `/etc/fstab`, put the backup drive's UUID on the `/mnt/storage` line, which has no `ro`, and
+   delete the `/mnt/backup` line.
+2. In `.env`, set `STORAGE_UUID` to that UUID and `STORAGE_DEVICE` to the drive's
+   `/dev/disk/by-id/` path, and empty `BACKUP_UUID`: there is no backup drive until you add a new
+   one.
+3. Run `sudo systemctl disable arr-mirror.timer`, `sudo systemctl daemon-reload` and
+   `scripts/host-install`, then mount it (`sudo mount /mnt/storage`, or switch it on); the stack
+   starts with it.
+
+What changed after the last mirror is lost: downloads since then come again, and the settings
+live on the system disk anyway. The `.trash/` folder comes along; delete it once you don't need
+it.
+
 ## Scripts and units involved
 
 | Name | Role | Reference |
 |---|---|---|
 | `stack-backup` | Stages, backs up, copies, checks, records success | [scripts](../reference/scripts.md#stack-backup) |
 | `arr-backup.timer` / `.service` | Daily at 04:30, only with the drive mounted | [systemd](../reference/systemd.md#arr-backuptimer) |
+| `storage-mirror` | Mirrors the media drive onto the backup drive, keeps the trash, records success | [scripts](../reference/scripts.md#storage-mirror) |
+| `arr-mirror.timer` / `.service` | Daily at 05:30, only with the media drive mounted | [systemd](../reference/systemd.md#arr-mirrortimer) |
+| `99-arr-backup.rules` | Mounts the backup drive when it appears | [systemd](../reference/systemd.md#99-arr-backuprules) |
 | `arr-notify-failure@.service` | Pushes a failed run's log lines to ntfy | [systemd](../reference/systemd.md#arr-notify-failureservice) |
 | `stack-update` | Takes the `pre-update` snapshot, restores from it on rollback | [scripts](../reference/scripts.md#stack-update) |
-| `stack-health` | Backup age, key file, system disk copy | [scripts](../reference/scripts.md#stack-health) |
-| `stack-backup` skill | Status, backup now, restore (restore asks first) | [AI agent](ai-agent.md#the-skills) |
+| `stack-health` | Backup age, key file, system disk copy; the backup drive and the mirror's age | [scripts](../reference/scripts.md#stack-health) |
+| `stack-backup` skill | Status, backup now, mirror now, restore (mirror and restore ask first) | [AI agent](ai-agent.md#the-skills) |
 
 ## When it goes wrong
 
 - **`stack-health` fails "last backup under 48h old".** The nightly run was skipped, usually
   because the drive was off at 04:30; it catches up once the drive is back. Otherwise read
   `journalctl -u arr-backup`.
+- **`stack-health` fails "media mirrored in the last 48h".** The mirror was skipped because the
+  media drive was off at 05:30, or it failed: `journalctl -u arr-mirror` shows why, often a
+  `FATAL` guard (the backup drive not mounted, or a UUID that doesn't match `.env`).
+- **`stack-health` fails "backup drive read-only between mirrors".** Something remounted it
+  read-write, or a run was killed before its exit trap: `sudo mount -o remount,ro /mnt/backup`.
 - **A backup failed on a database.** An app held its database through five retries. Run it again;
   if it keeps failing, the message names the file.
 - **restic says the password is wrong.** A quoted value in `.env` was passed with its quotes; use

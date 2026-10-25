@@ -65,7 +65,7 @@ pages, in this order:
 
 | Page | What is on it |
 |---|---|
-| **Lab** (the first, so `/` opens it) | Server CPU, RAM, temperature and both disks; the media drive's free space, growth per day, projected full date and SMART status from Scrutiny; library counts and sizes; response times of the apps people use; every container's state; Uptime Kuma's up and down counts with 24-hour uptime; pending image updates and the last backup; indexers backing off, subtitles wanted and throttled subtitle providers; new releases of the stack's apps |
+| **Lab** (the first, so `/` opens it) | Server CPU, RAM, temperature and both disks; the media drive's free space, growth per day, projected full date and SMART status from Scrutiny; library counts and sizes; response times of the apps people use; every container's state; Uptime Kuma's up and down counts with 24-hour uptime; pending image updates, the last backup and, when set up, the last media mirror and the UPS; indexers backing off, subtitles wanted and throttled subtitle providers; new releases of the stack's apps |
 | **Home** | Calendar, blogs, Twitch channels and ChangeDetection's watched pages; a search box with `!yt`, `!gh` and `!r` shortcuts, Hacker News and Lobsters, your tech YouTube subscriptions, Reddit and Ars Technica; the weather, your stocks, Formula 1 (next race, standings and last result, from [f1api.dev](https://f1api.dev)) and bookmarks |
 | **Media** | Poster rows: movies and episodes recently added to Jellyfin, the next two weeks of TV, the next 90 days of movies and 60 days of albums from your Lidarr artists, recent Seerr requests with their status, and the month's most watched. Beside them: the VPN (exit city, address and forwarded port; red when it is down or exits in the US), live torrent and Usenet speeds, Jellyfin's now playing, request counts, 30-day watch statistics, the download queue and every downloading torrent |
 | **Gaming** | Top Twitch games, gaming news, your gaming YouTube subscriptions, free Epic games, Steam deals and a Pokémon of the hour |
@@ -94,7 +94,10 @@ How it works, and what to know when you change it:
   copy exists, the sync reads it instead.
 - **Pending updates and the last backup** reach Glance through Prometheus: `stack-update-check`,
   `stack-update` and `stack-backup` write them as metrics, which node-exporter exports, so Grafana has
-  their history too.
+  their history too. The Maintenance block adds two lines once their metrics exist: "Media mirrored
+  N ago" from `storage-mirror` (red after 48 hours, [Backups](../flows/backups.md#the-media-mirror)),
+  and the UPS from `ups-metrics`: on mains power, on battery power or not responding, with the
+  battery charge and the minutes left ([Power](../flows/power.md)).
 - **Container states** come through the read-only socket proxy. Glance has no login, so it stays
   tailnet-only like everything here.
 
@@ -144,6 +147,7 @@ One-time setup:
 | **Node Exporter Full** | The server in depth: CPU, RAM, temperature, disk I/O, network |
 | **Sonarr v3**, **Radarr v3** | Library, queue, missing, disk |
 | **Scraping** | Everything Scraparr collects from the arr apps |
+| **UPS** (`/d/arr-ups`) | Power state, battery, runtime left, load in watts, input voltage and transfers to battery; charge and runtime over time with the shutdown thresholds dashed, load, voltages and an on-battery timeline; 24 hours by default. Empty without a UPS ([Power](../flows/power.md)) |
 
 The two overview dashboards link to each other and to Node Exporter Full; use the time picker for
 other ranges. They are provisioned from `apps/grafana/dashboards/` and picked up within about a minute.

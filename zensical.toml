@@ -19,6 +19,7 @@ nav = [
     { "Games" = "flows/games.md" },
     { "VPN and ports" = "flows/vpn-and-ports.md" },
     { "Storage and boot" = "flows/storage-and-boot.md" },
+    { "Power" = "flows/power.md" },
     { "Updates" = "flows/updates.md" },
     { "Backups" = "flows/backups.md" },
     { "Monitoring" = "flows/monitoring.md" },
