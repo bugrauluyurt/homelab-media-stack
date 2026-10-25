@@ -75,7 +75,8 @@ STATE=$(dirname "$(sed -n 's/^CONFIG_ROOT=//p' "$STACK/.env")")/state
 echo "$(( ($(date +%s) - $(awk '{print $2}' "$STATE/metrics/mirror.prom")) / 3600 )) h since the last mirror"
 ```
 
-`stack-health` fails once the last mirror is 48 hours old. A `FATAL` line means a guard stopped
+`stack-health` fails once the last mirror is 48 hours old and none is running; a run that hangs
+fails by itself after 24 hours. A `FATAL` line means a guard stopped
 it: the backup drive not mounted, a UUID that doesn't match `.env`, or an empty `DATA_ROOT`.
 
 ### Mirror now (ask first: it can run for hours)

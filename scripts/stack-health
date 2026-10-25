@@ -140,7 +140,8 @@ chk "backup key copy on the media drive" "! mountpoint -q '$STORAGE_MOUNT' || su
 chk "backup copy on the NVMe"          "sudo test -s /var/backups/arr-stack/restic/config"
 if [ -n "${BACKUP_UUID:-}" ]; then
   chk "mirror timer enabled"            "systemctl is-enabled -q arr-mirror.timer"
-  chk "media mirrored in the last ${BACKUP_MAX_AGE_H}h" "! mountpoint -q '$STORAGE_MOUNT' || [ \$(( \$(date +%s) - \$(awk '{print \$2}' '$STATE_ROOT/metrics/mirror.prom' 2>/dev/null || echo 0) )) -lt $((BACKUP_MAX_AGE_H * 3600)) ]"
+  # A copy in progress counts: the first one runs for hours, and arr-mirror's start timeout fails a hung one.
+  chk "media mirrored in the last ${BACKUP_MAX_AGE_H}h" "! mountpoint -q '$STORAGE_MOUNT' || [ \"\$(systemctl is-active arr-mirror.service)\" = activating ] || [ \$(( \$(date +%s) - \$(awk '{print \$2}' '$STATE_ROOT/metrics/mirror.prom' 2>/dev/null || echo 0) )) -lt $((BACKUP_MAX_AGE_H * 3600)) ]"
 fi
 
 if [ -f /etc/apcupsd/apcupsd.conf ]; then

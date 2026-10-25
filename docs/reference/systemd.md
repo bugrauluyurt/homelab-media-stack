@@ -271,6 +271,7 @@ Runs [`storage-mirror`](scripts.md#storage-mirror), the nightly copy of the whol
 
 - **File:** [`host/systemd/arr-mirror.service`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/arr-mirror.service)
 - **Runs:** `@REPO@/scripts/storage-mirror`, `Type=oneshot`, with `Nice=19` and `IOSchedulingClass=idle` so it yields to playback and downloads.
+- **Timeout:** `TimeoutStartSec=24h`. A first copy of a full drive can take most of a day; a run past that is hung, fails and is pushed. While it runs, `stack-health` counts the mirror as fresh.
 - **User:** root (no `User=`); it remounts the backup drive and copies files of every owner.
 - **Condition:** `ConditionPathIsMountPoint=@STORAGE_MOUNT@`: skipped, not failed, while the media drive is off. A missing backup drive is no condition: the script fails, and the failure is pushed.
 - **Dependencies:** `After=@STORAGE_UNIT@ @BACKUP_UNIT@`.

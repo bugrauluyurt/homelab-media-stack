@@ -522,7 +522,7 @@ One-shot status of the whole stack, grouped as STORAGE, HARDWARE (only where `vc
 | Drive SMART | on the media drive, and on the backup drive with `BACKUP_UUID` set: health not passed, any reallocated, pending or uncorrectable sector (NVMe: media errors), or 55 C or hotter |
 | Backup drive | with `BACKUP_UUID` set: not mounted at `BACKUP_MOUNT`, or mounted read-write while `arr-mirror.service` isn't running |
 | Raspberry Pi | under-voltage, frequency cap, throttling or soft temperature limit right now, or the SoC at 80 C or hotter |
-| Backups | the last backup is 48 hours old or more, or a restic copy or the key file is missing; with `BACKUP_UUID` set, `arr-mirror.timer` isn't enabled or the last mirror is 48 hours old or more (drive checks pass while the drive is off) |
+| Backups | the last backup is 48 hours old or more, or a restic copy or the key file is missing; with `BACKUP_UUID` set, `arr-mirror.timer` isn't enabled or the last mirror is 48 hours old or more with none running (drive checks pass while the drive is off) |
 | Power | with apcupsd configured: apcupsd isn't running, the UPS isn't answering it (`COMMLOST`), the UPS is on battery, or `arr-ups-metrics.timer` isn't enabled |
 | Units | a timer or `arr-stack.service` isn't enabled, or any systemd unit other than `arr-health.service` has failed (the checker evaluates current conditions instead of counting its own retained failure) |
 | Firewall | a chain isn't hooked, a port other than the firewall's `home-ports` is open to the home network, or SSH is |
