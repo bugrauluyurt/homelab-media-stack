@@ -69,6 +69,13 @@ ups_field() {
   PATH="$PATH:/usr/sbin:/sbin" apcaccess -u -p "$1" 2>/dev/null | sed 's/ *$//'
 }
 
+# long_down_indexers: the indexers Prowlarr's /api/v1/health JSON on stdin reports down for more than 6 hours.
+long_down_indexers() {
+  python3 -c '
+import json, sys
+print(", ".join(check["message"].split(": ", 1)[-1] for check in json.load(sys.stdin) if check["source"] == "IndexerLongTermStatusCheck"))'
+}
+
 # service_enabled NAME: whether NAME is in an active compose profile.
 service_enabled() {
   [ -n "${ENABLED_SERVICES:-}" ] || ENABLED_SERVICES=$(docker compose --project-directory "$REPO" config --services 2>/dev/null)

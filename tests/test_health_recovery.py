@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 import subprocess
@@ -75,6 +76,19 @@ curl() { [[ "$1" == *f* ]] || exit 10; return 22; }
 notify title tag body
 ''')
         self.assertEqual(result.returncode, 22, result.stderr)
+
+    def test_only_indexers_down_for_over_six_hours_are_named(self):
+        prowlarr_health = json.dumps([
+            {'source': 'IndexerStatusCheck', 'type': 'warning', 'message': 'Indexers unavailable due to failures: Knaben'},
+            {'source': 'IndexerLongTermStatusCheck', 'type': 'warning',
+             'message': 'Indexers unavailable due to failures for more than 6 hours: World-torrent, Torrent9'},
+            {'source': 'UpdateCheck', 'type': 'notice', 'message': 'New update is available: 2.7'},
+        ])
+        for health_json, expected in [(prowlarr_health, 'World-torrent, Torrent9'), ('[]', '')]:
+            with self.subTest(expected=expected):
+                result = self.shell('long_down_indexers <<< "$HEALTH"', HEALTH=health_json)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout.strip(), expected)
 
     def test_retry_budget_and_manual_check_boundary(self):
         unit = (ROOT / 'host/systemd/arr-health.service').read_text()
