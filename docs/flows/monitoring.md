@@ -51,8 +51,9 @@ flowchart LR
    | `youtube.prom` | `arr_youtube_sync_timestamp_seconds` | `youtube-sync.py` (Glance's YouTube rows) |
    | `mirror.prom` | `arr_mirror_last_success_timestamp_seconds` | `storage-mirror`, with a backup drive ([Backups](backups.md#the-media-mirror)) |
    | `ups.prom` | `arr_ups_*`: power state, charge, runtime, load, voltages, transfers, thresholds | `ups-metrics`, with a UPS ([Power](power.md)) |
+   | `drives.prom` | `arr_drive_temperature_celsius{drive="media"}`, and `{drive="backup"}` with a backup drive | `drive-metrics`, with `arr-drive-metrics.timer` enabled; a drive unmounted or asleep is left out |
 
-   The update, backup, mirror and UPS files are written whole and renamed into place, so a scrape
+   The update, backup, mirror, UPS and drive files are written whole and renamed into place, so a scrape
    never sees half a file.
 2. **scraparr** reads Radarr, Sonarr, Prowlarr and Bazarr from one container. It cannot read
    environment variables in its YAML, so `scripts/configure-scraparr` fills the API keys from
@@ -68,8 +69,8 @@ flowchart LR
    in the **Media Stack** folder. It re-reads `apps/grafana/dashboards/` every 60 seconds, so a new
    dashboard JSON appears without a restart. Edits made in the UI are allowed and survive, but for
    anything permanent export the JSON into `apps/grafana/dashboards/`.
-5. **Glance** queries Prometheus for its Lab page: disk space and growth, pending updates, the
-   age of the last backup and media mirror, and the UPS.
+5. **Glance** queries Prometheus for its Lab page: disk space and growth, the drive temperatures,
+   pending updates, the age of the last backup and media mirror, and the UPS.
 
 ### The watching dashboard
 
@@ -285,6 +286,8 @@ change the topic in their notification settings by hand.
 | `stack-failure-notify` | Pushes a failed unit's last log lines | [scripts](../reference/scripts.md#stack-failure-notify) |
 | `arr-notify-failure@.service` | The `OnFailure=` handler | [systemd](../reference/systemd.md#arr-notify-failureservice) |
 | `ups-metrics` | The UPS readings for Grafana and Glance | [scripts](../reference/scripts.md#ups-metrics) |
+| `drive-metrics` | The drive temperatures for Grafana and Glance | [scripts](../reference/scripts.md#drive-metrics) |
+| `arr-drive-metrics.timer` / `.service` | Every minute, optional | [systemd](../reference/systemd.md#arr-drive-metricstimer) |
 | `ups-event` | Pushes apcupsd's power events | [scripts](../reference/scripts.md#ups-event) |
 | `stack-env.sh` / `stack_env.py` | The shared `notify` helpers and `write_update_metrics` | [scripts](../reference/scripts.md#stack-envsh) |
 

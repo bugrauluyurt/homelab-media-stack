@@ -92,13 +92,16 @@ the `hosts` line of `/etc/nsswitch.conf`; `host-install` reminds you.
 
 The units start the stack when the media drive mounts and stop it when the drive goes, and run
 the timers: backups, the media mirror, update checks, the VPN port sync, the health check, the
-firewall, the download throttle, activity alerts, the UPS readings and the hourly YouTube sync. Every unit, timer and the boot
+firewall, the download throttle, activity alerts, the UPS readings, the drive temperatures and the hourly YouTube sync. Every unit, timer and the boot
 timeline are in [systemd reference](../reference/systemd.md); the drive and boot story is in
 [Storage and boot](../flows/storage-and-boot.md).
 
 ```bash
 systemctl list-timers 'arr-*'      # what runs when
 ```
+
+`arr-drive-metrics.timer` is optional: enable it for live drive temperatures in Grafana and Glance,
+with `sudo systemctl enable --now arr-drive-metrics.timer`. `stack-health` doesn't expect it.
 
 ## SSH: keys only, no root login
 
@@ -250,6 +253,18 @@ Then switch the mirror on:
    dock. The nightly runs after it copy only what changed.
 
 `stack-health` checks the drive and the mirror from then on.
+
+Optionally, give Scrutiny the backup drive's SMART history too
+([Configuration](../reference/configuration.md#composebackup-driveyml-and-backup_device)):
+
+1. Set `BACKUP_DEVICE` in `.env` to the backup disk's `/dev/disk/by-id/` path (the entry without
+   `-part`).
+2. Add `compose.backup-drive.yml` to `COMPOSE_FILE`, after any override you already have:
+   `COMPOSE_FILE=docker-compose.yml:compose.backup-drive.yml`.
+3. `docker compose up -d scrutiny`.
+
+Glance's Drives block lists the backup drive once Scrutiny has it. Grafana's Drive temperatures
+panel shows it without the override, once `arr-drive-metrics.timer` is enabled.
 
 ## UPS (apcupsd)
 

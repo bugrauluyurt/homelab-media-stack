@@ -47,6 +47,7 @@ Every file in [`scripts/`](https://github.com/bugrauluyurt/homelab-media-stack/t
 | [`downloads-throttle`](#downloads-throttle) | `arr-throttle.timer` | no | qBittorrent speed limits |
 | [`youtube-sync.py`](#youtube-syncpy) | `arr-youtube.timer`, `stack-up` | no | Glance channel lists and video rows, metric; `.env` with `--login` |
 | [`ups-metrics`](#ups-metrics) | `arr-ups-metrics.timer` | no | metric |
+| [`drive-metrics`](#drive-metrics) | `arr-drive-metrics.timer` | yes | metric |
 | [`stack-failure-notify`](#stack-failure-notify) | `arr-notify-failure@.service` | yes | ntfy only |
 | [`ups-event`](#ups-event) | apcupsd (`apccontrol`) | yes | ntfy only |
 | [`stack-update`](#stack-update) | by hand | sudo | pulls images, recreates containers, restores settings |
@@ -83,6 +84,7 @@ flowchart LR
     yttimer["arr-youtube.timer"]
     mirrortimer["arr-mirror.timer"]
     upstimer["arr-ups-metrics.timer"]
+    drivetimer["arr-drive-metrics.timer"]
     failsvc["arr-notify-failure@.service"]
   end
   subgraph hand["by hand"]
@@ -104,6 +106,7 @@ flowchart LR
   yttimer --> youtube["youtube-sync.py"]
   mirrortimer --> mirror["storage-mirror"]
   upstimer --> upsmetrics["ups-metrics"]
+  drivetimer --> drivemetrics["drive-metrics"]
   apcupsd["apcupsd, on a power event"] --> upsevent["ups-event"]
   failsvc --> notifyfail["stack-failure-notify"]
   stackup --> youtube
@@ -597,6 +600,23 @@ When apcupsd can't reach the UPS, the file holds only `arr_ups_up 0`. A reading 
 - **Changes:** `$STATE/metrics/ups.prom`.
 - **Idempotent:** yes.
 
+### drive-metrics
+
+Reads each drive's temperature for node-exporter's textfile collector, read by Grafana's Media Server: Overview dashboard and Glance's Drives block. It writes `$STATE/metrics/drives.prom` whole and renames it into place:
+
+| Metric | From |
+|---|---|
+| `arr_drive_temperature_celsius{drive="media"}` | the disk under `STORAGE_MOUNT` |
+| `arr_drive_temperature_celsius{drive="backup"}` | the disk under `BACKUP_MOUNT`, only with `BACKUP_UUID` set |
+
+It finds each disk from its mount and reads it with `smartctl -j -n standby -A`, adding `-d sat` for a drive behind a USB bridge. A drive that is not mounted is left out, because its mount path would resolve to the system disk; a drive that is asleep is left out too, never woken (`-n standby`). With neither drive readable, the file is empty.
+
+- **File:** [`scripts/drive-metrics`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/drive-metrics)
+- **Runs:** [`arr-drive-metrics.timer`](systemd.md#arr-drive-metricstimer) every minute, from 2 minutes after boot. Optional: `stack-health` doesn't check that the timer is enabled.
+- **Root:** yes (smartctl needs it).
+- **Changes:** `$STATE/metrics/drives.prom`.
+- **Idempotent:** yes.
+
 ### stack-failure-notify
 
 The `OnFailure=` handler: pushes "media stack: `<unit>` failed" with the unit's last 8 log lines (at most 1500 characters) to ntfy. Without `NTFY_TOPIC` it does nothing.
@@ -776,7 +796,7 @@ Release tooling for this repository, not part of the server. Every change adds i
 
 ### repo-check
 
-Every check CI and releases run, each tool from a pinned container, so it needs only Docker and Python 3: Python syntax, shell syntax, shellcheck (warnings and up), ruff, the Python unit tests (`tests/` and the agent's), JavaScript unit tests through Node's built-in runner, `docker compose config` against `.env.example` with every module, with none and with the GPU override, a gitleaks secret scan, a heading in these reference pages for every file in `scripts/` and `host/systemd/`, no em or en dashes in tracked files (the vendored Grafana dashboard excepted), every Mermaid diagram rendering, and a strict build of the documentation site. It prints the failed steps and exits 1 when any fails.
+Every check CI and releases run, each tool from a pinned container, so it needs only Docker and Python 3: Python syntax, shell syntax, shellcheck (warnings and up), ruff, the Python unit tests (`tests/` and the agent's), JavaScript unit tests through Node's built-in runner, `docker compose config` against `.env.example` with every module, with none, with the GPU override and with the backup-drive override, a gitleaks secret scan, a heading in these reference pages for every file in `scripts/` and `host/systemd/`, no em or en dashes in tracked files (the vendored Grafana dashboard excepted), every Mermaid diagram rendering, and a strict build of the documentation site. It prints the failed steps and exits 1 when any fails.
 
 - **File:** [`scripts/repo-check`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/repo-check)
 - **Flags:** `--fast` skips rendering the diagrams and building the documentation site.
@@ -795,6 +815,7 @@ What the scripts keep between runs. `$STATE` is the `state` folder next to `CONF
 | `$STATE/metrics/*.prom` | `stack-update-check`, `stack-update`, `stack-backup`, `youtube-sync.py` | node-exporter, `stack-health` |
 | `$STATE/metrics/mirror.prom` | `storage-mirror` | node-exporter (Glance), `stack-health` |
 | `$STATE/metrics/ups.prom` | `ups-metrics` | node-exporter (Grafana's UPS dashboard, Glance) |
+| `$STATE/metrics/drives.prom` | `drive-metrics` | node-exporter (Grafana's Media Server: Overview, Glance's Drives block) |
 | `$STATE/rollback/<service>` | `stack-update` | `stack-update --rollback` |
 | `$STATE/port-forward-missing-since`, `$STATE/port-forward-last-heal` | `vpn-port-sync` | `vpn-port-sync` |
 | `$STATE/throttle-by-script` | `downloads-throttle` | `downloads-throttle` |

@@ -18,7 +18,7 @@ network can't open them.
 | **Grafana** | 3001 | How has it behaved over time? | `GRAFANA_USER` / `GRAFANA_PASSWORD` | `monitoring` |
 | **Uptime Kuma** | 3003 | Is anything down, and since when? Status page at `/status/stack` | `UPTIME_KUMA_USER` / `UPTIME_KUMA_PASSWORD` | `monitoring` |
 | **Dozzle** | 8888 | What is this container saying? | `DOZZLE_USER` / `DOZZLE_PASSWORD` | `monitoring` |
-| **Scrutiny** | 3006 | Is the media drive healthy? | None | `monitoring` |
+| **Scrutiny** | 3006 | Are the drives healthy? | None | `monitoring` |
 | **Prometheus** | 9090 | Raw metrics; `/targets` shows every scrape | None | `monitoring` |
 | **Jellystat** | 3002 | What have we been watching? | Its own, created on first visit | `stats` |
 | **JellyDash** | 3004 | What's playing now, and the watch history | `JELLYDASH_USER` / `JELLYDASH_PASSWORD` | `stats` |
@@ -65,7 +65,7 @@ pages, in this order:
 
 | Page | What is on it |
 |---|---|
-| **Lab** (the first, so `/` opens it) | Server CPU, RAM, temperature and both disks; the media drive's free space, growth per day, projected full date and SMART status from Scrutiny; library counts and sizes; response times of the apps people use; every container's state; Uptime Kuma's up and down counts with 24-hour uptime; pending image updates, the last backup and, when set up, the last media mirror and the UPS; indexers backing off, subtitles wanted and throttled subtitle providers; new releases of the stack's apps |
+| **Lab** (the first, so `/` opens it) | Server CPU, RAM, temperature and both disks; the media drive's free space, growth per day and projected full date, and each drive's SMART status and temperature; library counts and sizes; response times of the apps people use; every container's state; Uptime Kuma's up and down counts with 24-hour uptime; pending image updates, the last backup and, when set up, the last media mirror and the UPS; indexers backing off, subtitles wanted and throttled subtitle providers; new releases of the stack's apps |
 | **Home** | Calendar, blogs, Twitch channels and ChangeDetection's watched pages; a search box with `!yt`, `!gh` and `!r` shortcuts, Hacker News and Lobsters, your tech YouTube subscriptions, Reddit and Ars Technica; the weather, your stocks, Formula 1 (next race, standings and last result, from [f1api.dev](https://f1api.dev)) and bookmarks |
 | **Media** | Poster rows: movies and episodes recently added to Jellyfin, the next two weeks of TV, the next 90 days of movies and 60 days of albums from your Lidarr artists, recent Seerr requests with their status, and the month's most watched. Beside them: the VPN (exit city, address and forwarded port; red when it is down or exits in the US), live torrent and Usenet speeds, Jellyfin's now playing, request counts, 30-day watch statistics, the download queue and every downloading torrent |
 | **Gaming** | Top Twitch games, gaming news, your gaming YouTube subscriptions, free Epic games, Steam deals and a Pokémon of the hour |
@@ -98,6 +98,12 @@ How it works, and what to know when you change it:
   N ago" from `storage-mirror` (red after 48 hours, [Backups](../flows/backups.md#the-media-mirror)),
   and the UPS from `ups-metrics`: on mains power, on battery power or not responding, with the
   battery charge and the minutes left ([Power](../flows/power.md)).
+- **Drives** shows the media drive's free space and growth, then each drive Scrutiny knows: the
+  media drive, and the backup drive once Scrutiny has it ([Scrutiny](#scrutiny)). For each: SMART
+  status, temperature (red at 55 °C), days powered on and model, refreshed every minute. The
+  temperature is the live reading `drive-metrics` writes for Prometheus; without it, for example
+  with `arr-drive-metrics.timer` off or the drive asleep, it is Scrutiny's last reading, up to an
+  hour old.
 - **Container states** come through the read-only socket proxy. Glance has no login, so it stays
   tailnet-only like everything here.
 
@@ -142,7 +148,7 @@ One-time setup:
 
 | Dashboard | Shows |
 |---|---|
-| **Media Server: Overview** (`/d/media-server-overview`) | Host CPU, temperature, RAM, storage, disk I/O, network and metrics-collection history; 24 hours by default |
+| **Media Server: Overview** (`/d/media-server-overview`) | Host CPU, temperature, RAM, storage, disk I/O, network and metrics-collection history, and the drive temperatures; 24 hours by default |
 | **Media Server: Watching** (`/d/media-watching-overview`) | Jellystat's recorded sessions, watch time, active viewers, totals per user and title, playback methods and recent history; 7 days by default |
 | **Node Exporter Full** | The server in depth: CPU, RAM, temperature, disk I/O, network |
 | **Sonarr v3**, **Radarr v3** | Library, queue, missing, disk |
@@ -154,6 +160,11 @@ other ranges. They are provisioned from `apps/grafana/dashboards/` and picked up
 Edits made in the UI survive, but for anything permanent, export the JSON into that folder. The
 Watching dashboard reads Jellystat's history through a read-only database user; how it is set up
 is in [Monitoring](../flows/monitoring.md).
+
+The overview's **Drive temperatures** panel draws the media drive, and the backup drive when there
+is one, as [`drive-metrics`](../reference/scripts.md#drive-metrics) reads them every minute: orange
+from 50 °C, red from 55 °C, where `stack-health` alerts. It stays empty until
+`arr-drive-metrics.timer` is enabled ([Host setup](../operations/host.md#systemd-units-and-the-udev-rules)).
 
 ## Uptime Kuma
 
@@ -174,9 +185,11 @@ proxy refuses writes anyway. `configure-dozzle.py` applies the login from `.env`
 ## Scrutiny
 
 `http://<tailscale-ip>:3006` keeps the media drive's SMART attributes, temperature and health over
-time, collected every six hours. `STORAGE_DEVICE` in `.env` names the drive (default `/dev/sda`);
+time, collected every hour. `STORAGE_DEVICE` in `.env` names the drive (default `/dev/sda`);
 behind a USB enclosure it reads through the bridge with the `sat` device type
-(`apps/scrutiny/collector.yaml`). Alerts still come from `stack-health`, which checks SMART every 6
+(`apps/scrutiny/collector.yaml`). The backup drive joins it with the `compose.backup-drive.yml`
+override and `BACKUP_DEVICE`
+([Configuration](../reference/configuration.md#composebackup-driveyml-and-backup_device)). Alerts still come from `stack-health`, which checks SMART every 6
 hours; Scrutiny is for the history. Its metrics database is left out of backups.
 
 ## ChangeDetection.io
