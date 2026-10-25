@@ -1,8 +1,10 @@
 import datetime
 import os
 import shutil
+import signal
 import subprocess
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -123,6 +125,23 @@ class StorageMirrorTests(unittest.TestCase):
             self.data.mkdir()
             self.assert_refused(self.run_mirror())
 
+    def test_stop_remounts_read_only_and_exits_143(self):
+        self.write_stub('rsync', 'exec sleep 30')
+        mirror_process = subprocess.Popen(['bash', str(self.root / 'scripts/storage-mirror')],
+                                          env=self.environment(), start_new_session=True,
+                                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.addCleanup(mirror_process.kill)
+
+        deadline = time.monotonic() + 10
+        while 'remount,rw' not in (self.mount_log.read_text() if self.mount_log.exists() else ''):
+            self.assertLess(time.monotonic(), deadline, 'the mirror never remounted read-write')
+            time.sleep(0.05)
+
+        os.killpg(mirror_process.pid, signal.SIGTERM)
+
+        self.assertEqual(mirror_process.wait(timeout=10), 143)
+        self.assertEqual(self.mount_log.read_text().splitlines()[-1], f'-o remount,ro {self.backup}')
+
     def test_dry_run_changes_nothing(self):
         mirror_result = self.run_mirror('--dry-run')
 
@@ -148,8 +167,8 @@ class StorageMirrorTests(unittest.TestCase):
         stub_path.write_text(f'#!/bin/sh\n{body}\n')
         stub_path.chmod(0o755)
 
-    def run_mirror(self, *arguments, now=NOW, **stub_environment):
-        environment = {
+    def environment(self, now=NOW, **stub_environment):
+        return {
             **os.environ,
             'PATH': f'{self.stub_directory}:{os.environ["PATH"]}',
             'TZ': 'UTC',
@@ -163,8 +182,9 @@ class StorageMirrorTests(unittest.TestCase):
             **stub_environment,
         }
 
-        return subprocess.run(['bash', str(self.root / 'scripts/storage-mirror'), *arguments],
-                              text=True, capture_output=True, env=environment, timeout=60)
+    def run_mirror(self, *arguments, now=NOW, **stub_environment):
+        return subprocess.run(['bash', str(self.root / 'scripts/storage-mirror'), *arguments], text=True,
+                              capture_output=True, env=self.environment(now, **stub_environment), timeout=60)
 
 
 if __name__ == '__main__':

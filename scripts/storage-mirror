@@ -48,6 +48,8 @@ fi
 
 mount -o remount,rw "$BACKUP_MOUNT" || fail "could not remount $BACKUP_MOUNT read-write"
 trap 'mount -o remount,ro "$BACKUP_MOUNT"' EXIT
+# Without its own trap, SIGTERM from systemctl stop kills bash before the EXIT trap runs.
+trap 'exit 143' TERM INT HUP
 
 rsync "${rsync_args[@]}" "$STORAGE_MOUNT/" "$BACKUP_MOUNT/"
 rsync_rc=$?
