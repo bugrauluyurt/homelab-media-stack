@@ -479,6 +479,7 @@ With the apps configured, switch on the timers that watch them:
 sudo systemctl enable --now arr-health.timer arr-watch.timer arr-throttle.timer
 sudo systemctl enable --now arr-youtube.timer        # dashboards module only
 sudo systemctl enable --now arr-mirror.timer         # with a backup drive only
+sudo systemctl enable --now arr-spindown.service     # with a backup drive only: spins it down between mirrors
 sudo systemctl enable --now arr-ups-metrics.timer    # with a UPS and apcupsd only
 sudo systemctl enable --now arr-drive-metrics.timer  # optional: live drive temperatures
 ```

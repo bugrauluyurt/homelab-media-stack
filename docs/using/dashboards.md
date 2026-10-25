@@ -102,8 +102,9 @@ How it works, and what to know when you change it:
   media drive, and the backup drive once Scrutiny has it ([Scrutiny](#scrutiny)). For each: SMART
   status, temperature (red at 55 °C), days powered on and model, refreshed every minute. The
   temperature is the live reading `drive-metrics` writes for Prometheus; without it, for example
-  with `arr-drive-metrics.timer` off or the drive asleep, it is Scrutiny's last reading, up to an
-  hour old.
+  with `arr-drive-metrics.timer` off or the drive asleep, it is Scrutiny's last reading, marked
+  "· last reading". For the media drive that is up to an hour old; for the backup drive, which
+  sleeps between mirrors, it is usually the reading from the last nightly mirror.
 - **Container states** come through the read-only socket proxy. Glance has no login, so it stays
   tailnet-only like everything here.
 
@@ -165,6 +166,8 @@ The overview's **Drive temperatures** panel draws the media drive, and the backu
 is one, as [`drive-metrics`](../reference/scripts.md#drive-metrics) reads them every minute: orange
 from 50 °C, red from 55 °C, where `stack-health` alerts. It stays empty until
 `arr-drive-metrics.timer` is enabled ([Host setup](../operations/host.md#systemd-units-and-the-udev-rules)).
+A drive that is asleep is not read, so the backup drive's line shows mostly around the nightly
+mirror.
 
 ## Uptime Kuma
 
@@ -189,8 +192,11 @@ time, collected every hour. `STORAGE_DEVICE` in `.env` names the drive (default 
 behind a USB enclosure it reads through the bridge with the `sat` device type
 (`apps/scrutiny/collector.yaml`). The backup drive joins it with the `compose.backup-drive.yml`
 override and `BACKUP_DEVICE`
-([Configuration](../reference/configuration.md#composebackup-driveyml-and-backup_device)). Alerts still come from `stack-health`, which checks SMART every 6
-hours; Scrutiny is for the history. Its metrics database is left out of backups.
+([Configuration](../reference/configuration.md#composebackup-driveyml-and-backup_device)). The
+backup drive sleeps between mirrors and the hourly run skips it while it sleeps, so its history is
+mostly one point a night, recorded by `storage-mirror` after the copy. Alerts still come from
+`stack-health`, which checks SMART every 6 hours, and from the nightly mirror for the backup
+drive; Scrutiny is for the history. Its metrics database is left out of backups.
 
 ## ChangeDetection.io
 

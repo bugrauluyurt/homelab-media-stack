@@ -24,7 +24,9 @@ safe to cut the enclosure's power.
 
 A backup drive (`BACKUP_UUID` set, mounted at `BACKUP_MOUNT`, default `/mnt/backup`) is read-only
 between mirrors and needs no unmount when only the media drive is powered off. If both drives
-share a dock that is being switched off, also stop the mirror and unmount it:
+share a dock that is being switched off, also stop the mirror and unmount it. The backup drive
+spins down after 10 idle minutes, so it may be asleep; that changes nothing, it still needs both
+steps:
 
 ```bash
 sudo systemctl stop arr-mirror.service

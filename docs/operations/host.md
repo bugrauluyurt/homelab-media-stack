@@ -246,13 +246,24 @@ Then switch the mirror on:
 2. Re-run `scripts/host-install`: it installs `99-arr-backup.rules`, which mounts the drive when it
    appears, and fills the backup mount into `arr-mirror.service`.
 3. `sudo systemctl enable --now arr-mirror.timer`.
-4. Review what the first run would do, without touching the drive:
+4. `sudo systemctl enable --now arr-spindown.service`, so the drive spins down between mirrors.
+5. Review what the first run would do, without touching the drive:
    `sudo scripts/storage-mirror --dry-run | less`.
-5. Start the first copy: `sudo systemctl start --no-block arr-mirror.service`, and follow it with
+6. Start the first copy: `sudo systemctl start --no-block arr-mirror.service`, and follow it with
    `journalctl -fu arr-mirror`. It can take hours: about 3.3 TB took 5 to 6 hours over one USB 3
    dock. The nightly runs after it copy only what changed.
 
 `stack-health` checks the drive and the mirror from then on.
+
+`arr-spindown.service` runs [`storage-spindown`](../reference/scripts.md#storage-spindown), which
+gives the drive a 10-minute idle timer (`smartctl -s standby,120`, through `-d sat` behind a USB
+bridge). The drive forgets the timer when it loses power, so the unit is wanted by the drive's
+mount unit and runs at every boot and every plug-in; `--now` applies it at once. Any read wakes
+the drive again, which takes about 10 seconds. In a fanless dual-bay dock, a second drive spinning
+beside the media drive kept it about 12 °C warmer (40 °C alone, 52 to 53 °C with both); with the
+backup drive asleep, the media drive fell from 53 to 50 °C within 35 minutes. `stack-health`,
+`drive-metrics` and Scrutiny leave a sleeping drive asleep, and the nightly mirror reads its SMART
+health while the copy has it awake ([Backups](../flows/backups.md#the-media-mirror)).
 
 Optionally, give Scrutiny the backup drive's SMART history too
 ([Configuration](../reference/configuration.md#composebackup-driveyml-and-backup_device)):
@@ -265,6 +276,12 @@ Optionally, give Scrutiny the backup drive's SMART history too
 
 Glance's Drives block lists the backup drive once Scrutiny has it. Grafana's Drive temperatures
 panel shows it without the override, once `arr-drive-metrics.timer` is enabled.
+
+Scrutiny's hourly run skips the backup drive while it sleeps (`-n standby` in
+`apps/scrutiny/collector.backup-drive.yaml`) instead of waking it, so its history of that drive
+comes mostly from the nightly mirror, which has Scrutiny read the drives after the copy. The
+collector file is bind-mounted as a single file, so a change to it applies after
+`docker restart scrutiny`.
 
 ## UPS (apcupsd)
 

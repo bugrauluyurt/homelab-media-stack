@@ -306,7 +306,7 @@ With `BACKUP_UUID` set, a second drive holds a nightly mirror of the whole media
 
 ### compose.backup-drive.yml and BACKUP_DEVICE
 
-[`compose.backup-drive.yml`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/compose.backup-drive.yml) is an override that adds the [backup drive](#backup_uuid-and-backup_mount) to Scrutiny, so it keeps that drive's SMART history too. It maps `BACKUP_DEVICE` to `/dev/sdb` in the container and mounts `apps/scrutiny/collector.backup-drive.yaml`, which lists `/dev/sda` and `/dev/sdb`, both with the device type `sat`, in place of `collector.yaml`.
+[`compose.backup-drive.yml`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/compose.backup-drive.yml) is an override that adds the [backup drive](#backup_uuid-and-backup_mount) to Scrutiny, so it keeps that drive's SMART history too. It maps `BACKUP_DEVICE` to `/dev/sdb` in the container and mounts `apps/scrutiny/collector.backup-drive.yaml`, which lists `/dev/sda` and `/dev/sdb`, both with the device type `sat`, in place of `collector.yaml`. It reads `/dev/sdb` with `-n standby`, so Scrutiny's hourly run skips the backup drive while it sleeps instead of waking it; [`storage-mirror`](scripts.md#storage-mirror) has Scrutiny read it after each nightly copy. The file is a single-file bind mount, so a change to it applies after `docker restart scrutiny`.
 
 1. In `.env`, set `BACKUP_DEVICE` to the backup disk's whole-disk path (`ls -l /dev/disk/by-id/`, the entry without `-part`), and `STORAGE_DEVICE` to the media disk's, so the two can't swap.
 2. Add the override to `COMPOSE_FILE`, after any you already have: `COMPOSE_FILE=docker-compose.yml:compose.backup-drive.yml`.

@@ -40,7 +40,8 @@ Every file in [`scripts/`](https://github.com/bugrauluyurt/homelab-media-stack/t
 | [`vpn-import-servers`](#vpn-import-servers) | by hand | no | verified Proton server files outside the repository |
 | [`host-firewall`](#host-firewall) | `arr-firewall.service` and `.timer` | yes | iptables and ip6tables rules |
 | [`stack-backup`](#stack-backup) | `arr-backup.timer`, `stack-update` | yes | restic repositories, key file, metrics |
-| [`storage-mirror`](#storage-mirror) | `arr-mirror.timer`, by hand | yes | the backup drive (remounted read-write, then read-only), its trash, metric |
+| [`storage-mirror`](#storage-mirror) | `arr-mirror.timer`, by hand | yes | the backup drive (remounted read-write, then read-only), its trash, metric, a Scrutiny reading |
+| [`storage-spindown`](#storage-spindown) | `arr-spindown.service` | yes | the backup drive's idle timer |
 | [`stack-update-check`](#stack-update-check) | `arr-updates.timer` | no | state file, metrics, ntfy |
 | [`stack-health`](#stack-health) | `arr-health.timer`, `stack-update`, by hand | sudo | test file on the drive, throwaway containers, ntfy |
 | [`activity-watch`](#activity-watch) | `arr-watch.timer` | sudo if needed | state file, ntfy |
@@ -86,6 +87,8 @@ flowchart LR
     upstimer["arr-ups-metrics.timer"]
     drivetimer["arr-drive-metrics.timer"]
     failsvc["arr-notify-failure@.service"]
+    budev["99-arr-backup.rules"]
+    spindownsvc["arr-spindown.service"]
   end
   subgraph hand["by hand"]
     update["update"]
@@ -105,6 +108,8 @@ flowchart LR
   throttletimer --> throttle["downloads-throttle"]
   yttimer --> youtube["youtube-sync.py"]
   mirrortimer --> mirror["storage-mirror"]
+  budev -->|"backup drive on"| spindownsvc
+  spindownsvc --> spindown["storage-spindown"]
   upstimer --> upsmetrics["ups-metrics"]
   drivetimer --> drivemetrics["drive-metrics"]
   apcupsd["apcupsd, on a power event"] --> upsevent["ups-event"]
@@ -490,16 +495,29 @@ It backs this up to `$STORAGE_MOUNT/backups/restic` (tag `arr-stack`, host `HOST
 
 Mirrors the whole media drive onto a second drive, the backup drive at `BACKUP_MOUNT` (default `/mnt/backup`), with `rsync -aHAX --numeric-ids --delete` from `$STORAGE_MOUNT/` to `$BACKUP_MOUNT/`: owners, ACLs, extended attributes and hardlinks are kept, so the copy is exact and a torrent and its library copy still take the space once. A file deleted or overwritten since the last run moves into `$BACKUP_MOUNT/.trash/<YYYY-MM-DD>/` instead of disappearing (rsync's `--backup-dir`, a rename on the same filesystem), and trash days older than 30 days are removed after the copy. It leaves out `/.trash/`, `/lost+found/`, `$DATA_ROOT/usenet/incomplete/` and `$DATA_ROOT/soulseek/incomplete/`. The backup drive is mounted read-only in fstab; the script remounts it read-write for the copy and back to read-only on exit, whether the copy worked or not. On success it writes `arr_mirror_last_success_timestamp_seconds` to `$STATE/metrics/mirror.prom`. [Backups](../flows/backups.md#the-media-mirror) covers restoring files and swapping the backup drive in.
 
+After the metric, while the copy has the backup drive awake, it has Scrutiny read the drives (`docker exec scrutiny scrutiny-collector-metrics run`, or `~ Scrutiny not updated (not running)`), then runs the backup drive's SMART health, sectors and temperature checks ([`drive_smart`](#stack-envsh)). A failed check ends the run with `FATAL: the backup drive failed its SMART <check> check`; the copy and its metric are kept.
+
 It refuses to start (exit 1, `FATAL`) when `BACKUP_UUID` is empty, when either mount is not a mount point, when the backup mount is not the drive `BACKUP_UUID` names (or, with `STORAGE_UUID` set, the media mount is not that drive), or when `DATA_ROOT` is empty.
 
 - **File:** [`scripts/storage-mirror`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/storage-mirror)
 - **Runs:** [`arr-mirror.timer`](systemd.md#arr-mirrortimer) daily at 05:30, after the 04:30 settings backup; by hand with `sudo` (the stack-backup skill, which asks first).
 - **Flags:** `--dry-run` lists what would change (`rsync -n -i`) and touches nothing, the mount included.
 - **Root:** yes; it remounts the backup drive and copies files of every owner.
-- **Changes:** `$BACKUP_MOUNT` and its `.trash/`; `$STATE/metrics/mirror.prom`.
-- **Exit:** 0 when rsync succeeds or exits 24 (files vanished during the copy, normal while downloads run); 1 otherwise, which fails `arr-mirror.service` and pushes ntfy.
-- **Why:** mirroring from an unmounted media drive would empty the backup, and onto an unmounted backup mount would fill the system disk, hence the guards. Read-only between runs, nothing but this script can change the copy. The copy is the drive's root, so the backup drive can stand in for the media drive as it is. The trash is pruned by age only: trash that fills the drive makes rsync fail, which alerts.
+- **Changes:** `$BACKUP_MOUNT` and its `.trash/`; `$STATE/metrics/mirror.prom`; a Scrutiny collector run.
+- **Exit:** 0 when rsync succeeds or exits 24 (files vanished during the copy, normal while downloads run) and the backup drive passes its SMART checks; 1 otherwise, which fails `arr-mirror.service` and pushes ntfy.
+- **Why:** mirroring from an unmounted media drive would empty the backup, and onto an unmounted backup mount would fill the system disk, hence the guards. Read-only between runs, nothing but this script can change the copy. The copy is the drive's root, so the backup drive can stand in for the media drive as it is. The trash is pruned by age only: trash that fills the drive makes rsync fail, which alerts. The backup drive sleeps between mirrors ([`storage-spindown`](#storage-spindown)), and `stack-health` and Scrutiny's hourly run leave it asleep, so its SMART data is read here, while the copy has it awake.
 - **Idempotent:** yes; a second run copies only what changed.
+
+### storage-spindown
+
+Gives the backup drive a 10-minute idle timer with `smartctl -s standby,120` (the timer counts in 5-second steps), adding `-d sat` for a drive behind a USB bridge, so the drive spins down between mirrors. Any read wakes it again, which takes about 10 seconds. The drive forgets the timer when it loses power, so [`arr-spindown.service`](systemd.md#arr-spindownservice) runs this each time the backup drive mounts. It refuses to run (exit 1, `FATAL`) when `BACKUP_MOUNT` is not a mount point.
+
+- **File:** [`scripts/storage-spindown`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/storage-spindown)
+- **Runs:** [`arr-spindown.service`](systemd.md#arr-spindownservice), at boot and whenever the backup drive is plugged in; apply it now with `sudo systemctl start arr-spindown.service`.
+- **Root:** yes (smartctl needs it).
+- **Changes:** the backup drive's standby timer, held by the drive until it loses power.
+- **Why:** two drives spinning in one fanless dual-bay dock kept the media drive about 12 C warmer (40 C alone, 52 to 53 C with both). With the backup drive asleep, the media drive fell from 53 to 50 C within 35 minutes and kept falling.
+- **Idempotent:** yes.
 
 ### stack-update-check
 
@@ -522,7 +540,7 @@ One-shot status of the whole stack, grouped as STORAGE, HARDWARE (only where `vc
 | Check | Fails when |
 |---|---|
 | Disks | the media drive, the backup drive or the system disk is 90% full or more |
-| Drive SMART | on the media drive, and on the backup drive with `BACKUP_UUID` set: health not passed, any reallocated, pending or uncorrectable sector (NVMe: media errors), or 55 C or hotter |
+| Drive SMART | on the media drive, and on the backup drive with `BACKUP_UUID` set: health not passed, any reallocated, pending or uncorrectable sector (NVMe: media errors), or 55 C or hotter. A drive that is asleep passes without being woken; [`storage-mirror`](#storage-mirror) reads the backup drive after each copy |
 | Backup drive | with `BACKUP_UUID` set: not mounted at `BACKUP_MOUNT`, or mounted read-write while `arr-mirror.service` isn't running |
 | Raspberry Pi | under-voltage, frequency cap, throttling or soft temperature limit right now, or the SoC at 80 C or hotter |
 | Backups | the last backup is 48 hours old or more, or a restic copy or the key file is missing; with `BACKUP_UUID` set, `arr-mirror.timer` isn't enabled or the last mirror is 48 hours old or more with none running (drive checks pass while the drive is off) |
@@ -757,6 +775,7 @@ Sourced by the stack's bash scripts. It sets `REPO`, exports every `.env` value,
 - `write_update_metrics`: pending image updates for node-exporter's textfile collector, written whole and renamed into place so a scrape never sees half a file;
 - `disk_of_mount PATH`: the whole disk a mount lives on, bind mounts included;
 - `long_down_indexers`: the indexers that Prowlarr's `/api/v1/health` JSON on stdin reports down for more than 6 hours (its `IndexerLongTermStatusCheck`), comma-separated;
+- `drive_smart MOUNT CHECK`: whether the disk under `MOUNT` passes `health` (SMART status passed), `sectors` (no reallocated, pending or uncorrectable sector; NVMe: no media errors) or `temperature` (under 55 C), read with `smartctl -j -n standby -a`, adding `-d sat` behind a USB bridge. A drive that is asleep passes without being woken and is read the next time it is used. Used by `stack-health` for both drives and by `storage-mirror` for the backup drive;
 - `ups_field NAME`: one apcupsd reading without its unit (`apcaccess -u -p`, so `BCHARGE` reads `100.0`), empty when apcupsd can't be reached;
 - `service_enabled NAME`: whether a service is in an active profile;
 - `json_get`, `tunnel_ip`, `forwarded_port`, `qbit_prefs`, `vpn_healthy`, `wait_gluetun_healthy`;

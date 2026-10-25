@@ -22,9 +22,9 @@ The files in `host/systemd/` are templates. [`host-install`](scripts.md#host-ins
 
 Without `STORAGE_UUID`, `host-install` skips `99-arr-storage.rules` and removes an installed copy: the media disk is then always mounted (through fstab or a bind mount), so there is nothing to hot-plug. Without `BACKUP_UUID` it does the same with `99-arr-backup.rules`: there is no backup drive.
 
-`host-install` never enables anything. The units meant to be enabled are `arr-stack.service`, `arr-firewall.service`, `arr-firewall.timer`, `arr-port-sync.timer`, `arr-backup.timer`, `arr-updates.timer`, `arr-health.timer`, `arr-watch.timer`, `arr-throttle.timer`, with the dashboards module `arr-youtube.timer`, with a backup drive `arr-mirror.timer`, with a UPS `arr-ups-metrics.timer`, and, optionally, for live drive temperatures, `arr-drive-metrics.timer`. [Getting started](../getting-started.md#start-the-stack) enables them in stages: the firewall first, the timers that read the apps' API keys last.
+`host-install` never enables anything. The units meant to be enabled are `arr-stack.service`, `arr-firewall.service`, `arr-firewall.timer`, `arr-port-sync.timer`, `arr-backup.timer`, `arr-updates.timer`, `arr-health.timer`, `arr-watch.timer`, `arr-throttle.timer`, with the dashboards module `arr-youtube.timer`, with a backup drive `arr-mirror.timer` and `arr-spindown.service`, with a UPS `arr-ups-metrics.timer`, and, optionally, for live drive temperatures, `arr-drive-metrics.timer`. [Getting started](../getting-started.md#start-the-stack) enables them in stages: the firewall first, the timers that read the apps' API keys last.
 
-The other services have no `[Install]` section: their timer, or `OnFailure=`, starts them. [`stack-health`](scripts.md#stack-health) fails when one of the units above is not enabled (`arr-youtube.timer` only while the dashboards module is on, `arr-mirror.timer` only with `BACKUP_UUID` set, `arr-ups-metrics.timer` only with apcupsd configured); it doesn't check the optional `arr-drive-metrics.timer`. Re-run `host-install` after changing a file in `host/systemd/` or `STACK_USER`, `STORAGE_MOUNT`, `STORAGE_UUID`, `BACKUP_MOUNT` or `BACKUP_UUID`.
+The other services have no `[Install]` section: their timer, or `OnFailure=`, starts them. [`stack-health`](scripts.md#stack-health) fails when one of the units above is not enabled (`arr-youtube.timer` only while the dashboards module is on, `arr-mirror.timer` only with `BACKUP_UUID` set, `arr-ups-metrics.timer` only with apcupsd configured); it doesn't check the optional `arr-drive-metrics.timer` or `arr-spindown.service`. Re-run `host-install` after changing a file in `host/systemd/` or `STACK_USER`, `STORAGE_MOUNT`, `STORAGE_UUID`, `BACKUP_MOUNT` or `BACKUP_UUID`.
 
 ## How the units fit together
 
@@ -32,6 +32,7 @@ The other services have no `[Install]` section: their timer, or `OnFailure=`, st
 flowchart LR
   udev["99-arr-storage.rules"] -->|"drive switched on"| mount["media drive mount unit"]
   budev["99-arr-backup.rules"] -->|"backup drive appears"| bmount["backup drive mount unit, read-only"]
+  bmount -->|"WantedBy"| spindown["arr-spindown.service"]
   boot["multi-user.target"] --> stack["arr-stack.service"]
   mount -->|"WantedBy"| stack
   mount -.->|"BindsTo: unmount stops it"| stack
@@ -45,7 +46,7 @@ flowchart LR
   svc -->|"OnFailure"| notify
 ```
 
-`OnFailure=` is set on `arr-stack`, `arr-firewall`, `arr-backup`, `arr-mirror`, `arr-updates` and `arr-youtube`; the other services have none. Nothing is wanted by or bound to the backup drive's mount unit: the stack never waits for it.
+`OnFailure=` is set on `arr-stack`, `arr-firewall`, `arr-backup`, `arr-mirror`, `arr-updates` and `arr-youtube`; the other services have none. Only `arr-spindown.service` is wanted by the backup drive's mount unit, and nothing is bound to it: the stack never waits for it.
 
 ## The first minutes after boot
 
@@ -73,7 +74,7 @@ gantt
 
 1. Docker and Tailscale start (both enabled on the host).
 2. `arr-firewall.service` loads the firewall once Docker, Tailscale and the network are up. It is a one-shot job, so `systemctl` shows it inactive afterwards; the rules stay. `arr-firewall.timer` applies it again 30 seconds after boot, then every 15 minutes.
-3. When the drive is mounted, `arr-stack.service` runs `stack-up`: every container starts, qBittorrent and slskd are re-attached to the VPN if needed, and the forwarded port is synced once gluetun is healthy. The unit allows up to 600 seconds for this.
+3. When the drive is mounted, `arr-stack.service` runs `stack-up`: every container starts, qBittorrent and slskd are re-attached to the VPN if needed, and the forwarded port is synced once gluetun is healthy. The unit allows up to 600 seconds for this. When the backup drive mounts, `arr-spindown.service`, when enabled, gives it its idle timer.
 4. `arr-ups-metrics.timer` reads the UPS 1 minute after boot, then every 30 seconds (skipped without apcupsd). `arr-port-sync.timer` runs `vpn-port-sync` 90 seconds after boot, then every 15 minutes. `arr-drive-metrics.timer`, when enabled, reads the drive temperatures 2 minutes after boot, then every minute.
 5. `arr-throttle.timer` and `arr-watch.timer` start 3 minutes after boot and then run every minute.
 6. `arr-backup.timer`, `arr-mirror.timer`, `arr-updates.timer` and `arr-youtube.timer` have `Persistent=true`: a run missed while the machine was off happens soon after boot. `arr-health.timer` has no catch-up; it waits for its next slot.
@@ -121,7 +122,7 @@ The udev rule that mounts the backup drive when it appears, the same way as [`99
 ACTION=="add", SUBSYSTEM=="block", ENV{ID_FS_UUID}=="@BACKUP_UUID@", ENV{SYSTEMD_WANTS}+="@BACKUP_UNIT@"
 ```
 
-When a block device with the filesystem UUID `BACKUP_UUID` appears, systemd starts the backup drive's mount unit, from its read-only fstab line ([Host](../operations/host.md#the-backup-drive)). Nothing is wanted by that mount unit, so the stack neither starts nor stops with it; only [`arr-mirror.service`](#arr-mirrorservice) uses the drive.
+When a block device with the filesystem UUID `BACKUP_UUID` appears, systemd starts the backup drive's mount unit, from its read-only fstab line ([Host](../operations/host.md#the-backup-drive)). Only [`arr-spindown.service`](#arr-spindownservice) is wanted by that mount unit, so the stack neither starts nor stops with it; only [`arr-mirror.service`](#arr-mirrorservice) writes to the drive.
 
 - **File:** [`host/systemd/99-arr-backup.rules`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/99-arr-backup.rules)
 - **Installed to:** `/etc/udev/rules.d/`, only when `BACKUP_UUID` is set.
@@ -138,6 +139,17 @@ Starts and stops the whole stack with the media drive.
 - **Dependencies:** `After=docker.service @STORAGE_UNIT@`, `Requires=docker.service`, `BindsTo=@STORAGE_UNIT@` (the stack stops when the drive is unmounted).
 - **Started by:** `WantedBy=multi-user.target @STORAGE_UNIT@`: at boot, and whenever the drive mounts.
 - **On failure:** `arr-notify-failure@arr-stack.service`.
+
+### arr-spindown.service
+
+Runs [`storage-spindown`](scripts.md#storage-spindown), which gives the backup drive a 10-minute idle timer so it spins down between mirrors. The drive forgets the timer when it loses power, so the unit runs each time the drive mounts: at boot and on every plug-in.
+
+- **File:** [`host/systemd/arr-spindown.service`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/arr-spindown.service)
+- **Runs:** `@REPO@/scripts/storage-spindown`, `Type=oneshot`.
+- **User:** root (no `User=`); smartctl needs it.
+- **Condition:** `ConditionPathIsMountPoint=@BACKUP_MOUNT@`. No `OnFailure=`.
+- **Dependencies:** `After=@BACKUP_UNIT@`.
+- **Started by:** `WantedBy=@BACKUP_UNIT@`: whenever the backup drive mounts. Enable it once there is a backup drive, with `sudo systemctl enable --now arr-spindown.service`; `--now` applies the timer without waiting for the next mount.
 
 ## Firewall
 

@@ -63,7 +63,9 @@ Only when `BACKUP_UUID` is set in `.env`. `storage-mirror` copies the whole medi
 backup drive at `BACKUP_MOUNT` (default `/mnt/backup`) daily at 05:30, after the settings backup,
 with hardlinks kept. Files deleted or overwritten since the last run move to
 `$BACKUP_MOUNT/.trash/<YYYY-MM-DD>/` (the night the mirror noticed) and stay 30 days. The backup
-drive is mounted read-only between runs.
+drive is mounted read-only between runs, and sleeps after 10 idle minutes (`arr-spindown.service`);
+the mirror wakes it. After each copy, while the drive is awake, the run has Scrutiny read the
+drives and checks the backup drive's SMART health, bad sectors and temperature.
 
 ### Status (safe)
 
@@ -78,6 +80,8 @@ echo "$(( ($(date +%s) - $(awk '{print $2}' "$STATE/metrics/mirror.prom")) / 360
 `stack-health` fails once the last mirror is 48 hours old and none is running; a run that hangs
 fails by itself after 24 hours. A `FATAL` line means a guard stopped
 it: the backup drive not mounted, a UUID that doesn't match `.env`, or an empty `DATA_ROOT`.
+`FATAL: the backup drive failed its SMART <check> check` comes after the copy instead: the copy
+and its success metric are fine, but the drive needs attention (the `drive-health` skill).
 
 ### Mirror now (ask first: it can run for hours)
 

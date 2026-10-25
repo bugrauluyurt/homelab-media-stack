@@ -305,7 +305,10 @@ flowchart TD
     SYNC -->|"rsync failed"| FAIL
     SYNC --> PRUNE["Remove trash days older than 30 days"]
     PRUNE --> METRIC["Record arr_mirror_last_success_timestamp_seconds"]
-    METRIC --> RO["Remount read-only, which also happens on a failure"]
+    METRIC --> SCRUTINY["Scrutiny reads the drives, the backup drive awake"]
+    SCRUTINY --> SMART{"Backup drive passes SMART health, sectors, temperature?"}
+    SMART -->|No| FAIL
+    SMART -->|Yes| RO["Remount read-only, which also happens on a failure"]
 ```
 
 - **An exact copy.** `rsync -aHAX --numeric-ids --delete` from `$STORAGE_MOUNT/` to
@@ -331,6 +334,15 @@ flowchart TD
   downloads run) counts as success.
 - **The first copy takes hours:** about 3.3 TB took 5 to 6 hours over one USB 3 dock. Later runs
   copy only what changed.
+- **Asleep between runs.** With [`arr-spindown.service`](../reference/systemd.md#arr-spindownservice)
+  enabled, the backup drive spins down after 10 idle minutes, so it doesn't heat a shared dock
+  around the clock. The mirror's first read wakes it, in about 10 seconds. `stack-health`,
+  `drive-metrics` and Scrutiny's hourly run leave it asleep.
+- **A health read after each copy.** While the drive is awake, the run has Scrutiny read the
+  drives (`docker exec scrutiny scrutiny-collector-metrics run`), so Scrutiny's history of the
+  backup drive gets a point every night, then runs the backup drive's SMART health, sectors and
+  temperature checks. A failed check fails the run with `FATAL: the backup drive failed its SMART
+  <check> check`, which reaches ntfy; the copy and its success metric are already done.
 
 | When | How |
 |---|---|
@@ -340,7 +352,7 @@ flowchart TD
 A successful run writes `arr_mirror_last_success_timestamp_seconds` to
 `$STATE_ROOT/metrics/mirror.prom`. Glance's Lab page shows "Media mirrored N ago", in red after 48
 hours. `stack-health` checks that the backup drive is mounted, read-only, under 90% full and
-healthy (SMART, sectors, temperature), that `arr-mirror.timer` is enabled, and that the last mirror
+healthy (SMART, sectors, temperature, passing unread while it is asleep), that `arr-mirror.timer` is enabled, and that the last mirror
 is under 48 hours old (while the media drive is mounted). A failed run pushes its last log lines to
 ntfy.
 
@@ -387,6 +399,8 @@ it.
 | `arr-backup.timer` / `.service` | Daily at 04:30, only with the drive mounted | [systemd](../reference/systemd.md#arr-backuptimer) |
 | `storage-mirror` | Mirrors the media drive onto the backup drive, keeps the trash, records success | [scripts](../reference/scripts.md#storage-mirror) |
 | `arr-mirror.timer` / `.service` | Daily at 05:30, only with the media drive mounted | [systemd](../reference/systemd.md#arr-mirrortimer) |
+| `storage-spindown` | Gives the backup drive its 10-minute idle timer | [scripts](../reference/scripts.md#storage-spindown) |
+| `arr-spindown.service` | Runs it each time the backup drive mounts | [systemd](../reference/systemd.md#arr-spindownservice) |
 | `99-arr-backup.rules` | Mounts the backup drive when it appears | [systemd](../reference/systemd.md#99-arr-backuprules) |
 | `arr-notify-failure@.service` | Pushes a failed run's log lines to ntfy | [systemd](../reference/systemd.md#arr-notify-failureservice) |
 | `stack-update` | Takes the `pre-update` snapshot, restores from it on rollback | [scripts](../reference/scripts.md#stack-update) |
@@ -401,6 +415,9 @@ it.
 - **`stack-health` fails "media mirrored in the last 48h".** The mirror was skipped because the
   media drive was off at 05:30, or it failed: `journalctl -u arr-mirror` shows why, often a
   `FATAL` guard (the backup drive not mounted, or a UUID that doesn't match `.env`).
+- **The mirror fails with "the backup drive failed its SMART ... check".** The copy finished and
+  was recorded; the drive needs attention. Ask an AI agent with the `drive-health` skill, or read
+  `sudo smartctl -a -d sat /dev/disk/by-id/<disk>`.
 - **`stack-health` fails "backup drive read-only between mirrors".** Something remounted it
   read-write, or a run was killed before its exit trap: `sudo mount -o remount,ro /mnt/backup`.
 - **A backup failed on a database.** An app held its database through five retries. Run it again;
