@@ -31,12 +31,13 @@ class DriveMetricsTests(unittest.TestCase):
                         'case "$mount_path" in "$STORAGE_PATH") echo /dev/sda1 ;; "$BACKUP_PATH") echo /dev/sdb1 ;; *) echo /dev/nvme0n1p2 ;; esac')
         self.write_stub('lsblk', 'for device_path; do :; done\n'
                         'case "$*" in *PKNAME*) basename "$device_path" | sed "s/[0-9p]*$//" ;; *TRAN*) echo usb ;; esac')
+        self.write_stub('systemctl', 'echo "$MIRROR_STATE"\nexit "$SYSTEMCTL_EXIT"')
         self.write_stub('smartctl', 'echo "$*" >> "$SMARTCTL_LOG"\nfor disk; do :; done\n'
                         'case " $ASLEEP " in *" $disk "*) echo \'{"smartctl": {"exit_status": 2}}\'; exit 2 ;; esac\n'
                         'case "$disk" in /dev/sda) echo \'{"temperature": {"current": 54}}\' ;; /dev/sdb) echo \'{"temperature": {"current": 49}}\' ;;'
                         ' *) echo \'{"temperature": {"current": 38}}\' ;; esac')
 
-    def test_both_drives_reported_by_role_without_waking_them(self):
+    def test_both_drives_reported_during_mirror_without_waking_them(self):
         metrics_result = self.run_metrics()
 
         self.assertEqual(metrics_result.returncode, 0, metrics_result.stderr)
@@ -65,6 +66,40 @@ class DriveMetricsTests(unittest.TestCase):
 
         self.assertEqual(self.metrics(), ['arr_drive_temperature_celsius{drive="backup"} 49'])
 
+    def test_idle_awake_backup_is_not_queried(self):
+        for state in ['inactive', 'failed', 'deactivating', 'reloading', 'unknown', '']:
+            with self.subTest(state=state):
+                self.smartctl_log.unlink(missing_ok=True)
+                result = self.run_metrics(MIRROR_STATE=state)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(self.metrics(), ['arr_drive_temperature_celsius{drive="media"} 54'])
+                self.assertNotIn('/dev/sdb', self.smartctl_log.read_text())
+
+    def test_active_mirror_can_publish_backup_temperature(self):
+        result = self.run_metrics(MIRROR_STATE='active')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('arr_drive_temperature_celsius{drive="backup"} 49', self.metrics())
+
+    def test_systemctl_failure_skips_backup_even_with_output(self):
+        result = self.run_metrics(MIRROR_STATE='active', SYSTEMCTL_EXIT='1')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn('/dev/sdb', self.smartctl_log.read_text())
+        self.assertEqual(self.metrics(), ['arr_drive_temperature_celsius{drive="media"} 54'])
+
+    def test_mirror_stopping_removes_old_live_temperature(self):
+        self.run_metrics(MIRROR_STATE='activating')
+        self.assertIn('arr_drive_temperature_celsius{drive="backup"} 49', self.metrics())
+        self.smartctl_log.unlink()
+        self.run_metrics(MIRROR_STATE='inactive')
+        self.assertEqual(self.metrics(), ['arr_drive_temperature_celsius{drive="media"} 54'])
+        self.assertNotIn('/dev/sdb', self.smartctl_log.read_text())
+
+    def test_no_mounts_publish_empty_file_without_smart_queries(self):
+        result = self.run_metrics(MOUNTED='')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.metrics(), [])
+        self.assertFalse(self.smartctl_log.exists())
+
     def metrics(self):
         return (self.root / 'state/metrics/drives.prom').read_text().splitlines()
 
@@ -87,6 +122,8 @@ class DriveMetricsTests(unittest.TestCase):
             'BACKUP_PATH': str(self.backup),
             'SMARTCTL_LOG': str(self.smartctl_log),
             'ASLEEP': '',
+            'MIRROR_STATE': 'activating',
+            'SYSTEMCTL_EXIT': '0',
             **stub_environment,
         }
 

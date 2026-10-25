@@ -625,9 +625,18 @@ Reads each drive's temperature for node-exporter's textfile collector, read by G
 | Metric | From |
 |---|---|
 | `arr_drive_temperature_celsius{drive="media"}` | the disk under `STORAGE_MOUNT` |
-| `arr_drive_temperature_celsius{drive="backup"}` | the disk under `BACKUP_MOUNT`, only with `BACKUP_UUID` set |
+| `arr_drive_temperature_celsius{drive="backup"}` | the disk under `BACKUP_MOUNT`, only with `BACKUP_UUID` set and the mirror service running |
 
 It finds each disk from its mount and reads it with `smartctl -j -n standby -A`, adding `-d sat` for a drive behind a USB bridge. A drive that is not mounted is left out, because its mount path would resolve to the system disk; a drive that is asleep is left out too, never woken (`-n standby`). With neither drive readable, the file is empty.
+
+The backup drive is queried only while `arr-mirror.service` reports `activating`
+(the running oneshot) or `active`. Inactive, failed, stopping or unknown states,
+including a failed systemctl query, skip its SMART query entirely. Standby-aware
+SMART reads can still prevent an awake drive from reaching its idle timeout.
+When the mirror stops, the next collection removes the backup temperature from
+this live metric. Glance falls back to Scrutiny's stored temperature labelled
+`last reading`; Grafana retains historical samples but has a gap in live data.
+No cached temperature is republished as current, and no drive is forced to sleep.
 
 - **File:** [`scripts/drive-metrics`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/drive-metrics)
 - **Runs:** [`arr-drive-metrics.timer`](systemd.md#arr-drive-metricstimer) every minute, from 2 minutes after boot. Optional: `stack-health` doesn't check that the timer is enabled.

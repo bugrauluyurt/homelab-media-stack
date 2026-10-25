@@ -266,7 +266,7 @@ Runs [`drive-metrics`](scripts.md#drive-metrics), which writes the drive tempera
 - **File:** [`host/systemd/arr-drive-metrics.service`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/arr-drive-metrics.service)
 - **Runs:** `@REPO@/scripts/drive-metrics`, `Type=oneshot`.
 - **User:** root (no `User=`); smartctl needs it.
-- **Condition:** none: a drive that is unmounted or asleep is left out of the file, so the run needs neither drive. No `OnFailure=`.
+- **Condition:** none: a drive that is unmounted or asleep is left out of the file, so the run needs neither drive. The collector also skips the backup drive entirely unless `arr-mirror.service` is activating or active, allowing its idle timer to expire. No `OnFailure=`.
 - **Started by:** `arr-drive-metrics.timer`.
 
 ### arr-drive-metrics.timer

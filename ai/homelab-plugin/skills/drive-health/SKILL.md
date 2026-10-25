@@ -59,8 +59,10 @@ backup drive too only with the `compose.backup-drive.yml` override on, and its h
 that drive while it sleeps, so the backup drive's history is mostly one point a night, recorded by
 the mirror.
 
-With `arr-drive-metrics.timer` enabled, each drive's temperature is read every minute, without
-waking a sleeping drive: Grafana's Media Server: Overview dashboard has it in the Drive
+With `arr-drive-metrics.timer` enabled, the media drive's temperature is read every minute,
+and the backup drive is read only while `arr-mirror.service` is activating or active. Idle
+backup drives are not queried: even standby-aware polling can delay entering sleep.
+Neither drive is woken if already asleep: Grafana's Media Server: Overview dashboard has it in the Drive
 temperatures panel, Glance's Lab page in the Drives block, and the file itself needs no sudo:
 
 ```bash
@@ -68,7 +70,8 @@ STATE=$(dirname "$(sed -n 's/^CONFIG_ROOT=//p' "$STACK/.env")")/state
 cat "$STATE/metrics/drives.prom"    # arr_drive_temperature_celsius{drive="media"} 41
 ```
 
-A drive missing from the file is unmounted or asleep.
+A drive missing from the file is unmounted, asleep, or (for the backup drive) not being mirrored.
+Glance labels its Scrutiny fallback temperature as `last reading`; do not treat it as live.
 
 ## Reading it
 

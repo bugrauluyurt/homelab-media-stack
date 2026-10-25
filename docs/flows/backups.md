@@ -337,7 +337,11 @@ flowchart TD
 - **Asleep between runs.** With [`arr-spindown.service`](../reference/systemd.md#arr-spindownservice)
   enabled, the backup drive spins down after 10 idle minutes, so it doesn't heat a shared dock
   around the clock. The mirror's first read wakes it, in about 10 seconds. `stack-health`,
-  `drive-metrics` and Scrutiny's hourly run leave it asleep.
+  `drive-metrics` skips the backup drive entirely while the mirror is not running,
+  so minute-by-minute SMART polling cannot keep resetting its idle timer. During a
+  mirror it still records live temperatures. Scrutiny's hourly run skips sleeping
+  drives; Glance uses its stored temperature as a labelled `last reading` when no
+  live backup metric exists.
 - **A health read after each copy.** While the drive is awake, the run has Scrutiny read the
   drives (`docker exec scrutiny scrutiny-collector-metrics run`), so Scrutiny's history of the
   backup drive gets a point every night, then runs the backup drive's SMART health, sectors and
