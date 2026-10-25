@@ -10,5 +10,7 @@ Type=oneshot
 ExecStart=@REPO@/scripts/storage-mirror
 # A first copy of a full drive can take most of a day; longer than that it is hung, and failing alerts.
 TimeoutStartSec=24h
+# A requested stop exits 143 after remounting read-only; a timeout still fails with result 'timeout'.
+SuccessExitStatus=143
 Nice=19
 IOSchedulingClass=idle
