@@ -528,6 +528,7 @@ One-shot status of the whole stack, grouped as STORAGE, HARDWARE (only where `vc
 | Firewall | a chain isn't hooked, a port other than the firewall's `home-ports` is open to the home network, or SSH is |
 | VPN | the exit country isn't in `VPN_COUNTRIES` or is the United States, or qBittorrent isn't bound to the tunnel on the forwarded port |
 | qBittorrent | the alternative download limit is under 1,000,000 bytes/s, or the upload cap differs from `downloads-throttle --upload-cap` |
+| Indexers | no indexer passes `indexers-check`, or Prowlarr reports any indexer down for more than 6 hours (the failure names it) |
 
 - **File:** [`scripts/stack-health`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/stack-health)
 - **Runs:** [`arr-health.timer`](systemd.md#arr-healthtimer) every 6 hours with `--notify`; [`stack-update`](#stack-update) after recreating containers; by hand (the `health` alias); the operational skills in `ai/homelab-plugin/skills/`.
@@ -735,6 +736,7 @@ Sourced by the stack's bash scripts. It sets `REPO`, exports every `.env` value,
 - `notify TITLE TAGS BODY` (ntfy, a no-op without `NTFY_TOPIC`);
 - `write_update_metrics`: pending image updates for node-exporter's textfile collector, written whole and renamed into place so a scrape never sees half a file;
 - `disk_of_mount PATH`: the whole disk a mount lives on, bind mounts included;
+- `long_down_indexers`: the indexers that Prowlarr's `/api/v1/health` JSON on stdin reports down for more than 6 hours (its `IndexerLongTermStatusCheck`), comma-separated;
 - `ups_field NAME`: one apcupsd reading without its unit (`apcaccess -u -p`, so `BCHARGE` reads `100.0`), empty when apcupsd can't be reached;
 - `service_enabled NAME`: whether a service is in an active profile;
 - `json_get`, `tunnel_ip`, `forwarded_port`, `qbit_prefs`, `vpn_healthy`, `wait_gluetun_healthy`;

@@ -217,6 +217,9 @@ chk "intro skipper plugin removed"    "! docker exec jellyfin sh -c 'ls /config/
 
 echo "INDEXERS"
 chk "prowlarr has working indexers"      "test \$(./scripts/indexers-check 2>/dev/null | grep -c ' PASS ') -ge 1"
+# The check above passes while any indexer works; this one names each indexer down for more than 6 hours.
+long_down=$(curl -sf --max-time 10 -H "X-Api-Key: $PROWLARR_API_KEY" http://127.0.0.1:9696/api/v1/health | long_down_indexers 2>/dev/null)
+chk "no indexer down for over 6h${long_down:+ (down: $long_down)}" "[ -z \"\$long_down\" ]"
 # Byparr's /health launches a real browser (15 to 20s), so read its container healthcheck instead.
 chk "byparr (cloudflare solver) healthy" "test \"\$(docker inspect -f '{{.State.Health.Status}}' byparr 2>/dev/null)\" = healthy"
 
