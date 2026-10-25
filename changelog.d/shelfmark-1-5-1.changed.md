@@ -1,1 +1,0 @@
-- Update the standard Shelfmark image to v1.5.1 for format handling, search, download recovery and security fixes.
