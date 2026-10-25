@@ -735,7 +735,7 @@ services:
   # SYS_RAWIO lets smartctl reach the drive behind its USB-SATA bridge (sat type in apps/scrutiny/collector.yaml).
   scrutiny:
     <<: *common
-    image: ghcr.io/analogj/scrutiny:master-omnibus
+    image: ghcr.io/analogj/scrutiny:latest-omnibus
     container_name: scrutiny
     profiles: [monitoring]
     ports: ["3006:8080"]
