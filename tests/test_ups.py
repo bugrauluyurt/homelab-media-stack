@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 # apcaccess -u status from a Back-UPS ES 850G2 over USB, with the serial number replaced.
-ONLINE_READINGS = '''APC      : 001,036,0880
+ONLINE_READINGS = '''APC      : 001,036,0866
 DATE     : 2026-10-25 01:10:00 +0000
 HOSTNAME : server
 VERSION  : 3.14.14 (31 May 2016) debian
@@ -20,27 +20,31 @@ UPSMODE  : Stand Alone
 STARTTIME: 2026-10-25 01:00:00 +0000
 MODEL    : Back-UPS ES 850G2
 STATUS   : ONLINE
-LINEV    : 121.0
-LOADPCT  : 9.0
+LINEV    : 119.0
+LOADPCT  : 10.0
 BCHARGE  : 100.0
-TIMELEFT : 52.6
+TIMELEFT : 63.3
 MBATTCHG : 10
 MINTIMEL : 5
 MAXTIME  : 0
 SENSE    : Medium
 LOTRANS  : 92.0
 HITRANS  : 139.0
+ALARMDEL : 30
 BATTV    : 13.6
 LASTXFER : No transfers since turnon
 NUMXFERS : 2
 TONBATT  : 0
 CUMONBATT: 74
 XOFFBATT : N/A
+SELFTEST : NO
 STATFLAG : 0x05000008
 SERIALNO : 0B0000L00000
+BATTDATE : 2026-06-23
 NOMINV   : 120
 NOMBATTV : 12.0
-NOMPOWER : 510
+NOMPOWER : 450
+FIRMWARE : 931.a10.D USB FW:a
 END APC  : 2026-10-25 01:10:00 +0000
 '''
 
@@ -89,15 +93,15 @@ class UpsMetricsTests(UpsTestCase):
             'arr_ups_online 1',
             'arr_ups_on_battery 0',
             'arr_ups_battery_charge_percent 100',
-            'arr_ups_runtime_seconds 3156',
-            'arr_ups_load_percent 9',
-            'arr_ups_input_voltage 121',
+            'arr_ups_runtime_seconds 3798',
+            'arr_ups_load_percent 10',
+            'arr_ups_input_voltage 119',
             'arr_ups_battery_voltage 13.6',
             'arr_ups_transfers_total 2',
             'arr_ups_on_battery_seconds_total 74',
             'arr_ups_shutdown_charge_percent 10',
             'arr_ups_shutdown_runtime_seconds 300',
-            'arr_ups_load_watts 45.9',
+            'arr_ups_load_watts 45',
         ])
 
     def test_on_battery_status_is_reported(self):
@@ -133,7 +137,7 @@ class UpsEventTests(UpsTestCase):
 
         curl_arguments = self.curl_log.read_text()
         self.assertIn('Title: media stack: on battery', curl_arguments)
-        self.assertIn('Battery 100%, about 52 min left.', curl_arguments)
+        self.assertIn('Battery 100%, about 63 min left.', curl_arguments)
         self.assertIn('shuts down at 5 min or 10% left', curl_arguments)
 
     def test_always_exits_zero_so_apccontrol_still_acts(self):
