@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Drive temperatures for node-exporter's textfile collector, read by Grafana and Glance: the media
-# drive, and the backup drive when BACKUP_UUID is set. A drive that is unmounted or asleep is left out,
-# never woken.
+# drive, and the backup drive during a mirror when BACKUP_UUID is set. Idle backup drives are not
+# queried: even standby-aware SMART polling can prevent an awake disk's idle timer from expiring.
 # Runs: arr-drive-metrics.timer every minute, as root (smartctl needs it).
 # Changes: $STATE_ROOT/metrics/drives.prom.
 # Idempotent: yes.
@@ -30,6 +30,12 @@ drives=("media $STORAGE_MOUNT")
 for drive_entry in "${drives[@]}"; do
   read -r drive_role drive_mount <<< "$drive_entry"
   mountpoint -q "$drive_mount" || continue
+
+  if [ "$drive_role" = backup ]; then
+    # A running Type=oneshot mirror is activating; unknown state must not probe the disk.
+    mirror_state=$(systemctl show arr-mirror.service --property=ActiveState --value 2>/dev/null) || continue
+    case "$mirror_state" in activating|active) ;; *) continue ;; esac
+  fi
 
   temperature=$(drive_temperature "$drive_mount")
   if [ -n "$temperature" ]; then
