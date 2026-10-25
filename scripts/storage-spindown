@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Give the backup drive a 10-minute idle timer, so it spins down between mirrors instead of heating the
+# dock around the clock; any read wakes it again. The drive forgets the timer when it loses power.
+# Runs: arr-spindown.service each time the backup drive mounts (at boot and when it is plugged in), as root.
+# Changes: the backup drive's standby timer, held by the drive until it loses power.
+# Idempotent: yes.
+
+set -uo pipefail
+. "$(dirname "$0")/stack-env.sh"
+PATH="$PATH:/usr/sbin:/sbin"
+
+# smartctl counts the timer in 5-second steps, so 120 is 10 minutes.
+IDLE_STEPS=120
+
+mountpoint -q "$BACKUP_MOUNT" || { echo "FATAL: $BACKUP_MOUNT is not mounted" >&2; exit 1; }
+
+disk=$(disk_of_mount "$BACKUP_MOUNT")
+device_type=()
+[ "$(lsblk -dno TRAN "$disk")" = usb ] && device_type=(-d sat)
+
+smartctl -s "standby,$IDLE_STEPS" "${device_type[@]}" "$disk"

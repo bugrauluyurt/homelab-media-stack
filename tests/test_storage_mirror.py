@@ -1,4 +1,5 @@
 import datetime
+import json
 import os
 import shutil
 import signal
@@ -13,6 +14,8 @@ ROOT = Path(__file__).resolve().parents[1]
 REAL_DATE = shutil.which('date')
 NOW = int(datetime.datetime(2026, 10, 25, 12, tzinfo=datetime.timezone.utc).timestamp())
 DAY = 86400
+HEALTHY_SMART = json.dumps({'smartctl': {'exit_status': 0}, 'smart_status': {'passed': True},
+                            'temperature': {'current': 45}, 'ata_smart_attributes': {'table': []}})
 
 
 @unittest.skipUnless(shutil.which('rsync'), 'rsync is not installed')
@@ -50,7 +53,14 @@ class StorageMirrorTests(unittest.TestCase):
         self.stub_directory.mkdir()
         self.write_stub('mountpoint', '[ "$1" = -q ] && shift\ncase " $MOUNTED " in *" $1 "*) exit 0 ;; esac\nexit 1')
         self.write_stub('findmnt', 'for mount_path; do :; done\n'
+                        'case "$*" in *SOURCE*) echo /dev/sdb1; exit ;; esac\n'
                         'case "$mount_path" in "$STORAGE_PATH") echo "$STORAGE_FS_UUID" ;; "$BACKUP_PATH") echo "$BACKUP_FS_UUID" ;; esac')
+        self.write_stub('lsblk', 'case "$*" in *PKNAME*) echo sdb ;; *TRAN*) echo usb ;; esac')
+        self.write_stub('sudo', 'exec "$@"')
+        self.write_stub('smartctl', 'echo "$*" >> "$SMARTCTL_LOG"\nprintf "%s" "$SMART_JSON"')
+        self.write_stub('docker', 'echo "$*" >> "$DOCKER_LOG"')
+        self.smartctl_log = self.root / 'smartctl.log'
+        self.docker_log = self.root / 'docker.log'
         self.write_stub('mount', 'echo "$*" >> "$MOUNT_LOG"')
         self.write_stub('date', f'if [ "$1" = +%s ]; then echo "$FAKE_NOW"; else exec {REAL_DATE} "$@"; fi')
 
@@ -142,6 +152,25 @@ class StorageMirrorTests(unittest.TestCase):
         self.assertEqual(mirror_process.wait(timeout=10), 143)
         self.assertEqual(self.mount_log.read_text().splitlines()[-1], f'-o remount,ro {self.backup}')
 
+    def test_drives_are_read_after_the_copy_while_the_backup_drive_is_awake(self):
+        mirror_result = self.run_mirror()
+
+        self.assertEqual(mirror_result.returncode, 0, mirror_result.stderr)
+        self.assertIn('exec scrutiny scrutiny-collector-metrics run', self.docker_log.read_text())
+        self.assertEqual(len(self.smartctl_log.read_text().splitlines()), 3)
+
+    def test_failing_backup_drive_alerts_after_the_copy_and_keeps_the_success_metric(self):
+        failing_smart = json.dumps({'smartctl': {'exit_status': 0}, 'smart_status': {'passed': False},
+                                    'temperature': {'current': 45}, 'ata_smart_attributes': {'table': []}})
+
+        mirror_result = self.run_mirror(SMART_JSON=failing_smart)
+
+        self.assertEqual(mirror_result.returncode, 1)
+        self.assertIn('SMART health', mirror_result.stderr)
+        self.assertTrue((self.backup / 'data/media/movies/film.mkv').exists())
+        self.assertTrue((self.root / 'state/metrics/mirror.prom').exists())
+        self.assertEqual(self.mount_log.read_text().splitlines()[-1], f'-o remount,ro {self.backup}')
+
     def test_dry_run_changes_nothing(self):
         mirror_result = self.run_mirror('--dry-run')
 
@@ -150,6 +179,7 @@ class StorageMirrorTests(unittest.TestCase):
         self.assertFalse((self.backup / 'data').exists())
         self.assertFalse(self.mount_log.exists())
         self.assertFalse((self.root / 'state/metrics/mirror.prom').exists())
+        self.assertFalse(self.docker_log.exists())
 
     def assert_refused(self, mirror_result):
         self.assertEqual(mirror_result.returncode, 1)
@@ -179,6 +209,9 @@ class StorageMirrorTests(unittest.TestCase):
             'STORAGE_FS_UUID': 'storage-uuid',
             'BACKUP_FS_UUID': 'backup-uuid',
             'MOUNT_LOG': str(self.mount_log),
+            'SMARTCTL_LOG': str(self.smartctl_log),
+            'DOCKER_LOG': str(self.docker_log),
+            'SMART_JSON': HEALTHY_SMART,
             **stub_environment,
         }
 

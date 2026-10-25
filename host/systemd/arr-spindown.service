@@ -1,0 +1,12 @@
+[Unit]
+Description=Let the backup drive spin down after 10 idle minutes
+# Wanted by the backup drive's mount, so it runs at boot and on every plug-in: the drive forgets the timer without power.
+After=@BACKUP_UNIT@
+ConditionPathIsMountPoint=@BACKUP_MOUNT@
+
+[Service]
+Type=oneshot
+ExecStart=@REPO@/scripts/storage-spindown
+
+[Install]
+WantedBy=@BACKUP_UNIT@

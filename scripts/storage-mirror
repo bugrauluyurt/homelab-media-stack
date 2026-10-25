@@ -4,7 +4,8 @@
 # --dry-run: list what would change, without touching the backup drive.
 # Runs: arr-mirror.timer nightly, as root; by hand with sudo (the stack-backup skill).
 # Changes: $BACKUP_MOUNT, remounted read-write for the copy and read-only after; removes trash older
-#   than 30 days; writes $STATE_ROOT/metrics/mirror.prom.
+#   than 30 days; writes $STATE_ROOT/metrics/mirror.prom; has Scrutiny read the drives, then fails if the
+#   backup drive's SMART health, sectors or temperature check fails.
 # Idempotent: yes.
 
 set -uo pipefail
@@ -69,3 +70,10 @@ done
 mkdir -p "$METRICS"
 echo "arr_mirror_last_success_timestamp_seconds $(date +%s)" > "$METRICS/mirror.prom.tmp" &&
   chmod 644 "$METRICS/mirror.prom.tmp" && mv "$METRICS/mirror.prom.tmp" "$METRICS/mirror.prom"
+
+# The backup drive sleeps between mirrors and stack-health and Scrutiny leave it asleep, so it is read now.
+docker exec scrutiny scrutiny-collector-metrics run >/dev/null 2>&1 || echo "  ~ Scrutiny not updated (not running)"
+
+for smart_check in health sectors temperature; do
+  drive_smart "$BACKUP_MOUNT" "$smart_check" || fail "the backup drive failed its SMART $smart_check check"
+done
