@@ -286,7 +286,7 @@ Logins in capitals are keys in `.env`.
 | node-exporter | monitoring | 9100 | you | None | Host metrics, on the host network |
 | Scraparr | monitoring | 7100 | Docker only | None | Metrics from the arr apps |
 | Uptime Kuma | monitoring | 3003 | you | `UPTIME_KUMA_USER` / `UPTIME_KUMA_PASSWORD` | Checks every service each minute, alerts to ntfy |
-| Scrutiny | monitoring | 3006 | you | None | SMART history of the media disk |
+| Scrutiny | monitoring | 3006 | you | None | SMART history of the media disk, and of the backup disk with `compose.backup-drive.yml` |
 | Dozzle | monitoring | 8888 | you | `DOZZLE_USER` / `DOZZLE_PASSWORD` | Live container logs, read-only |
 | Jellystat | stats | 3002 | you | Its own, created on first visit | Watch statistics |
 | jellystat-db | stats | 5432 | Docker only | `JELLYSTAT_DB_USER` / `JELLYSTAT_DB_PASSWORD` | Jellystat's Postgres |

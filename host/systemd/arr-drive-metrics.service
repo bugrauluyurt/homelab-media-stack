@@ -1,0 +1,6 @@
+[Unit]
+Description=Write drive temperatures for Prometheus
+
+[Service]
+Type=oneshot
+ExecStart=@REPO@/scripts/drive-metrics

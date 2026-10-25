@@ -214,7 +214,7 @@ layout, the safety rules and what needs your approval.
 |---|---|
 | `stack-health` | Is everything OK? (read-only diagnosis first) |
 | `vpn-check` | Is P2P traffic confined to the VPN? (read-only) |
-| `drive-health` | SMART status and temperature of the media drive (read-only) |
+| `drive-health` | SMART status and temperature of the media drive and the backup drive (read-only) |
 | `stack-logs` | Diagnose a service, with a list of solved problems |
 | `stack-update` | Check, apply and roll back image updates (asks first) |
 | `stack-backup` | Backup status, back up now, restore settings (restore asks first) |

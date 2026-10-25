@@ -37,7 +37,19 @@ The USB link speed line prints the enclosure's negotiated speed in Mbps (5000 is
 empty for internal drives.
 
 Scrutiny (`http://<host>:3006`, `curl -s localhost:3006/api/summary`) keeps the
-same attributes as history, so a trend is visible without sudo.
+same attributes as history, collected every hour, so a trend is visible without sudo. It has the
+backup drive too only with the `compose.backup-drive.yml` override on.
+
+With `arr-drive-metrics.timer` enabled, each drive's temperature is read every minute, without
+waking a sleeping drive: Grafana's Media Server: Overview dashboard has it in the Drive
+temperatures panel, Glance's Lab page in the Drives block, and the file itself needs no sudo:
+
+```bash
+STATE=$(dirname "$(sed -n 's/^CONFIG_ROOT=//p' "$STACK/.env")")/state
+cat "$STATE/metrics/drives.prom"    # arr_drive_temperature_celsius{drive="media"} 41
+```
+
+A drive missing from the file is unmounted or asleep.
 
 ## Reading it
 

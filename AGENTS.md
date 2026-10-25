@@ -18,14 +18,15 @@ Operating skills live in `ai/homelab-plugin/skills/` (linked into `.claude/skill
 |---|---|
 | `stack-health` | Is everything OK? (read-only diagnosis first) |
 | `vpn-check` | Is P2P traffic confined to the VPN? (read-only) |
-| `drive-health` | SMART status and temperature of the media drive (read-only) |
+| `drive-health` | SMART status and temperature of the media drive and the backup drive (read-only) |
 | `stack-logs` | Diagnose a service; `references/known-issues.md` lists solved problems |
 | `stack-update` | Check, apply and roll back image updates (**ask first**) |
 | `stack-backup` | Backup status, backup now, restore settings (**restore: ask first**) |
 | `stack-power` | Stop the stack or unmount the drive, and start it again (**ask first**) |
 
 ## Layout
-- `docker-compose.yml`: every service; `compose.gpu.yml`: opt-in GPU transcoding.
+- `docker-compose.yml`: every service; `compose.gpu.yml`: opt-in GPU transcoding; `compose.backup-drive.yml`:
+  opt-in Scrutiny history of the backup drive.
 - `.env` holds every secret and this machine's values (gitignored); `.env.example` documents each key.
 - `apps/`: the config files the repo ships per app (Glance, Homepage, Grafana, gluetun, Prometheus,
   qBittorrent, Recyclarr, Scrutiny...), bind-mounted or copied in as seeds.

@@ -1,0 +1,10 @@
+# Scrutiny's SMART history for the backup drive too. Turn it on in .env, next to BACKUP_UUID:
+#   COMPOSE_FILE=docker-compose.yml:compose.backup-drive.yml
+#   BACKUP_DEVICE=/dev/disk/by-id/<the backup disk>
+# then recreate scrutiny: docker compose up -d scrutiny.
+
+services:
+  scrutiny:
+    devices: ["${BACKUP_DEVICE:?set BACKUP_DEVICE in .env to the backup disk's /dev/disk/by-id path}:/dev/sdb"]
+    volumes:
+      - ./apps/scrutiny/collector.backup-drive.yaml:/opt/scrutiny/config/collector.yaml:ro

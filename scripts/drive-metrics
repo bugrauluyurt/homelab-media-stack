@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Drive temperatures for node-exporter's textfile collector, read by Grafana and Glance: the media
+# drive, and the backup drive when BACKUP_UUID is set. A drive that is unmounted or asleep is left out,
+# never woken.
+# Runs: arr-drive-metrics.timer every minute, as root (smartctl needs it).
+# Changes: $STATE_ROOT/metrics/drives.prom.
+# Idempotent: yes.
+
+set -uo pipefail
+. "$(dirname "$0")/stack-env.sh"
+PATH="$PATH:/usr/sbin:/sbin"
+
+METRICS="$STATE_ROOT/metrics"
+mkdir -p "$METRICS"
+
+# drive_temperature MOUNT: the disk under MOUNT in degrees C; empty while it sleeps (smartctl -n standby).
+drive_temperature() {
+  local disk device_type=()
+  disk=$(disk_of_mount "$1")
+  [ "$(lsblk -dno TRAN "$disk")" = usb ] && device_type=(-d sat)
+
+  smartctl -j -n standby -A "${device_type[@]}" "$disk" 2>/dev/null |
+    python3 -c 'import json, sys; print(json.load(sys.stdin)["temperature"]["current"])' 2>/dev/null
+}
+
+drives=("media $STORAGE_MOUNT")
+[ -n "${BACKUP_UUID:-}" ] && drives+=("backup $BACKUP_MOUNT")
+
+# An unmounted path resolves to the system disk, so it is skipped rather than reported as this drive.
+for drive_entry in "${drives[@]}"; do
+  read -r drive_role drive_mount <<< "$drive_entry"
+  mountpoint -q "$drive_mount" || continue
+
+  temperature=$(drive_temperature "$drive_mount")
+  if [ -n "$temperature" ]; then
+    echo "arr_drive_temperature_celsius{drive=\"$drive_role\"} $temperature"
+  fi
+done > "$METRICS/drives.prom.tmp" && chmod 644 "$METRICS/drives.prom.tmp" && mv "$METRICS/drives.prom.tmp" "$METRICS/drives.prom"

@@ -1,0 +1,9 @@
+# Scrutiny's collector with the backup drive too: compose.backup-drive.yml mounts it in place of collector.yaml.
+# Read by: scrutiny, mounted read-only.
+# Applies: when scrutiny restarts.
+version: 1
+devices:
+  - device: /dev/sda
+    type: sat
+  - device: /dev/sdb
+    type: sat

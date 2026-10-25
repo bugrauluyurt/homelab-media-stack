@@ -134,7 +134,9 @@ On a Raspberry Pi it also checks that the board isn't throttled or short of powe
 chip stays under 80 °C.
 
 For history, Scrutiny (`:3006`, [Dashboards](../using/dashboards.md#scrutiny)) keeps the SMART
-attributes and temperature over time. For a closer look, ask an AI agent with the `drive-health`
+attributes and temperature over time, read every hour. With `arr-drive-metrics.timer` enabled,
+each drive's temperature is also read every minute, for Grafana's Drive temperatures panel and
+Glance's Drives block. For a closer look, ask an AI agent with the `drive-health`
 skill, which also checks the USB link of a drive in an enclosure. Before you switch the drive
 off, run `drive-off` first ([Storage and boot](../flows/storage-and-boot.md)).
 

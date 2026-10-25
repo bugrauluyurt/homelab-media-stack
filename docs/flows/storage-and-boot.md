@@ -109,7 +109,8 @@ If your media disk is always connected, leave `STORAGE_UUID` empty:
 
 `STORAGE_DEVICE` (the whole disk, ideally a `/dev/disk/by-id/` path) tells Scrutiny which disk to
 read SMART data from. With two USB drives, `/dev/sda` and `/dev/sdb` can swap at boot, so the
-by-id path matters then. The keys are in [Configuration](../reference/configuration.md#storage_uuid).
+by-id path matters then. `BACKUP_DEVICE` does the same for the backup drive with the
+`compose.backup-drive.yml` override. The keys are in [Configuration](../reference/configuration.md#storage_uuid).
 
 ### The backup drive
 
@@ -200,9 +201,10 @@ Nothing needs starting by hand:
 | [`arr-updates.timer`](../reference/systemd.md#arr-updatestimer) | `OnCalendar=*-*-* 06:00:00`, up to 30 min later | `stack-update-check` | no |
 | [`arr-youtube.timer`](../reference/systemd.md#arr-youtubetimer) | `OnCalendar=hourly`, up to 10 min later | `youtube-sync.py` | no |
 | [`arr-ups-metrics.timer`](../reference/systemd.md#arr-ups-metricstimer) | `OnBootSec=1min`, then `OnUnitActiveSec=30s` | `ups-metrics` (skipped without apcupsd) | no |
+| [`arr-drive-metrics.timer`](../reference/systemd.md#arr-drive-metricstimer) | `OnBootSec=2min`, then `OnUnitActiveSec=1min` | `drive-metrics` (optional) | no: a drive that is off is left out of the file |
 
-- "Up to N min later" is `RandomizedDelaySec`. The throttle and watch timers use `AccuracySec=10s`
-  so they really run every minute.
+- "Up to N min later" is `RandomizedDelaySec`. The throttle, watch and drive-metrics timers use
+  `AccuracySec=10s` so they really run every minute.
 - The backup, mirror, update and YouTube timers have `Persistent=true`: a run missed while the
   server was off happens at the next boot.
 - The units that need the drive carry `ConditionPathIsMountPoint=` on it, so they are skipped, not

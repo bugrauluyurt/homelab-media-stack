@@ -23,11 +23,12 @@ In the tables below, **Required** is *yes* when the core stack or a core script 
 | <a id="stack_user"></a>`STACK_USER` | yes | none | Linux user that owns the repository and runs the stack's services and timers. | [`host-install`](scripts.md#host-install) (systemd templates), [`stack-backup`](scripts.md#stack-backup), [`stack-health`](scripts.md#stack-health) |
 | <a id="host_name"></a>`HOST_NAME` | yes | none | The server's host name, also its Tailscale MagicDNS name (`hostname`). Used for links on the dashboards and as an allowed host. | homepage, glance, changedetection, grafana; [`vpn-port-sync`](scripts.md#vpn-port-sync) (qBittorrent's allowed hosts), `stack-backup` (restic host), `stack-health` (`<host>.local` resolves to a LAN address) |
 | <a id="tailscale_ip"></a>`TAILSCALE_IP` | yes | none | The server's Tailscale IPv4 address (`tailscale ip -4`). | [`configure-jellyfin-plugins.py`](scripts.md#configure-jellyfin-pluginspy) (external links), `stack-health` (SFTPGo's admin refused on it) |
-| <a id="storage_mount"></a>`STORAGE_MOUNT` | no | `/mnt/storage` | Where the media disk is mounted. See [below](#storage_mount-and-storage_device). | `host-install`, [`stack-up`](scripts.md#stack-up), [`drive-off`](scripts.md#drive-off), `stack-health`, [`stack-update`](scripts.md#stack-update), `stack-backup`, [`configure-uptime-kuma.py`](scripts.md#configure-uptime-kumapy), glance, the skills |
+| <a id="storage_mount"></a>`STORAGE_MOUNT` | no | `/mnt/storage` | Where the media disk is mounted. See [below](#storage_mount-and-storage_device). | `host-install`, [`stack-up`](scripts.md#stack-up), [`drive-off`](scripts.md#drive-off), `stack-health`, [`stack-update`](scripts.md#stack-update), `stack-backup`, [`configure-uptime-kuma.py`](scripts.md#configure-uptime-kumapy), [`drive-metrics`](scripts.md#drive-metrics), glance, the skills |
 | <a id="storage_uuid"></a>`STORAGE_UUID` | no | empty | Filesystem UUID (`lsblk -f`) of a media drive you switch on by hand, so it mounts on power-on. Leave empty when the disk is always mounted through fstab. | `host-install` ([`99-arr-storage.rules`](systemd.md#99-arr-storagerules)), `storage-mirror` (checks the media mount is this drive) |
 | <a id="storage_device"></a>`STORAGE_DEVICE` | no | `/dev/sda` | The media drive's whole-disk device, for Scrutiny's SMART history; a `/dev/disk/by-id/` path, above all with a second drive. See [below](#storage_mount-and-storage_device). | scrutiny |
-| <a id="backup_uuid"></a>`BACKUP_UUID` | no | empty | Filesystem UUID (`lsblk -f`) of a second drive that [`storage-mirror`](scripts.md#storage-mirror) copies the whole media drive onto every night. Empty means no backup drive: its udev rule, the mirror and its health checks are all off. See [below](#backup_uuid-and-backup_mount). | `host-install` ([`99-arr-backup.rules`](systemd.md#99-arr-backuprules)), `storage-mirror`, `stack-health` |
-| <a id="backup_mount"></a>`BACKUP_MOUNT` | no | `/mnt/backup` | Where the backup drive is mounted, read-only between mirrors. | `host-install`, `storage-mirror`, `stack-health` |
+| <a id="backup_uuid"></a>`BACKUP_UUID` | no | empty | Filesystem UUID (`lsblk -f`) of a second drive that [`storage-mirror`](scripts.md#storage-mirror) copies the whole media drive onto every night. Empty means no backup drive: its udev rule, the mirror and its health checks are all off. See [below](#backup_uuid-and-backup_mount). | `host-install` ([`99-arr-backup.rules`](systemd.md#99-arr-backuprules)), `storage-mirror`, `stack-health`, `drive-metrics` |
+| <a id="backup_mount"></a>`BACKUP_MOUNT` | no | `/mnt/backup` | Where the backup drive is mounted, read-only between mirrors. | `host-install`, `storage-mirror`, `stack-health`, `drive-metrics` |
+| <a id="backup_device"></a>`BACKUP_DEVICE` | with `compose.backup-drive.yml` | none | The backup drive's whole-disk device, a `/dev/disk/by-id/` path, for Scrutiny's SMART history of it too. Commented out in the example; only `compose.backup-drive.yml` reads it, and with that override on `docker compose` refuses to run without it. See [below](#composebackup-driveyml-and-backup_device). | scrutiny |
 | <a id="questarr_allowed_origins"></a>`QUESTARR_ALLOWED_ORIGINS` | games | none | Every URL Questarr is opened on (host name, `<host>.local`, LAN IP, Tailscale IP, `localhost`), each with port 5000, comma-separated. | questarr |
 
 ### Identity and permissions
@@ -57,7 +58,7 @@ In the tables below, **Required** is *yes* when the core stack or a core script 
 | <a id="qbit_port"></a>`QBIT_PORT` | yes | none (`8080`) | qBittorrent's web UI port, published by gluetun; every app and script reaches qBittorrent on it. | gluetun, qbittorrent, homepage, glance; `stack-env.sh`, `vpn-port-sync`, `stack-health`, [`downloads-throttle`](scripts.md#downloads-throttle), [`configure-arr.py`](scripts.md#configure-arrpy) |
 | <a id="compose_profiles"></a>`COMPOSE_PROFILES` | no | `*` for the scripts | Which optional modules run: `*` for all, or a list such as `music,monitoring`. See [compose profiles](#compose-profiles). | Docker Compose; `stack-env.sh`, `stack_env.py` and every script that skips a module |
 | <a id="media_cpus"></a>`MEDIA_CPUS` | no | `3` | CPU cores Jellyfin, Plex and Byparr may each use. See [below](#cpu-limit). | jellyfin, plex, byparr |
-| <a id="compose_file"></a>`COMPOSE_FILE` | no | `docker-compose.yml` | Commented out in the example. Add `compose.gpu.yml` for hardware transcoding or `compose.vpn-failover.yml` for a verified Proton server pool, separated by colons. Both overrides can be combined. See [below](#composegpuyml-and-compose_file) and [VPN failover](../flows/vpn-and-ports.md#verified-proton-server-pool). | Docker Compose |
+| <a id="compose_file"></a>`COMPOSE_FILE` | no | `docker-compose.yml` | Commented out in the example. Add `compose.gpu.yml` for hardware transcoding, `compose.backup-drive.yml` for the backup drive in Scrutiny or `compose.vpn-failover.yml` for a verified Proton server pool, separated by colons. The overrides can be combined. See [below](#composegpuyml-and-compose_file), [the backup drive in Scrutiny](#composebackup-driveyml-and-backup_device) and [VPN failover](../flows/vpn-and-ports.md#verified-proton-server-pool). | Docker Compose |
 | <a id="hwaccel"></a>`HWACCEL` | no | empty | Hardware transcoding type: `vaapi` (Intel or AMD) or `qsv` (Intel). Commented out in the example. | `configure-jellyfin-plugins.py` |
 
 ### Proton VPN
@@ -269,7 +270,7 @@ From then on the scripts skip the module (they print `~ <service> is off (COMPOS
 |---|---|---|
 | `music` | Needle, Lidarr | Lab page: the Music entry of Apps. Media page: Coming up in music |
 | `games` | Questarr, Game downloads | Lab page: the Questarr and Games page entries of Apps |
-| `monitoring` | Uptime Kuma, Dozzle, Scrutiny, Grafana | Lab page: Media drive (Scrutiny and Prometheus), Uptime, Maintenance (Prometheus), and the movie and TV sizes in Library (Prometheus) |
+| `monitoring` | Uptime Kuma, Dozzle, Scrutiny, Grafana | Lab page: Drives (Scrutiny and Prometheus), Uptime, Maintenance (Prometheus), and the movie and TV sizes in Library (Prometheus) |
 | `stats` | JellyDash, Jellystat | Media page: Most watched this month, Watching last 30 days |
 | `plex` | Plex | none |
 | `dashboards` | the whole of Homepage | the whole of Glance, including Watched pages (ChangeDetection.io) |
@@ -302,6 +303,16 @@ The `cpus:` limit of jellyfin, plex and byparr, each on its own; default `3`. Ke
 ### BACKUP_UUID and BACKUP_MOUNT
 
 With `BACKUP_UUID` set, a second drive holds a nightly mirror of the whole media drive ([Backups](../flows/backups.md#the-media-mirror)). Its fstab line mounts it read-only at `BACKUP_MOUNT` (default `/mnt/backup`), and `storage-mirror` remounts it read-write only for the copy. `storage-mirror` refuses to run when the drive mounted there is not the one `BACKUP_UUID` names, and `stack-health` checks that it is mounted, read-only, under 90% full and healthy. Re-run [`host-install`](scripts.md#host-install) after changing either key: it installs or removes `99-arr-backup.rules` and fills the mount into `arr-mirror.service`. [Host setup](../operations/host.md#the-backup-drive) has the steps.
+
+### compose.backup-drive.yml and BACKUP_DEVICE
+
+[`compose.backup-drive.yml`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/compose.backup-drive.yml) is an override that adds the [backup drive](#backup_uuid-and-backup_mount) to Scrutiny, so it keeps that drive's SMART history too. It maps `BACKUP_DEVICE` to `/dev/sdb` in the container and mounts `apps/scrutiny/collector.backup-drive.yaml`, which lists `/dev/sda` and `/dev/sdb`, both with the device type `sat`, in place of `collector.yaml`.
+
+1. In `.env`, set `BACKUP_DEVICE` to the backup disk's whole-disk path (`ls -l /dev/disk/by-id/`, the entry without `-part`), and `STORAGE_DEVICE` to the media disk's, so the two can't swap.
+2. Add the override to `COMPOSE_FILE`, after any you already have: `COMPOSE_FILE=docker-compose.yml:compose.backup-drive.yml`.
+3. Recreate Scrutiny: `docker compose up -d scrutiny`.
+
+With the override on and `BACKUP_DEVICE` empty, `docker compose` stops with an error naming the key. Glance's Drives block lists the backup drive once Scrutiny has it. `stack-health` and [`drive-metrics`](scripts.md#drive-metrics) don't use this key: they find each disk from its mount.
 
 ### Needle image
 

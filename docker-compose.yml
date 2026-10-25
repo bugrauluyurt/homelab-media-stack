@@ -744,7 +744,7 @@ services:
     devices: ["${STORAGE_DEVICE:-/dev/sda}:/dev/sda"]
     environment:
       TZ: ${TZ}
-      COLLECTOR_CRON_SCHEDULE: "0 */6 * * *"
+      COLLECTOR_CRON_SCHEDULE: "0 * * * *"
     volumes:
       - ${CONFIG_ROOT}/scrutiny/config:/opt/scrutiny/config
       - ${CONFIG_ROOT}/scrutiny/influxdb:/opt/scrutiny/influxdb

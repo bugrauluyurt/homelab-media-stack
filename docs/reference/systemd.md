@@ -22,9 +22,9 @@ The files in `host/systemd/` are templates. [`host-install`](scripts.md#host-ins
 
 Without `STORAGE_UUID`, `host-install` skips `99-arr-storage.rules` and removes an installed copy: the media disk is then always mounted (through fstab or a bind mount), so there is nothing to hot-plug. Without `BACKUP_UUID` it does the same with `99-arr-backup.rules`: there is no backup drive.
 
-`host-install` never enables anything. The units meant to be enabled are `arr-stack.service`, `arr-firewall.service`, `arr-firewall.timer`, `arr-port-sync.timer`, `arr-backup.timer`, `arr-updates.timer`, `arr-health.timer`, `arr-watch.timer`, `arr-throttle.timer`, with the dashboards module `arr-youtube.timer`, with a backup drive `arr-mirror.timer`, and with a UPS `arr-ups-metrics.timer`. [Getting started](../getting-started.md#start-the-stack) enables them in stages: the firewall first, the timers that read the apps' API keys last.
+`host-install` never enables anything. The units meant to be enabled are `arr-stack.service`, `arr-firewall.service`, `arr-firewall.timer`, `arr-port-sync.timer`, `arr-backup.timer`, `arr-updates.timer`, `arr-health.timer`, `arr-watch.timer`, `arr-throttle.timer`, with the dashboards module `arr-youtube.timer`, with a backup drive `arr-mirror.timer`, with a UPS `arr-ups-metrics.timer`, and, optionally, for live drive temperatures, `arr-drive-metrics.timer`. [Getting started](../getting-started.md#start-the-stack) enables them in stages: the firewall first, the timers that read the apps' API keys last.
 
-The other services have no `[Install]` section: their timer, or `OnFailure=`, starts them. [`stack-health`](scripts.md#stack-health) fails when one of the units above is not enabled (`arr-youtube.timer` only while the dashboards module is on, `arr-mirror.timer` only with `BACKUP_UUID` set, `arr-ups-metrics.timer` only with apcupsd configured). Re-run `host-install` after changing a file in `host/systemd/` or `STACK_USER`, `STORAGE_MOUNT`, `STORAGE_UUID`, `BACKUP_MOUNT` or `BACKUP_UUID`.
+The other services have no `[Install]` section: their timer, or `OnFailure=`, starts them. [`stack-health`](scripts.md#stack-health) fails when one of the units above is not enabled (`arr-youtube.timer` only while the dashboards module is on, `arr-mirror.timer` only with `BACKUP_UUID` set, `arr-ups-metrics.timer` only with apcupsd configured); it doesn't check the optional `arr-drive-metrics.timer`. Re-run `host-install` after changing a file in `host/systemd/` or `STACK_USER`, `STORAGE_MOUNT`, `STORAGE_UUID`, `BACKUP_MOUNT` or `BACKUP_UUID`.
 
 ## How the units fit together
 
@@ -66,6 +66,7 @@ gantt
   section Timers
   arr-ups-metrics.timer first run at 1 min :milestone, 01:00, 0s
   arr-port-sync.timer first run at 90 s :milestone, 01:30, 0s
+  arr-drive-metrics.timer first run at 2 min :milestone, 02:00, 0s
   arr-throttle and arr-watch first run at 3 min :milestone, 03:00, 0s
   arr-throttle and arr-watch every minute :03:00, 120s
 ```
@@ -73,7 +74,7 @@ gantt
 1. Docker and Tailscale start (both enabled on the host).
 2. `arr-firewall.service` loads the firewall once Docker, Tailscale and the network are up. It is a one-shot job, so `systemctl` shows it inactive afterwards; the rules stay. `arr-firewall.timer` applies it again 30 seconds after boot, then every 15 minutes.
 3. When the drive is mounted, `arr-stack.service` runs `stack-up`: every container starts, qBittorrent and slskd are re-attached to the VPN if needed, and the forwarded port is synced once gluetun is healthy. The unit allows up to 600 seconds for this.
-4. `arr-ups-metrics.timer` reads the UPS 1 minute after boot, then every 30 seconds (skipped without apcupsd). `arr-port-sync.timer` runs `vpn-port-sync` 90 seconds after boot, then every 15 minutes.
+4. `arr-ups-metrics.timer` reads the UPS 1 minute after boot, then every 30 seconds (skipped without apcupsd). `arr-port-sync.timer` runs `vpn-port-sync` 90 seconds after boot, then every 15 minutes. `arr-drive-metrics.timer`, when enabled, reads the drive temperatures 2 minutes after boot, then every minute.
 5. `arr-throttle.timer` and `arr-watch.timer` start 3 minutes after boot and then run every minute.
 6. `arr-backup.timer`, `arr-mirror.timer`, `arr-updates.timer` and `arr-youtube.timer` have `Persistent=true`: a run missed while the machine was off happens soon after boot. `arr-health.timer` has no catch-up; it waits for its next slot.
 
@@ -84,6 +85,7 @@ With the drive off, steps 3 and 5 do nothing: `arr-stack.service` waits for the 
 | Timer | When | Randomized delay | Catches up after downtime | Runs |
 |---|---|---|---|---|
 | [`arr-ups-metrics.timer`](#arr-ups-metricstimer) | every 30 seconds, first 1 min after boot | none (accuracy 5 s) | no | `ups-metrics` |
+| [`arr-drive-metrics.timer`](#arr-drive-metricstimer) | every minute, first 2 min after boot | none (accuracy 10 s) | no | `drive-metrics` |
 | [`arr-throttle.timer`](#arr-throttletimer) | every minute, first 3 min after boot | none (accuracy 10 s) | no | `downloads-throttle` |
 | [`arr-watch.timer`](#arr-watchtimer) | every minute, first 3 min after boot | none (accuracy 10 s) | no | `activity-watch` |
 | [`arr-firewall.timer`](#arr-firewalltimer) | every 15 minutes, first 30 s after boot | none | no | `host-firewall` |
@@ -244,6 +246,22 @@ Runs [`ups-metrics`](scripts.md#ups-metrics), which writes the UPS readings for 
 - **File:** [`host/systemd/arr-ups-metrics.timer`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/arr-ups-metrics.timer)
 - **When:** `OnBootSec=1min`, `OnUnitActiveSec=30s`, `AccuracySec=5s`.
 - **Started by:** `WantedBy=timers.target`; enable it once apcupsd is installed.
+
+### arr-drive-metrics.service
+
+Runs [`drive-metrics`](scripts.md#drive-metrics), which writes the drive temperatures for Grafana's Media Server: Overview dashboard and Glance.
+
+- **File:** [`host/systemd/arr-drive-metrics.service`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/arr-drive-metrics.service)
+- **Runs:** `@REPO@/scripts/drive-metrics`, `Type=oneshot`.
+- **User:** root (no `User=`); smartctl needs it.
+- **Condition:** none: a drive that is unmounted or asleep is left out of the file, so the run needs neither drive. No `OnFailure=`.
+- **Started by:** `arr-drive-metrics.timer`.
+
+### arr-drive-metrics.timer
+
+- **File:** [`host/systemd/arr-drive-metrics.timer`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/arr-drive-metrics.timer)
+- **When:** `OnBootSec=2min`, `OnUnitActiveSec=1min`, `AccuracySec=10s`.
+- **Started by:** `WantedBy=timers.target`; optional, enable it for live drive temperatures.
 
 ## Maintenance
 

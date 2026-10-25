@@ -477,9 +477,10 @@ With the apps configured, switch on the timers that watch them:
 
 ```bash
 sudo systemctl enable --now arr-health.timer arr-watch.timer arr-throttle.timer
-sudo systemctl enable --now arr-youtube.timer      # dashboards module only
-sudo systemctl enable --now arr-mirror.timer       # with a backup drive only
-sudo systemctl enable --now arr-ups-metrics.timer  # with a UPS and apcupsd only
+sudo systemctl enable --now arr-youtube.timer        # dashboards module only
+sudo systemctl enable --now arr-mirror.timer         # with a backup drive only
+sudo systemctl enable --now arr-ups-metrics.timer    # with a UPS and apcupsd only
+sudo systemctl enable --now arr-drive-metrics.timer  # optional: live drive temperatures
 ```
 
 They are enabled last because `activity-watch` and `downloads-throttle` read Jellyfin and
