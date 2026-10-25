@@ -89,6 +89,7 @@ compose_configs() {
   done
 
   docker compose --env-file .env.example -f docker-compose.yml -f compose.gpu.yml config -q || return 1
+  BACKUP_DEVICE=/dev/sdb docker compose --env-file .env.example -f docker-compose.yml -f compose.backup-drive.yml config -q || return 1
   VPN_COUNTRIES=Netherlands VPN_SERVER_NAMES='NL#1,NL#2' \
     docker compose --env-file .env.example -f docker-compose.yml -f compose.gpu.yml -f compose.vpn-failover.yml config -q
 }

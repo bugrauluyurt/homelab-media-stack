@@ -50,9 +50,9 @@ pages:
                   /media-drive: {name: Media drive, hide: false}
 
           - type: custom-api
-            title: Media drive
+            title: Drives
             title-url: http://${HOST_NAME}:3006
-            cache: 30m
+            cache: 1m
             url: http://scrutiny:8080/api/summary
             template: |
               {{ $prom := "http://prometheus:9090/api/v1/query" }}
@@ -75,8 +75,13 @@ pages:
               <ul class="list list-gap-8 margin-top-15">
               {{ range .JSON.Array "data.summary|@values" }}
                 {{ $ok := eq (.Int "device.device_status") 0 }}
+                {{/* Scrutiny sees the media drive as sda and the backup drive as sdb (compose.backup-drive.yml). */}}
+                {{ $role := "media" }}{{ if eq (.String "device.device_name") "sdb" }}{{ $role = "backup" }}{{ end }}
+                {{ $live := (newRequest $prom | withParameter "query" (printf "arr_drive_temperature_celsius{drive=%q}" $role) | getResponse).JSON }}
+                {{ $temp := .Int "smart.temp" }}{{ if ne ($live.String "data.result.0.value.1") "" }}{{ $temp = $live.Int "data.result.0.value.1" }}{{ end }}
+                <li class="flex justify-between margin-top-10"><span class="color-highlight">{{ if eq $role "backup" }}Backup drive{{ else }}Media drive{{ end }}</span></li>
                 <li class="flex justify-between"><span>SMART</span><span class="{{ if $ok }}color-positive{{ else }}color-negative{{ end }}">{{ if $ok }}Passed{{ else }}Failing{{ end }}</span></li>
-                <li class="flex justify-between"><span>Temperature</span><span class="color-highlight">{{ .Int "smart.temp" }}°C</span></li>
+                <li class="flex justify-between"><span>Temperature</span><span class="{{ if ge $temp 55 }}color-negative{{ else }}color-highlight{{ end }}">{{ $temp }}°C</span></li>
                 <li class="flex justify-between"><span>Powered on</span><span>{{ div (.Int "smart.power_on_hours") 24 }} days</span></li>
                 <li class="flex justify-between"><span>Model</span><span class="text-truncate">{{ .String "device.model_name" }}</span></li>
               {{ end }}
