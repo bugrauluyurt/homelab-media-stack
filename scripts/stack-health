@@ -55,8 +55,8 @@ chk "media drive under 55C"              "drive_smart '$STORAGE_MOUNT' temperatu
 if [ -n "${BACKUP_UUID:-}" ]; then
   chk "$BACKUP_MOUNT is mounted"          "mountpoint -q '$BACKUP_MOUNT'"
   if mountpoint -q "$BACKUP_MOUNT"; then
-    # Read-only between mirrors, so nothing but storage-mirror can change the copy.
-    chk "backup drive read-only between mirrors" "findmnt -no OPTIONS '$BACKUP_MOUNT' | tr , '\n' | grep -qx ro || systemctl is-active -q arr-mirror.service"
+    # Read-only between mirrors, so nothing but storage-mirror can change the copy; a running oneshot reads "activating".
+    chk "backup drive read-only between mirrors" "findmnt -no OPTIONS '$BACKUP_MOUNT' | tr , '\n' | grep -qx ro || [ \"\$(systemctl is-active arr-mirror.service)\" = activating ]"
     chk "backup drive under 90% full"     "disk_below '$BACKUP_MOUNT' 90"
     chk "backup drive SMART health passed" "drive_smart '$BACKUP_MOUNT' health"
     chk "backup drive: no bad sectors"    "drive_smart '$BACKUP_MOUNT' sectors"
