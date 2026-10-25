@@ -1,12 +1,12 @@
 # systemd reference
 
-Every file in [`host/systemd/`](https://github.com/bugrauluyurt/homelab-media-stack/tree/main/host/systemd): the units, timers and udev rule that start the stack with the media drive and run its scheduled jobs. It is for anyone checking when something runs, as which user, and why it did or didn't. [Storage and boot](../flows/storage-and-boot.md) tells the story; the scripts they run are in the [scripts reference](scripts.md).
+Every file in [`host/systemd/`](https://github.com/bugrauluyurt/homelab-media-stack/tree/main/host/systemd): the units, timers and udev rules that start the stack with the media drive, mount the backup drive and run the scheduled jobs. It is for anyone checking when something runs, as which user, and why it did or didn't. [Storage and boot](../flows/storage-and-boot.md) tells the story; the scripts they run are in the [scripts reference](scripts.md).
 
 **Anchors.** Each entry's heading is the file name, so its anchor is the file name in lower case with dots and `@` removed: `arr-stack.service` is `#arr-stackservice`, `arr-notify-failure@.service` is `#arr-notify-failureservice`, `99-arr-storage.rules` is `#99-arr-storagerules`.
 
 ## How the templates are installed
 
-The files in `host/systemd/` are templates. [`host-install`](scripts.md#host-install) fills in their placeholders from `.env` with `sed` and installs them: the udev rule into `/etc/udev/rules.d`, everything else into `/etc/systemd/system`. It then runs `systemctl daemon-reload` and `udevadm control --reload`.
+The files in `host/systemd/` are templates. [`host-install`](scripts.md#host-install) fills in their placeholders from `.env` with `sed` and installs them: the udev rules into `/etc/udev/rules.d`, everything else into `/etc/systemd/system`. It then runs `systemctl daemon-reload` and `udevadm control --reload`.
 
 | Placeholder | Filled with | Example |
 |---|---|---|
@@ -16,18 +16,22 @@ The files in `host/systemd/` are templates. [`host-install`](scripts.md#host-ins
 | `@STORAGE_UUID@` | `STORAGE_UUID` | the drive's filesystem UUID |
 | `@STORAGE_MOUNT@` | `STORAGE_MOUNT`, default `/mnt/storage` | `/mnt/storage` |
 | `@STORAGE_UNIT@` | the mount unit of `STORAGE_MOUNT`: `systemd-escape --path --suffix=mount "$STORAGE_MOUNT"` | `mnt-storage.mount` |
+| `@BACKUP_UUID@` | `BACKUP_UUID` | the backup drive's filesystem UUID |
+| `@BACKUP_MOUNT@` | `BACKUP_MOUNT`, default `/mnt/backup` | `/mnt/backup` |
+| `@BACKUP_UNIT@` | the mount unit of `BACKUP_MOUNT` | `mnt-backup.mount` |
 
-Without `STORAGE_UUID`, `host-install` skips the udev rule and removes an installed copy: the media disk is then always mounted (through fstab or a bind mount), so there is nothing to hot-plug.
+Without `STORAGE_UUID`, `host-install` skips `99-arr-storage.rules` and removes an installed copy: the media disk is then always mounted (through fstab or a bind mount), so there is nothing to hot-plug. Without `BACKUP_UUID` it does the same with `99-arr-backup.rules`: there is no backup drive.
 
-`host-install` never enables anything. The units meant to be enabled are `arr-stack.service`, `arr-firewall.service`, `arr-firewall.timer`, `arr-port-sync.timer`, `arr-backup.timer`, `arr-updates.timer`, `arr-health.timer`, `arr-watch.timer`, `arr-throttle.timer` and, with the dashboards module, `arr-youtube.timer`. [Getting started](../getting-started.md#start-the-stack) enables them in stages: the firewall first, the timers that read the apps' API keys last.
+`host-install` never enables anything. The units meant to be enabled are `arr-stack.service`, `arr-firewall.service`, `arr-firewall.timer`, `arr-port-sync.timer`, `arr-backup.timer`, `arr-updates.timer`, `arr-health.timer`, `arr-watch.timer`, `arr-throttle.timer`, with the dashboards module `arr-youtube.timer`, with a backup drive `arr-mirror.timer`, and with a UPS `arr-ups-metrics.timer`. [Getting started](../getting-started.md#start-the-stack) enables them in stages: the firewall first, the timers that read the apps' API keys last.
 
-The other services have no `[Install]` section: their timer, or `OnFailure=`, starts them. [`stack-health`](scripts.md#stack-health) fails when one of the units above is not enabled (`arr-youtube.timer` only while the dashboards module is on). Re-run `host-install` after changing a file in `host/systemd/` or `STACK_USER`, `STORAGE_MOUNT` or `STORAGE_UUID`.
+The other services have no `[Install]` section: their timer, or `OnFailure=`, starts them. [`stack-health`](scripts.md#stack-health) fails when one of the units above is not enabled (`arr-youtube.timer` only while the dashboards module is on, `arr-mirror.timer` only with `BACKUP_UUID` set, `arr-ups-metrics.timer` only with apcupsd configured). Re-run `host-install` after changing a file in `host/systemd/` or `STACK_USER`, `STORAGE_MOUNT`, `STORAGE_UUID`, `BACKUP_MOUNT` or `BACKUP_UUID`.
 
 ## How the units fit together
 
 ```mermaid
 flowchart LR
   udev["99-arr-storage.rules"] -->|"drive switched on"| mount["media drive mount unit"]
+  budev["99-arr-backup.rules"] -->|"backup drive appears"| bmount["backup drive mount unit, read-only"]
   boot["multi-user.target"] --> stack["arr-stack.service"]
   mount -->|"WantedBy"| stack
   mount -.->|"BindsTo: unmount stops it"| stack
@@ -41,7 +45,7 @@ flowchart LR
   svc -->|"OnFailure"| notify
 ```
 
-`OnFailure=` is set on `arr-stack`, `arr-firewall`, `arr-backup`, `arr-updates` and `arr-youtube`; the other services have none.
+`OnFailure=` is set on `arr-stack`, `arr-firewall`, `arr-backup`, `arr-mirror`, `arr-updates` and `arr-youtube`; the other services have none. Nothing is wanted by or bound to the backup drive's mount unit: the stack never waits for it.
 
 ## The first minutes after boot
 
@@ -60,6 +64,7 @@ gantt
   Media drive mounts                  :mnt, 00:00, 15s
   arr-stack.service runs stack-up     :stack, after host, 150s
   section Timers
+  arr-ups-metrics.timer first run at 1 min :milestone, 01:00, 0s
   arr-port-sync.timer first run at 90 s :milestone, 01:30, 0s
   arr-throttle and arr-watch first run at 3 min :milestone, 03:00, 0s
   arr-throttle and arr-watch every minute :03:00, 120s
@@ -68,9 +73,9 @@ gantt
 1. Docker and Tailscale start (both enabled on the host).
 2. `arr-firewall.service` loads the firewall once Docker, Tailscale and the network are up. It is a one-shot job, so `systemctl` shows it inactive afterwards; the rules stay. `arr-firewall.timer` applies it again 30 seconds after boot, then every 15 minutes.
 3. When the drive is mounted, `arr-stack.service` runs `stack-up`: every container starts, qBittorrent and slskd are re-attached to the VPN if needed, and the forwarded port is synced once gluetun is healthy. The unit allows up to 600 seconds for this.
-4. `arr-port-sync.timer` runs `vpn-port-sync` 90 seconds after boot, then every 15 minutes.
+4. `arr-ups-metrics.timer` reads the UPS 1 minute after boot, then every 30 seconds (skipped without apcupsd). `arr-port-sync.timer` runs `vpn-port-sync` 90 seconds after boot, then every 15 minutes.
 5. `arr-throttle.timer` and `arr-watch.timer` start 3 minutes after boot and then run every minute.
-6. `arr-backup.timer`, `arr-updates.timer` and `arr-youtube.timer` have `Persistent=true`: a run missed while the machine was off happens soon after boot. `arr-health.timer` has no catch-up; it waits for its next slot.
+6. `arr-backup.timer`, `arr-mirror.timer`, `arr-updates.timer` and `arr-youtube.timer` have `Persistent=true`: a run missed while the machine was off happens soon after boot. `arr-health.timer` has no catch-up; it waits for its next slot.
 
 With the drive off, steps 3 and 5 do nothing: `arr-stack.service` waits for the mount, and the drive-dependent services are skipped by `ConditionPathIsMountPoint=`.
 
@@ -78,12 +83,14 @@ With the drive off, steps 3 and 5 do nothing: `arr-stack.service` waits for the 
 
 | Timer | When | Randomized delay | Catches up after downtime | Runs |
 |---|---|---|---|---|
+| [`arr-ups-metrics.timer`](#arr-ups-metricstimer) | every 30 seconds, first 1 min after boot | none (accuracy 5 s) | no | `ups-metrics` |
 | [`arr-throttle.timer`](#arr-throttletimer) | every minute, first 3 min after boot | none (accuracy 10 s) | no | `downloads-throttle` |
 | [`arr-watch.timer`](#arr-watchtimer) | every minute, first 3 min after boot | none (accuracy 10 s) | no | `activity-watch` |
 | [`arr-firewall.timer`](#arr-firewalltimer) | every 15 minutes, first 30 s after boot | none | no | `host-firewall` |
 | [`arr-port-sync.timer`](#arr-port-synctimer) | every 15 minutes, first 90 s after boot | none | no | `vpn-port-sync` |
 | [`arr-health.timer`](#arr-healthtimer) | 00:20, 06:20, 12:20, 18:20 | up to 10 min | no | `stack-health --notify` |
 | [`arr-backup.timer`](#arr-backuptimer) | daily 04:30 | up to 15 min | yes | `stack-backup` |
+| [`arr-mirror.timer`](#arr-mirrortimer) | daily 05:30 | up to 10 min | yes | `storage-mirror` |
 | [`arr-youtube.timer`](#arr-youtubetimer) | hourly | up to 10 min | yes | `youtube-sync.py` |
 | [`arr-updates.timer`](#arr-updatestimer) | daily 06:00 | up to 30 min | yes | `stack-update-check` |
 
@@ -103,6 +110,19 @@ When a block device with the filesystem UUID `STORAGE_UUID` appears, systemd sta
 
 - **File:** [`host/systemd/99-arr-storage.rules`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/99-arr-storage.rules)
 - **Installed to:** `/etc/udev/rules.d/`, only when `STORAGE_UUID` is set.
+
+### 99-arr-backup.rules
+
+The udev rule that mounts the backup drive when it appears, the same way as [`99-arr-storage.rules`](#99-arr-storagerules) for the media drive:
+
+```
+ACTION=="add", SUBSYSTEM=="block", ENV{ID_FS_UUID}=="@BACKUP_UUID@", ENV{SYSTEMD_WANTS}+="@BACKUP_UNIT@"
+```
+
+When a block device with the filesystem UUID `BACKUP_UUID` appears, systemd starts the backup drive's mount unit, from its read-only fstab line ([Host](../operations/host.md#the-backup-drive)). Nothing is wanted by that mount unit, so the stack neither starts nor stops with it; only [`arr-mirror.service`](#arr-mirrorservice) uses the drive.
+
+- **File:** [`host/systemd/99-arr-backup.rules`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/99-arr-backup.rules)
+- **Installed to:** `/etc/udev/rules.d/`, only when `BACKUP_UUID` is set.
 
 ### arr-stack.service
 
@@ -209,6 +229,22 @@ Runs [`downloads-throttle`](scripts.md#downloads-throttle), which caps qBittorre
 - **When:** `OnBootSec=3min`, `OnUnitActiveSec=1min`, `AccuracySec=10s`.
 - **Started by:** `WantedBy=timers.target`.
 
+### arr-ups-metrics.service
+
+Runs [`ups-metrics`](scripts.md#ups-metrics), which writes the UPS readings for Grafana's UPS dashboard and Glance.
+
+- **File:** [`host/systemd/arr-ups-metrics.service`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/arr-ups-metrics.service)
+- **Runs:** `@REPO@/scripts/ups-metrics`, `Type=oneshot`.
+- **User and group:** `@STACK_USER@`, `@STACK_GROUP@`.
+- **Condition:** `ConditionPathExists=/etc/apcupsd/apcupsd.conf`: without apcupsd (no UPS) the run is skipped. It doesn't need the media drive. No `OnFailure=`.
+- **Started by:** `arr-ups-metrics.timer`.
+
+### arr-ups-metrics.timer
+
+- **File:** [`host/systemd/arr-ups-metrics.timer`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/arr-ups-metrics.timer)
+- **When:** `OnBootSec=1min`, `OnUnitActiveSec=30s`, `AccuracySec=5s`.
+- **Started by:** `WantedBy=timers.target`; enable it once apcupsd is installed.
+
 ## Maintenance
 
 ### arr-backup.service
@@ -228,6 +264,25 @@ Runs [`stack-backup`](scripts.md#stack-backup), the restic backup of the stack's
 - **File:** [`host/systemd/arr-backup.timer`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/arr-backup.timer)
 - **When:** `OnCalendar=*-*-* 04:30:00`, `RandomizedDelaySec=15min`, `Persistent=true` (if the machine was off at 04:30, it runs at the next opportunity).
 - **Started by:** `WantedBy=timers.target`.
+
+### arr-mirror.service
+
+Runs [`storage-mirror`](scripts.md#storage-mirror), the nightly copy of the whole media drive onto the backup drive.
+
+- **File:** [`host/systemd/arr-mirror.service`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/arr-mirror.service)
+- **Runs:** `@REPO@/scripts/storage-mirror`, `Type=oneshot`, with `Nice=19` and `IOSchedulingClass=idle` so it yields to playback and downloads.
+- **Timeout:** `TimeoutStartSec=24h`. A first copy of a full drive can take most of a day; a run past that is hung, fails and is pushed. While it runs, `stack-health` counts the mirror as fresh.
+- **User:** root (no `User=`); it remounts the backup drive and copies files of every owner.
+- **Condition:** `ConditionPathIsMountPoint=@STORAGE_MOUNT@`: skipped, not failed, while the media drive is off. A missing backup drive is no condition: the script fails, and the failure is pushed.
+- **Dependencies:** `After=@STORAGE_UNIT@ @BACKUP_UNIT@`.
+- **Started by:** `arr-mirror.timer`; by hand with `sudo systemctl start --no-block arr-mirror.service`.
+- **On failure:** `arr-notify-failure@arr-mirror.service`.
+
+### arr-mirror.timer
+
+- **File:** [`host/systemd/arr-mirror.timer`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/arr-mirror.timer)
+- **When:** `OnCalendar=*-*-* 05:30:00`, `RandomizedDelaySec=10min`, `Persistent=true`. It comes after `arr-backup.timer` (04:30, up to 15 minutes later), so the mirror also carries that night's restic repository in `$STORAGE_MOUNT/backups`.
+- **Started by:** `WantedBy=timers.target`; enable it once there is a backup drive.
 
 ### arr-updates.service
 
@@ -272,7 +327,7 @@ A template unit that pushes a failed unit's last log lines to ntfy through [`sta
 - **File:** [`host/systemd/arr-notify-failure@.service`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/host/systemd/arr-notify-failure@.service)
 - **Runs:** `@REPO@/scripts/stack-failure-notify %i`, `Type=oneshot`.
 - **User:** root (no `User=`).
-- **Used by:** `arr-stack.service`, `arr-firewall.service`, `arr-backup.service`, `arr-updates.service`, `arr-youtube.service`.
+- **Used by:** `arr-stack.service`, `arr-firewall.service`, `arr-backup.service`, `arr-mirror.service`, `arr-updates.service`, `arr-youtube.service`.
 
 ## Not in host/systemd/
 

@@ -58,6 +58,7 @@ are listed at the end of the known issues.
 | SYSTEMD | [systemd reference](reference/systemd.md), [Host setup](operations/host.md) |
 | SECURITY | [Security](security.md), [Host setup](operations/host.md) |
 | BACKUPS | [Backups](flows/backups.md) |
+| POWER | [Power](flows/power.md) |
 | SERVICES, MONITORING | The app's logs; [Monitoring](flows/monitoring.md) |
 | CLEANUP & INTROS | [Cleanuparr](operations/maintenance.md#cleanuparr) |
 | INDEXERS | [Indexers](operations/indexers.md) |

@@ -203,6 +203,12 @@ pages:
               {{ $checked := (newRequest $prom | withParameter "query" "arr_image_updates_checked_timestamp_seconds" | getResponse).JSON.String "data.result.0.value.1" }}
               {{ $backup := (newRequest $prom | withParameter "query" "arr_backup_last_success_timestamp_seconds" | getResponse).JSON.String "data.result.0.value.1" }}
               {{ $backupAge := (newRequest $prom | withParameter "query" "time() - arr_backup_last_success_timestamp_seconds" | getResponse).JSON.Float "data.result.0.value.1" }}
+              {{ $mirror := (newRequest $prom | withParameter "query" "arr_mirror_last_success_timestamp_seconds" | getResponse).JSON.String "data.result.0.value.1" }}
+              {{ $mirrorAge := (newRequest $prom | withParameter "query" "time() - arr_mirror_last_success_timestamp_seconds" | getResponse).JSON.Float "data.result.0.value.1" }}
+              {{ $ups := (newRequest $prom | withParameter "query" "arr_ups_up" | getResponse).JSON.String "data.result.0.value.1" }}
+              {{ $onBattery := (newRequest $prom | withParameter "query" "arr_ups_on_battery" | getResponse).JSON.Int "data.result.0.value.1" }}
+              {{ $charge := (newRequest $prom | withParameter "query" "arr_ups_battery_charge_percent" | getResponse).JSON.Float "data.result.0.value.1" }}
+              {{ $runtime := (newRequest $prom | withParameter "query" "arr_ups_runtime_seconds" | getResponse).JSON.Float "data.result.0.value.1" }}
               <ul class="list list-gap-10">
                 <li>
                   <p class="{{ if gt $updates 0 }}color-highlight{{ else }}color-positive{{ end }}">{{ if gt $updates 0 }}{{ $updates }} image updates available{{ else }}All images up to date{{ end }}</p>
@@ -212,6 +218,18 @@ pages:
                   <p class="{{ if or (eq $backup "") (gt $backupAge 172800.0) }}color-negative{{ else }}color-positive{{ end }}">{{ if eq $backup "" }}No backup recorded{{ else }}Settings backed up{{ end }}</p>
                   {{ if ne $backup "" }}<p class="size-h6"><span {{ parseTime "unix" $backup | toRelativeTime }}></span> ago · restic on the media drive</p>{{ end }}
                 </li>
+                {{ if ne $mirror "" }}
+                <li>
+                  <p class="{{ if gt $mirrorAge 172800.0 }}color-negative{{ else }}color-positive{{ end }}">Media mirrored</p>
+                  <p class="size-h6"><span {{ parseTime "unix" $mirror | toRelativeTime }}></span> ago · to the backup drive</p>
+                </li>
+                {{ end }}
+                {{ if ne $ups "" }}
+                <li>
+                  <p class="{{ if or (ne $ups "1") (gt $onBattery 0) }}color-negative{{ else }}color-positive{{ end }}">{{ if ne $ups "1" }}UPS not responding{{ else if gt $onBattery 0 }}On battery power{{ else }}UPS on mains power{{ end }}</p>
+                  {{ if eq $ups "1" }}<p class="size-h6">battery {{ $charge | printf "%.0f" }}% · about {{ div $runtime 60.0 | printf "%.0f" }} min left</p>{{ end }}
+                </li>
+                {{ end }}
               </ul>
 
           - type: custom-api

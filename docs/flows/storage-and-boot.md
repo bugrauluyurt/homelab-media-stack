@@ -1,8 +1,9 @@
 # Storage and boot
 
 This page covers the media drive's life: how switching it on mounts it and starts the stack, how
-to switch it off safely, what happens at boot, and when each timer runs. It is for anyone running
-the server, and matters most if your media drive is powered on and off by hand.
+to switch it off safely, what happens at boot, and when each timer runs. It also covers the
+optional backup drive, which the stack never depends on. It is for anyone running the server, and
+matters most if your media drive is powered on and off by hand.
 
 The split is deliberate: the operating system, Docker and every app's settings (`$CONFIG_ROOT`)
 live on the system disk, and only media and downloads (`$DATA_ROOT`) live on the media drive at
@@ -76,7 +77,13 @@ it:
 7. Spins the drive down with `hdparm -Y`, then tells you it is safe to switch off.
 
 If the power goes without `drive-off`, `BindsTo=` still stops the stack, but only after the
-drive has gone, so writes in flight can be lost.
+drive has gone, so writes in flight can be lost. A UPS avoids that for a power cut
+([Power](power.md)).
+
+A [backup drive](#the-backup-drive) is read-only between mirrors and needs no unmount when you
+switch the media drive off alone. If both drives sit in one dock that you switch off, stop a
+running mirror and unmount the backup drive too: `sudo systemctl stop arr-mirror.service`, then
+`sudo umount /mnt/backup` (your `BACKUP_MOUNT`).
 
 ### The empty mount point
 
@@ -101,7 +108,27 @@ If your media disk is always connected, leave `STORAGE_UUID` empty:
 - `drive-off` still stops the stack and unmounts, and never spins down the system disk.
 
 `STORAGE_DEVICE` (the whole disk, ideally a `/dev/disk/by-id/` path) tells Scrutiny which disk to
-read SMART data from. The keys are in [Configuration](../reference/configuration.md#storage_uuid).
+read SMART data from. With two USB drives, `/dev/sda` and `/dev/sdb` can swap at boot, so the
+by-id path matters then. The keys are in [Configuration](../reference/configuration.md#storage_uuid).
+
+### The backup drive
+
+An optional second drive holds a nightly mirror of the whole media drive
+([Backups](backups.md#the-media-mirror)). It mounts the same way, by filesystem UUID
+(`BACKUP_UUID`) at `BACKUP_MOUNT` (default `/mnt/backup`), but read-only:
+
+```
+UUID=<BACKUP_UUID>  /mnt/backup  ext4  ro,noatime,nofail,x-systemd.device-timeout=60  0  2
+```
+
+[`99-arr-backup.rules`](../reference/systemd.md#99-arr-backuprules) mounts it when it appears, and
+`nofail` lets the server boot without it. The stack never depends on it: nothing is wanted by or
+bound to its mount unit, `arr-stack.service` neither waits for it nor stops without it, and only
+[`arr-mirror.service`](../reference/systemd.md#arr-mirrorservice) uses it, remounting it
+read-write for the copy and read-only after. Its empty mount point is immutable too
+(`sudo chattr +i /mnt/backup`). Without `BACKUP_UUID`, `host-install` skips its udev rule and
+nothing mirror-related runs. Setting it up is in
+[Host setup](../operations/host.md#the-backup-drive).
 
 ## What stack-up does
 
@@ -154,8 +181,9 @@ Nothing needs starting by hand:
 2. [`arr-firewall.service`](../reference/systemd.md#arr-firewallservice) loads the host firewall
    once Docker, Tailscale and the network are up. It's a one-shot job, so `systemctl` shows it
    *inactive* afterwards; the rules stay. See [Security](../security.md).
-3. The drive mounts (from `/etc/fstab` if it is on, or later through udev), and
-   `arr-stack.service` runs `stack-up`.
+3. The drives mount (from `/etc/fstab` if they are on, or later through udev), and
+   `arr-stack.service` runs `stack-up` once the media drive is there. The backup drive plays no
+   part in this. After a power cut, the UPS's part is in [Power](power.md).
 4. The timers take over, as below. `arr-port-sync.service` is ordered after `arr-stack.service`.
 
 ### The timers
@@ -168,18 +196,20 @@ Nothing needs starting by hand:
 | [`arr-watch.timer`](../reference/systemd.md#arr-watchtimer) | `OnBootSec=3min`, then `OnUnitActiveSec=1min` | `activity-watch` | yes |
 | [`arr-health.timer`](../reference/systemd.md#arr-healthtimer) | `OnCalendar=00/6:20` (00:20, 06:20, 12:20, 18:20), up to 10 min later | `stack-health --notify` | yes |
 | [`arr-backup.timer`](../reference/systemd.md#arr-backuptimer) | `OnCalendar=*-*-* 04:30:00`, up to 15 min later | `stack-backup` | yes |
+| [`arr-mirror.timer`](../reference/systemd.md#arr-mirrortimer) | `OnCalendar=*-*-* 05:30:00`, up to 10 min later | `storage-mirror` (with a backup drive) | yes |
 | [`arr-updates.timer`](../reference/systemd.md#arr-updatestimer) | `OnCalendar=*-*-* 06:00:00`, up to 30 min later | `stack-update-check` | no |
 | [`arr-youtube.timer`](../reference/systemd.md#arr-youtubetimer) | `OnCalendar=hourly`, up to 10 min later | `youtube-sync.py` | no |
+| [`arr-ups-metrics.timer`](../reference/systemd.md#arr-ups-metricstimer) | `OnBootSec=1min`, then `OnUnitActiveSec=30s` | `ups-metrics` (skipped without apcupsd) | no |
 
 - "Up to N min later" is `RandomizedDelaySec`. The throttle and watch timers use `AccuracySec=10s`
   so they really run every minute.
-- The backup, update and YouTube timers have `Persistent=true`: a run missed while the server was
-  off happens at the next boot.
+- The backup, mirror, update and YouTube timers have `Persistent=true`: a run missed while the
+  server was off happens at the next boot.
 - The units that need the drive carry `ConditionPathIsMountPoint=` on it, so they are skipped, not
   failed, while it's off.
 - `arr-port-sync`'s automatic VPN restart counts how long the port has been missing from this boot
   on, not how many runs failed, so the quick runs at boot can't trigger it.
-- When `arr-stack`, `arr-backup`, `arr-updates`, `arr-firewall` or `arr-youtube` fails,
+- When `arr-stack`, `arr-backup`, `arr-mirror`, `arr-updates`, `arr-firewall` or `arr-youtube` fails,
   `OnFailure=` starts [`arr-notify-failure@.service`](../reference/systemd.md#arr-notify-failureservice),
   which pushes the unit's last log lines to ntfy.
 
@@ -190,9 +220,9 @@ What each timer's job does is in [Monitoring](monitoring.md), [Backups](backups.
 
 The files in [`host/systemd/`](https://github.com/bugrauluyurt/homelab-media-stack/tree/main/host/systemd)
 are templates. [`host-install`](../reference/scripts.md#host-install) fills in `@REPO@`,
-`@STACK_USER@`, `@STACK_GROUP@`, `@STORAGE_UUID@`, `@STORAGE_MOUNT@` and `@STORAGE_UNIT@` from
-`.env`, installs units into `/etc/systemd/system` and the udev rule into `/etc/udev/rules.d`, and
-reloads both. It enables nothing: a new unit needs `sudo systemctl enable --now <unit>` once (the
+`@STACK_USER@`, `@STACK_GROUP@`, `@STORAGE_UUID@`, `@STORAGE_MOUNT@`, `@STORAGE_UNIT@`,
+`@BACKUP_UUID@`, `@BACKUP_MOUNT@` and `@BACKUP_UNIT@` from `.env`, installs units into
+`/etc/systemd/system` and the udev rules into `/etc/udev/rules.d`, and reloads both. It enables nothing: a new unit needs `sudo systemctl enable --now <unit>` once (the
 list is in [Getting started](../getting-started.md)). Check them with
 `systemctl list-timers 'arr-*'`.
 
@@ -201,11 +231,12 @@ list is in [Getting started](../getting-started.md)). Check them with
 | Name | Role | Reference |
 |---|---|---|
 | `99-arr-storage.rules` | Asks for the mount unit when the drive with `STORAGE_UUID` appears | [systemd](../reference/systemd.md#99-arr-storagerules) |
+| `99-arr-backup.rules` | The same for the backup drive with `BACKUP_UUID`, which nothing else waits for | [systemd](../reference/systemd.md#99-arr-backuprules) |
 | `arr-stack.service` | Starts the stack with the drive, stops it without | [systemd](../reference/systemd.md#arr-stackservice) |
 | `stack-up` | Starts the containers and settles the VPN | [scripts](../reference/scripts.md#stack-up) |
 | `drive-off` | Stops, unmounts and spins the drive down | [scripts](../reference/scripts.md#drive-off) |
 | `host-install` | Renders and installs the units and the udev rule | [scripts](../reference/scripts.md#host-install) |
-| `stack-env.sh` | `STORAGE_MOUNT`, profiles, and the disk behind a mount | [scripts](../reference/scripts.md#stack-envsh) |
+| `stack-env.sh` | `STORAGE_MOUNT`, `BACKUP_MOUNT`, profiles, and the disk behind a mount | [scripts](../reference/scripts.md#stack-envsh) |
 | `arr-firewall.service` | Loads the firewall at boot | [systemd](../reference/systemd.md#arr-firewallservice) |
 | `arr-notify-failure@.service` | Pushes a failed unit's log to ntfy | [systemd](../reference/systemd.md#arr-notify-failureservice) |
 

@@ -14,7 +14,7 @@ Every file in [`scripts/`](https://github.com/bugrauluyurt/homelab-media-stack/t
 
 | Script | Run by | Root | Changes state |
 |---|---|---|---|
-| [`host-install`](#host-install) | by hand, first | sudo | systemd units, udev rule, SSH and Docker config, rpcbind |
+| [`host-install`](#host-install) | by hand, first | sudo | systemd units, udev rules, SSH and Docker config, rpcbind, apcupsd settings |
 | [`configure-jellyfin.py`](#configure-jellyfinpy) | by hand | no | Jellyfin API |
 | [`configure-sabnzbd.py`](#configure-sabnzbdpy) | by hand | sudo | `.env`, `sabnzbd.ini` (restarts SABnzbd), SABnzbd API |
 | [`configure-arr.py`](#configure-arrpy) | by hand | sudo if needed | Radarr, Sonarr, Lidarr and Prowlarr APIs |
@@ -40,12 +40,15 @@ Every file in [`scripts/`](https://github.com/bugrauluyurt/homelab-media-stack/t
 | [`vpn-import-servers`](#vpn-import-servers) | by hand | no | verified Proton server files outside the repository |
 | [`host-firewall`](#host-firewall) | `arr-firewall.service` and `.timer` | yes | iptables and ip6tables rules |
 | [`stack-backup`](#stack-backup) | `arr-backup.timer`, `stack-update` | yes | restic repositories, key file, metrics |
+| [`storage-mirror`](#storage-mirror) | `arr-mirror.timer`, by hand | yes | the backup drive (remounted read-write, then read-only), its trash, metric |
 | [`stack-update-check`](#stack-update-check) | `arr-updates.timer` | no | state file, metrics, ntfy |
 | [`stack-health`](#stack-health) | `arr-health.timer`, `stack-update`, by hand | sudo | test file on the drive, throwaway containers, ntfy |
 | [`activity-watch`](#activity-watch) | `arr-watch.timer` | sudo if needed | state file, ntfy |
 | [`downloads-throttle`](#downloads-throttle) | `arr-throttle.timer` | no | qBittorrent speed limits |
 | [`youtube-sync.py`](#youtube-syncpy) | `arr-youtube.timer`, `stack-up` | no | Glance channel lists and video rows, metric; `.env` with `--login` |
+| [`ups-metrics`](#ups-metrics) | `arr-ups-metrics.timer` | no | metric |
 | [`stack-failure-notify`](#stack-failure-notify) | `arr-notify-failure@.service` | yes | ntfy only |
+| [`ups-event`](#ups-event) | apcupsd (`apccontrol`) | yes | ntfy only |
 | [`stack-update`](#stack-update) | by hand | sudo | pulls images, recreates containers, restores settings |
 | [`drive-off`](#drive-off) | by hand | sudo | stops the stack, unmounts and spins down the drive |
 | [`vpn-leak-test`](#vpn-leak-test) | by hand | no | nothing |
@@ -78,6 +81,8 @@ flowchart LR
     watchtimer["arr-watch.timer"]
     throttletimer["arr-throttle.timer"]
     yttimer["arr-youtube.timer"]
+    mirrortimer["arr-mirror.timer"]
+    upstimer["arr-ups-metrics.timer"]
     failsvc["arr-notify-failure@.service"]
   end
   subgraph hand["by hand"]
@@ -97,6 +102,9 @@ flowchart LR
   watchtimer --> watch["activity-watch"]
   throttletimer --> throttle["downloads-throttle"]
   yttimer --> youtube["youtube-sync.py"]
+  mirrortimer --> mirror["storage-mirror"]
+  upstimer --> upsmetrics["ups-metrics"]
+  apcupsd["apcupsd, on a power event"] --> upsevent["ups-event"]
   failsvc --> notifyfail["stack-failure-notify"]
   stackup --> youtube
   stackup --> syncport
@@ -120,13 +128,13 @@ These run by hand while you set the server up, listed in the order [Getting star
 
 ### host-install
 
-Installs the host side of the stack: renders every template in `host/systemd/` with values from `.env` (see [placeholders](systemd.md#how-the-templates-are-installed)) into `/etc/systemd/system` and `/etc/udev/rules.d`, installs the SSH hardening from `host/sshd_config.d/` and Docker's log rotation from `host/docker/daemon.json`, and switches rpcbind off. It checks prerequisites first and, for anything missing, prints the `apt-get` (Debian, Ubuntu) or `pacman` (Arch) command that installs it, then stops.
+Installs the host side of the stack: renders every template in `host/systemd/` with values from `.env` (see [placeholders](systemd.md#how-the-templates-are-installed)) into `/etc/systemd/system` and `/etc/udev/rules.d`, installs the SSH hardening from `host/sshd_config.d/` and Docker's log rotation from `host/docker/daemon.json`, switches rpcbind off and, when apcupsd is installed, installs the UPS settings from `host/apcupsd/apcupsd.conf` ([Power](../flows/power.md)). It checks prerequisites first and, for anything missing, prints the `apt-get` (Debian, Ubuntu) or `pacman` (Arch) command that installs it, then stops.
 
 - **File:** [`scripts/host-install`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/host-install)
-- **Runs:** by hand, first; again after changing `STACK_USER`, `STORAGE_MOUNT`, `STORAGE_UUID` or any file in `host/systemd/`.
+- **Runs:** by hand, first; again after changing `STACK_USER`, `STORAGE_MOUNT`, `STORAGE_UUID`, `BACKUP_MOUNT`, `BACKUP_UUID` or any file in `host/`.
 - **Checks:** Docker with the compose and buildx plugins, restic, smartctl, hdparm, lsof, ip6tables, Tailscale, avahi-daemon, mDNS in `/etc/nsswitch.conf`, Python 3.9 or newer, passwordless sudo, the stack user in the docker group, and that `ARR_SUBNET` overlaps no other Docker network and holds `PROWLARR_IP`.
 - **Root:** sudo; it needs passwordless sudo (it checks `sudo -n true`).
-- **Changes:** writes the units, timers and udev rule, then `systemctl daemon-reload` and `udevadm control --reload`; installs `/etc/ssh/sshd_config.d/10-arr-hardening.conf` (keys only, no root login), checks it with `sshd -t` and reloads ssh, warning when the `Include` line is missing from `sshd_config`; installs `/etc/docker/daemon.json` only when it differs, leaving the Docker restart to you because it restarts every container; disables and masks `rpcbind.socket` and `rpcbind.service`. Without `STORAGE_UUID` it skips the udev rule and removes an installed copy. It never enables or starts a unit.
+- **Changes:** writes the units, timers and udev rules, then `systemctl daemon-reload` and `udevadm control --reload`; installs `/etc/ssh/sshd_config.d/10-arr-hardening.conf` (keys only, no root login), checks it with `sshd -t` and reloads ssh, warning when the `Include` line is missing from `sshd_config`; installs `/etc/docker/daemon.json` only when it differs, leaving the Docker restart to you because it restarts every container; disables and masks `rpcbind.socket` and `rpcbind.service`. Without `STORAGE_UUID` it skips `99-arr-storage.rules` and removes an installed copy, and without `BACKUP_UUID` the same for `99-arr-backup.rules`. When `/etc/apcupsd` exists it installs `/etc/apcupsd/apcupsd.conf` when it differs, leaving `sudo systemctl restart apcupsd` to you, and links `/etc/apcupsd/onbattery`, `offbattery`, `doshutdown`, `commfailure`, `commok` and `changeme` to [`ups-event`](#ups-event); without apcupsd (no UPS) it skips both. It never enables, starts or restarts a unit.
 - **Idempotent:** yes.
 
 ### configure-jellyfin.py
@@ -475,6 +483,21 @@ It backs this up to `$STORAGE_MOUNT/backups/restic` (tag `arr-stack`, host `HOST
 - **Why:** a WAL-mode database keeps its newest writes in the `-wal` file, so copying the `.db` alone loses them; the online backup API gives a consistent copy without stopping the app, and retries while an app holds its database mid-checkpoint. The second copy on the system disk keeps the history if the media drive dies; the key beside the repository keeps the drive's backups readable if the system disk dies. `pre-update` snapshots skip the daily thinning, which would otherwise drop one taken the same day.
 - **Idempotent:** each run adds a snapshot; retention keeps the repositories bounded.
 
+### storage-mirror
+
+Mirrors the whole media drive onto a second drive, the backup drive at `BACKUP_MOUNT` (default `/mnt/backup`), with `rsync -aHAX --numeric-ids --delete` from `$STORAGE_MOUNT/` to `$BACKUP_MOUNT/`: owners, ACLs, extended attributes and hardlinks are kept, so the copy is exact and a torrent and its library copy still take the space once. A file deleted or overwritten since the last run moves into `$BACKUP_MOUNT/.trash/<YYYY-MM-DD>/` instead of disappearing (rsync's `--backup-dir`, a rename on the same filesystem), and trash days older than 30 days are removed after the copy. It leaves out `/.trash/`, `/lost+found/`, `$DATA_ROOT/usenet/incomplete/` and `$DATA_ROOT/soulseek/incomplete/`. The backup drive is mounted read-only in fstab; the script remounts it read-write for the copy and back to read-only on exit, whether the copy worked or not. On success it writes `arr_mirror_last_success_timestamp_seconds` to `$STATE/metrics/mirror.prom`. [Backups](../flows/backups.md#the-media-mirror) covers restoring files and swapping the backup drive in.
+
+It refuses to start (exit 1, `FATAL`) when `BACKUP_UUID` is empty, when either mount is not a mount point, when the backup mount is not the drive `BACKUP_UUID` names (or, with `STORAGE_UUID` set, the media mount is not that drive), or when `DATA_ROOT` is empty.
+
+- **File:** [`scripts/storage-mirror`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/storage-mirror)
+- **Runs:** [`arr-mirror.timer`](systemd.md#arr-mirrortimer) daily at 05:30, after the 04:30 settings backup; by hand with `sudo` (the stack-backup skill, which asks first).
+- **Flags:** `--dry-run` lists what would change (`rsync -n -i`) and touches nothing, the mount included.
+- **Root:** yes; it remounts the backup drive and copies files of every owner.
+- **Changes:** `$BACKUP_MOUNT` and its `.trash/`; `$STATE/metrics/mirror.prom`.
+- **Exit:** 0 when rsync succeeds or exits 24 (files vanished during the copy, normal while downloads run); 1 otherwise, which fails `arr-mirror.service` and pushes ntfy.
+- **Why:** mirroring from an unmounted media drive would empty the backup, and onto an unmounted backup mount would fill the system disk, hence the guards. Read-only between runs, nothing but this script can change the copy. The copy is the drive's root, so the backup drive can stand in for the media drive as it is. The trash is pruned by age only: trash that fills the drive makes rsync fail, which alerts.
+- **Idempotent:** yes; a second run copies only what changed.
+
 ### stack-update-check
 
 Checks every image the stack's containers run for a newer build upstream for this machine's architecture. It writes the result to `$STATE/updates` (read by [`stack-health`](#stack-health) and [`stack-update`](#stack-update)) and the metrics `arr_image_updates_available` and `arr_image_updates_checked_timestamp_seconds`, and pushes each update not seen before to ntfy once, flagging a major version change. It never pulls or restarts anything. [Updates](../flows/updates.md) covers the whole cycle.
@@ -491,14 +514,16 @@ Changing such a pin is a manual configuration change, including the gluetun fail
 
 ### stack-health
 
-One-shot status of the whole stack, grouped as STORAGE, HARDWARE (only where `vcgencmd` exists, as on a Raspberry Pi), SYSTEMD, SECURITY, BACKUPS, SERVICES, MONITORING, CLEANUP & INTROS, INDEXERS and VPN. It ends by listing available image updates from `$STATE/updates` (informational, never a failure) and exits 0 only when every check passes. Some of the thresholds:
+One-shot status of the whole stack, grouped as STORAGE, HARDWARE (only where `vcgencmd` exists, as on a Raspberry Pi), SYSTEMD, SECURITY, BACKUPS, POWER (only where `/etc/apcupsd/apcupsd.conf` exists), SERVICES, MONITORING, CLEANUP & INTROS, INDEXERS and VPN. It ends by listing available image updates from `$STATE/updates` (informational, never a failure) and exits 0 only when every check passes. Some of the thresholds:
 
 | Check | Fails when |
 |---|---|
-| Disks | the media drive or the system disk is 90% full or more |
-| Media drive SMART | health not passed, any reallocated, pending or uncorrectable sector (NVMe: media errors), or 55 C or hotter |
+| Disks | the media drive, the backup drive or the system disk is 90% full or more |
+| Drive SMART | on the media drive, and on the backup drive with `BACKUP_UUID` set: health not passed, any reallocated, pending or uncorrectable sector (NVMe: media errors), or 55 C or hotter |
+| Backup drive | with `BACKUP_UUID` set: not mounted at `BACKUP_MOUNT`, or mounted read-write while `arr-mirror.service` isn't running |
 | Raspberry Pi | under-voltage, frequency cap, throttling or soft temperature limit right now, or the SoC at 80 C or hotter |
-| Backups | the last backup is 48 hours old or more, or a restic copy or the key file is missing (drive checks pass while the drive is off) |
+| Backups | the last backup is 48 hours old or more, or a restic copy or the key file is missing; with `BACKUP_UUID` set, `arr-mirror.timer` isn't enabled or the last mirror is 48 hours old or more with none running (drive checks pass while the drive is off) |
+| Power | with apcupsd configured: apcupsd isn't running, the UPS isn't answering it (`COMMLOST`), the UPS is on battery, or `arr-ups-metrics.timer` isn't enabled |
 | Units | a timer or `arr-stack.service` isn't enabled, or any systemd unit other than `arr-health.service` has failed (the checker evaluates current conditions instead of counting its own retained failure) |
 | Firewall | a chain isn't hooked, a port other than the firewall's `home-ports` is open to the home network, or SSH is |
 | VPN | the exit country isn't in `VPN_COUNTRIES` or is the United States, or qBittorrent isn't bound to the tunnel on the forwarded port |
@@ -508,7 +533,7 @@ One-shot status of the whole stack, grouped as STORAGE, HARDWARE (only where `vc
 - **Runs:** [`arr-health.timer`](systemd.md#arr-healthtimer) every 6 hours with `--notify`; [`stack-update`](#stack-update) after recreating containers; by hand (the `health` alias); the operational skills in `ai/homelab-plugin/skills/`.
 - **Flags:** `--notify` pushes failing checks to ntfy and remembers the incident in `$STATE/health-failed`. The next successful notifying run sends one recovered message and clears the marker. Failed delivery retains the marker for the next notifying run; no topic configured means notifications are disabled. Notification state updates are locked. Manual checks without `--notify` neither create nor consume this state. The systemd service retries failed checks after five minutes, bounded to four starts per hour; the six-hour timer remains the fallback.
 - **Calls:** [`host-firewall`](#host-firewall) `home-ports`, [`downloads-throttle`](#downloads-throttle) `--upload-cap`, [`cleanuparr-state`](#cleanuparr-state), [`indexers-check`](#indexers-check).
-- **Root:** sudo (smartctl, iptables, `sshd -T`, the backup files).
+- **Root:** sudo (smartctl on both drives, iptables, `sshd -T`, the backup files).
 - **Changes:** not read-only: it creates and removes a hardlink test file in `$DATA_ROOT/torrents/movies` and `$DATA_ROOT/media/movies`, and starts throwaway `curlimages/curl` containers on the `arr` network. Don't run it during a look-only investigation.
 - **Module:** checks of a switched-off module's services are skipped.
 - **Why:** a container created while the memory cgroup was unavailable silently loses its `mem_limit`, and compose won't recreate it because its config is unchanged, hence the memory-limit check. A Jellyfin update can disable plugins built for the older version without anything else failing. Byparr's `/health` launches a real browser, so its container health status is read instead.
@@ -548,15 +573,59 @@ Keeps Glance's YouTube channel lists in step with your subscriptions, read throu
 - **Module:** `dashboards` (`glance`). `stack-health` expects a sync within the last day.
 - **Idempotent:** yes.
 
+### ups-metrics
+
+Turns apcupsd's readings (`apcaccess -u status`) into metrics for node-exporter's textfile collector, read by Grafana's UPS dashboard and Glance. It writes `$STATE/metrics/ups.prom` whole and renames it into place:
+
+| Metric | From apcupsd |
+|---|---|
+| `arr_ups_up` | 1 while apcupsd reaches the UPS (`STATUS` present and not `COMMLOST`) |
+| `arr_ups_online`, `arr_ups_on_battery` | `STATUS` contains `ONLINE`, `ONBATT` |
+| `arr_ups_battery_charge_percent` | `BCHARGE` |
+| `arr_ups_runtime_seconds` | `TIMELEFT`, in seconds |
+| `arr_ups_load_percent`, `arr_ups_load_watts` | `LOADPCT`, and that share of `NOMPOWER` |
+| `arr_ups_input_voltage`, `arr_ups_battery_voltage` | `LINEV`, `BATTV` |
+| `arr_ups_transfers_total`, `arr_ups_on_battery_seconds_total` | `NUMXFERS`, `CUMONBATT` |
+| `arr_ups_shutdown_charge_percent`, `arr_ups_shutdown_runtime_seconds` | `MBATTCHG`, `MINTIMEL` in seconds: where apcupsd shuts the server down |
+
+When apcupsd can't reach the UPS, the file holds only `arr_ups_up 0`. A reading the UPS doesn't report is left out.
+
+- **File:** [`scripts/ups-metrics`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/ups-metrics)
+- **Runs:** [`arr-ups-metrics.timer`](systemd.md#arr-ups-metricstimer) every 30 seconds, from a minute after boot; skipped without `/etc/apcupsd/apcupsd.conf`.
+- **Root:** no.
+- **Changes:** `$STATE/metrics/ups.prom`.
+- **Idempotent:** yes.
+
 ### stack-failure-notify
 
 The `OnFailure=` handler: pushes "media stack: `<unit>` failed" with the unit's last 8 log lines (at most 1500 characters) to ntfy. Without `NTFY_TOPIC` it does nothing.
 
 - **File:** [`scripts/stack-failure-notify`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/stack-failure-notify)
-- **Runs:** [`arr-notify-failure@.service`](systemd.md#arr-notify-failureservice), started with the failed unit's name when `arr-stack`, `arr-firewall`, `arr-backup`, `arr-updates` or `arr-youtube` fails.
+- **Runs:** [`arr-notify-failure@.service`](systemd.md#arr-notify-failureservice), started with the failed unit's name when `arr-stack`, `arr-firewall`, `arr-backup`, `arr-mirror`, `arr-updates` or `arr-youtube` fails.
 - **Arguments:** the unit name.
 - **Root:** yes (the unit runs as root).
 - **Changes:** one ntfy push per run.
+
+### ups-event
+
+Pushes one ntfy message per apcupsd power event. apcupsd's `apccontrol` runs `/etc/apcupsd/<event>` without naming the event, so [`host-install`](#host-install) links each event's file to this script, which reads the event from the link's name:
+
+| Event | Push |
+|---|---|
+| `onbattery` | "media stack: on battery", with the charge, the minutes left and the shutdown thresholds |
+| `offbattery` | "media stack: power restored" |
+| `doshutdown` | "media stack: shutting down": the battery is nearly empty, and the server starts again when power returns |
+| `commfailure` | "media stack: UPS not responding": until it is back, a power cut would not shut the server down cleanly |
+| `commok` | "media stack: UPS responding again" |
+| `changeme` | "media stack: replace the UPS battery" |
+
+- **File:** [`scripts/ups-event`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/ups-event)
+- **Runs:** apcupsd through `apccontrol`, on the six events above. [Power](../flows/power.md) has the whole outage sequence.
+- **Root:** yes (apccontrol runs it as root).
+- **Changes:** one ntfy push per run.
+- **Exit:** always 0.
+- **Why:** an event script that exits 99 cancels apccontrol's own action for the event, the shutdown included.
+- **Idempotent:** yes.
 
 ## Day-to-day tools
 
@@ -661,11 +730,12 @@ Imported by the stack's Python scripts. It reads `.env` (a value wrapped in sing
 
 ### stack-env.sh
 
-Sourced by the stack's bash scripts. It sets `REPO`, exports every `.env` value, defaults `STORAGE_MOUNT` to `/mnt/storage` and `COMPOSE_PROFILES` to `*`, sets `STATE_ROOT` (the `state` folder next to `CONFIG_ROOT`) and defines:
+Sourced by the stack's bash scripts. It sets `REPO`, exports every `.env` value, defaults `STORAGE_MOUNT` to `/mnt/storage`, `BACKUP_MOUNT` to `/mnt/backup` and `COMPOSE_PROFILES` to `*`, sets `STATE_ROOT` (the `state` folder next to `CONFIG_ROOT`) and defines:
 
 - `notify TITLE TAGS BODY` (ntfy, a no-op without `NTFY_TOPIC`);
 - `write_update_metrics`: pending image updates for node-exporter's textfile collector, written whole and renamed into place so a scrape never sees half a file;
 - `disk_of_mount PATH`: the whole disk a mount lives on, bind mounts included;
+- `ups_field NAME`: one apcupsd reading without its unit (`apcaccess -u -p`, so `BCHARGE` reads `100.0`), empty when apcupsd can't be reached;
 - `service_enabled NAME`: whether a service is in an active profile;
 - `json_get`, `tunnel_ip`, `forwarded_port`, `qbit_prefs`, `vpn_healthy`, `wait_gluetun_healthy`;
 - `vpn_apps_attached` and `reattach_vpn_apps`: qBittorrent and slskd share gluetun's network namespace, and when gluetun is restarted or recreated under them they keep "running" with a dead network until they are recreated too. slskd is named only when its module is on, because naming a service starts it even when its profile is off. Reattachment requires a healthy VPN, uses `--no-deps` to avoid touching other services, and waits for the downloaders to answer.
@@ -721,6 +791,8 @@ What the scripts keep between runs. `$STATE` is the `state` folder next to `CONF
 |---|---|---|
 | `$STATE/updates`, `$STATE/updates.notified` | `stack-update-check`, `stack-update` | `stack-health`, `stack-update` |
 | `$STATE/metrics/*.prom` | `stack-update-check`, `stack-update`, `stack-backup`, `youtube-sync.py` | node-exporter, `stack-health` |
+| `$STATE/metrics/mirror.prom` | `storage-mirror` | node-exporter (Glance), `stack-health` |
+| `$STATE/metrics/ups.prom` | `ups-metrics` | node-exporter (Grafana's UPS dashboard, Glance) |
 | `$STATE/rollback/<service>` | `stack-update` | `stack-update --rollback` |
 | `$STATE/port-forward-missing-since`, `$STATE/port-forward-last-heal` | `vpn-port-sync` | `vpn-port-sync` |
 | `$STATE/throttle-by-script` | `downloads-throttle` | `downloads-throttle` |
@@ -730,6 +802,7 @@ What the scripts keep between runs. `$STATE` is the `state` folder next to `CONF
 | `$STORAGE_MOUNT/backups/RESTIC_PASSWORD` | `stack-backup` | `stack-update --rollback`, `stack-health` |
 | `/var/backups/arr-stack/restic` | `stack-backup` | `stack-health` |
 | `/var/lib/arr-backup/last-success` | `stack-backup` | `stack-health` |
+| `$BACKUP_MOUNT/.trash/<date>/` | `storage-mirror` | you, when restoring a file ([Backups](../flows/backups.md#restoring-files-from-the-mirror)) |
 
 ## downloads-meeting
 

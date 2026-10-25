@@ -5,6 +5,7 @@
 REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 set -a; . "$REPO/.env"; set +a
 export STORAGE_MOUNT=${STORAGE_MOUNT:-/mnt/storage}
+export BACKUP_MOUNT=${BACKUP_MOUNT:-/mnt/backup}
 # Every module runs unless .env lists the wanted profiles.
 export COMPOSE_PROFILES=${COMPOSE_PROFILES:-*}
 
@@ -61,6 +62,11 @@ disk_of_mount() {
   source=$(findmnt -no SOURCE "$1" | sed 's/\[.*//')
   pkname=$(lsblk -no PKNAME "$source" | head -1)
   echo "/dev/${pkname:-${source#/dev/}}"
+}
+
+# ups_field NAME: one apcupsd reading without its unit (BCHARGE reads "100.0"); empty when apcupsd is unreachable.
+ups_field() {
+  PATH="$PATH:/usr/sbin:/sbin" apcaccess -u -p "$1" 2>/dev/null | sed 's/ *$//'
 }
 
 # service_enabled NAME: whether NAME is in an active compose profile.

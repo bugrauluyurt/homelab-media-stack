@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# UPS readings from apcupsd for node-exporter's textfile collector, read by Grafana's UPS dashboard
+# and Glance. When apcupsd can't reach the UPS, only arr_ups_up 0 is written.
+# Runs: arr-ups-metrics.timer every 30 seconds.
+# Changes: $STATE_ROOT/metrics/ups.prom.
+# Idempotent: yes.
+
+set -uo pipefail
+. "$(dirname "$0")/stack-env.sh"
+PATH="$PATH:/usr/sbin:/sbin"
+
+METRICS="$STATE_ROOT/metrics"
+mkdir -p "$METRICS"
+
+readings=$(apcaccess -u status 2>/dev/null)
+
+# Values can hold ": " themselves (DATE), so each line splits at its first colon only.
+awk '
+  function metric(name, key, scale) {
+    if (key in reading && reading[key] ~ /^[0-9.]+$/) print name, reading[key] * scale
+  }
+
+  {
+    colon = index($0, ":")
+    if (!colon) next
+
+    key = substr($0, 1, colon - 1)
+    value = substr($0, colon + 1)
+    gsub(/^ +| +$/, "", key)
+    gsub(/^ +| +$/, "", value)
+    reading[key] = value
+  }
+
+  END {
+    up = ("STATUS" in reading) && reading["STATUS"] !~ /COMMLOST/
+    print "arr_ups_up", up ? 1 : 0
+    if (!up) exit
+
+    print "arr_ups_online", reading["STATUS"] ~ /ONLINE/ ? 1 : 0
+    print "arr_ups_on_battery", reading["STATUS"] ~ /ONBATT/ ? 1 : 0
+    metric("arr_ups_battery_charge_percent", "BCHARGE", 1)
+    metric("arr_ups_runtime_seconds", "TIMELEFT", 60)
+    metric("arr_ups_load_percent", "LOADPCT", 1)
+    metric("arr_ups_input_voltage", "LINEV", 1)
+    metric("arr_ups_battery_voltage", "BATTV", 1)
+    metric("arr_ups_transfers_total", "NUMXFERS", 1)
+    metric("arr_ups_on_battery_seconds_total", "CUMONBATT", 1)
+    metric("arr_ups_shutdown_charge_percent", "MBATTCHG", 1)
+    metric("arr_ups_shutdown_runtime_seconds", "MINTIMEL", 60)
+
+    if (reading["LOADPCT"] ~ /^[0-9.]+$/ && reading["NOMPOWER"] ~ /^[0-9.]+$/)
+      print "arr_ups_load_watts", reading["LOADPCT"] * reading["NOMPOWER"] / 100
+  }
+' <<< "$readings" > "$METRICS/ups.prom.tmp" && chmod 644 "$METRICS/ups.prom.tmp" && mv "$METRICS/ups.prom.tmp" "$METRICS/ups.prom"

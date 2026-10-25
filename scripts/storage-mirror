@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# Mirror the whole media drive onto the backup drive, hardlinks kept. Files deleted or overwritten
+# since the last run move to .trash/<date>/ on the backup drive and stay there for 30 days.
+# --dry-run: list what would change, without touching the backup drive.
+# Runs: arr-mirror.timer nightly, as root; by hand with sudo (the stack-backup skill).
+# Changes: $BACKUP_MOUNT, remounted read-write for the copy and read-only after; removes trash older
+#   than 30 days; writes $STATE_ROOT/metrics/mirror.prom.
+# Idempotent: yes.
+
+set -uo pipefail
+. "$(dirname "$0")/stack-env.sh"
+
+TRASH_DAYS=30
+TRASH="$BACKUP_MOUNT/.trash"
+METRICS="$STATE_ROOT/metrics"
+
+dry_run=false
+[ "${1:-}" = --dry-run ] && dry_run=true
+
+fail() { echo "FATAL: $*" >&2; exit 1; }
+
+# Mirroring from an unmounted drive would empty the backup; onto an unmounted one would fill the system disk.
+[ -n "${BACKUP_UUID:-}" ] || fail "BACKUP_UUID is not set in .env"
+mountpoint -q "$STORAGE_MOUNT" || fail "$STORAGE_MOUNT is not mounted"
+mountpoint -q "$BACKUP_MOUNT" || fail "$BACKUP_MOUNT is not mounted"
+[ "$(findmnt -no UUID --mountpoint "$BACKUP_MOUNT")" = "$BACKUP_UUID" ] || fail "$BACKUP_MOUNT is not the drive BACKUP_UUID names"
+[ -z "${STORAGE_UUID:-}" ] || [ "$(findmnt -no UUID --mountpoint "$STORAGE_MOUNT")" = "$STORAGE_UUID" ] ||
+  fail "$STORAGE_MOUNT is not the drive STORAGE_UUID names"
+[ -n "$(ls -A "$DATA_ROOT" 2>/dev/null)" ] || fail "$DATA_ROOT is empty"
+
+now=$(date +%s)
+data_dir=${DATA_ROOT#"$STORAGE_MOUNT"}
+
+# Unfinished downloads change every night and are fetched again anyway.
+rsync_args=(-aHAX --numeric-ids --delete --stats
+  --backup "--backup-dir=$TRASH/$(date -d "@$now" +%F)"
+  --exclude=/.trash/ --exclude=/lost+found/
+  "--exclude=$data_dir/usenet/incomplete/" "--exclude=$data_dir/soulseek/incomplete/")
+
+# 24: files vanished during the copy, which is normal while downloads run.
+rsync_ok() { [ "$1" -eq 0 ] || [ "$1" -eq 24 ]; }
+
+if $dry_run; then
+  rsync --dry-run --itemize-changes "${rsync_args[@]}" "$STORAGE_MOUNT/" "$BACKUP_MOUNT/"
+  rsync_ok $?
+  exit
+fi
+
+mount -o remount,rw "$BACKUP_MOUNT" || fail "could not remount $BACKUP_MOUNT read-write"
+trap 'mount -o remount,ro "$BACKUP_MOUNT"' EXIT
+
+rsync "${rsync_args[@]}" "$STORAGE_MOUNT/" "$BACKUP_MOUNT/"
+rsync_rc=$?
+rsync_ok "$rsync_rc" || fail "rsync exited $rsync_rc"
+
+# Pruned by age only: trash that fills the backup drive fails rsync, which pushes an alert.
+oldest_kept=$(date -d "@$((now - TRASH_DAYS * 86400))" +%F)
+for trash_day in "$TRASH"/????-??-??; do
+  [ -d "$trash_day" ] || continue
+
+  if [[ "$(basename "$trash_day")" < "$oldest_kept" ]]; then
+    rm -rf "$trash_day"
+    echo "  - removed trash from $(basename "$trash_day")"
+  fi
+done
+
+mkdir -p "$METRICS"
+echo "arr_mirror_last_success_timestamp_seconds $(date +%s)" > "$METRICS/mirror.prom.tmp" &&
+  chmod 644 "$METRICS/mirror.prom.tmp" && mv "$METRICS/mirror.prom.tmp" "$METRICS/mirror.prom"

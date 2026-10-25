@@ -140,7 +140,12 @@ sudo mount /mnt/storage
 ```
 
 Set `STORAGE_DEVICE` to the disk's stable name (`ls -l /dev/disk/by-id/`) so Scrutiny reads
-the right drive's SMART data.
+the right drive's SMART data. With a second USB drive, `/dev/sda` and `/dev/sdb` can swap at
+boot, so the stable name matters.
+
+**A backup drive (optional).** A second drive, at least as large, can hold a nightly mirror of
+the whole media drive, mounted read-only between runs. Set it up after the stack runs, as in
+[Host setup: the backup drive](operations/host.md#the-backup-drive).
 
 Then create the data folders, owned by the stack user. Compose is told never to create a
 missing media folder (a missing one stops the container instead), so they must exist first:
@@ -176,6 +181,7 @@ with `openssl rand -hex 24`.
 | [`HOST_NAME`](reference/configuration.md#host_name) | `hostname`; also its MagicDNS name |
 | [`TAILSCALE_IP`](reference/configuration.md#tailscale_ip) | `tailscale ip -4` |
 | [`STORAGE_MOUNT`](reference/configuration.md#storage_mount), [`STORAGE_UUID`](reference/configuration.md#storage_uuid), [`STORAGE_DEVICE`](reference/configuration.md#storage_device) | From [Prepare the media disk](#prepare-the-media-disk) |
+| [`BACKUP_UUID`](reference/configuration.md#backup_uuid), [`BACKUP_MOUNT`](reference/configuration.md#backup_mount) | Empty without a backup drive; see [Host setup](operations/host.md#the-backup-drive) |
 | [`QUESTARR_ALLOWED_ORIGINS`](reference/configuration.md#questarr_allowed_origins) | Every URL you open Questarr on, port 5000 |
 
 **Identity, paths and network**
@@ -369,6 +375,10 @@ A few host changes are made by hand and depend on the machine, such as the memor
 Raspberry Pi OS (without it Docker ignores every container's memory limit) and limiting
 avahi to your real network interfaces. They are in [Host changes](operations/host.md).
 
+With an APC UPS on USB, install apcupsd (`sudo apt-get install apcupsd`) and re-run
+`host-install`: it then installs the UPS settings, which shut the server down cleanly before
+the battery runs out ([Power](flows/power.md)).
+
 ## Tailscale policy and tag
 
 Tailscale enforces who reaches which port from its admin console, not from the server. The
@@ -468,6 +478,8 @@ With the apps configured, switch on the timers that watch them:
 ```bash
 sudo systemctl enable --now arr-health.timer arr-watch.timer arr-throttle.timer
 sudo systemctl enable --now arr-youtube.timer      # dashboards module only
+sudo systemctl enable --now arr-mirror.timer       # with a backup drive only
+sudo systemctl enable --now arr-ups-metrics.timer  # with a UPS and apcupsd only
 ```
 
 They are enabled last because `activity-watch` and `downloads-throttle` read Jellyfin and

@@ -32,10 +32,11 @@ disk_below() { [ "$(df --output=pcent "$1" | tail -1 | tr -dc 0-9)" -lt "$2" ]; 
 chk "media drive under 90% full"        "disk_below '$STORAGE_MOUNT' 90"
 chk "system disk under 90% full"         "disk_below / 90"
 
-# smartctl's JSON reads the same for SATA, NVMe and USB drives (a USB bridge needs -d sat); any bad sector means failure is near.
+# drive_smart MOUNT CHECK: smartctl's JSON reads the same for SATA, NVMe and USB drives (a USB bridge needs -d sat);
+# any bad sector means failure is near.
 drive_smart() {
   local disk device_type=()
-  disk=$(disk_of_mount "$STORAGE_MOUNT")
+  disk=$(disk_of_mount "$1")
   [ "$(lsblk -dno TRAN "$disk")" = usb ] && device_type=(-d sat)
 
   sudo smartctl -j -a "${device_type[@]}" "$disk" | python3 -c '
@@ -45,11 +46,23 @@ ata = {attribute["name"]: attribute["raw"]["value"] for attribute in smart.get("
 bad_sectors = sum(ata.get(name, 0) for name in ("Reallocated_Sector_Ct", "Current_Pending_Sector", "Offline_Uncorrectable"))
 bad_sectors += smart.get("nvme_smart_health_information_log", {}).get("media_errors", 0)
 passed = {"health": smart["smart_status"]["passed"], "sectors": bad_sectors == 0, "temperature": smart["temperature"]["current"] < 55}
-sys.exit(not passed[sys.argv[1]])' "$1"
+sys.exit(not passed[sys.argv[1]])' "$2"
 }
-chk "media drive SMART health passed"    "drive_smart health"
-chk "media drive: no bad sectors"        "drive_smart sectors"
-chk "media drive under 55C"              "drive_smart temperature"
+chk "media drive SMART health passed"    "drive_smart '$STORAGE_MOUNT' health"
+chk "media drive: no bad sectors"        "drive_smart '$STORAGE_MOUNT' sectors"
+chk "media drive under 55C"              "drive_smart '$STORAGE_MOUNT' temperature"
+
+if [ -n "${BACKUP_UUID:-}" ]; then
+  chk "$BACKUP_MOUNT is mounted"          "mountpoint -q '$BACKUP_MOUNT'"
+  if mountpoint -q "$BACKUP_MOUNT"; then
+    # Read-only between mirrors, so nothing but storage-mirror can change the copy; a running oneshot reads "activating".
+    chk "backup drive read-only between mirrors" "findmnt -no OPTIONS '$BACKUP_MOUNT' | tr , '\n' | grep -qx ro || [ \"\$(systemctl is-active arr-mirror.service)\" = activating ]"
+    chk "backup drive under 90% full"     "disk_below '$BACKUP_MOUNT' 90"
+    chk "backup drive SMART health passed" "drive_smart '$BACKUP_MOUNT' health"
+    chk "backup drive: no bad sectors"    "drive_smart '$BACKUP_MOUNT' sectors"
+    chk "backup drive under 55C"          "drive_smart '$BACKUP_MOUNT' temperature"
+  fi
+fi
 
 if command -v vcgencmd >/dev/null; then
   echo "HARDWARE"
@@ -125,6 +138,20 @@ BACKUP_MAX_AGE_H=48
 chk "last backup under ${BACKUP_MAX_AGE_H}h old" "! mountpoint -q '$STORAGE_MOUNT' || [ \$(( \$(date +%s) - \$(date -d \"\$(cat /var/lib/arr-backup/last-success 2>/dev/null || echo 1970-01-01)\" +%s) )) -lt $((BACKUP_MAX_AGE_H * 3600)) ]"
 chk "backup key copy on the media drive" "! mountpoint -q '$STORAGE_MOUNT' || sudo test -s '$STORAGE_MOUNT/backups/RESTIC_PASSWORD'"
 chk "backup copy on the NVMe"          "sudo test -s /var/backups/arr-stack/restic/config"
+if [ -n "${BACKUP_UUID:-}" ]; then
+  chk "mirror timer enabled"            "systemctl is-enabled -q arr-mirror.timer"
+  # A copy in progress counts: the first one runs for hours, and arr-mirror's start timeout fails a hung one.
+  chk "media mirrored in the last ${BACKUP_MAX_AGE_H}h" "! mountpoint -q '$STORAGE_MOUNT' || [ \"\$(systemctl is-active arr-mirror.service)\" = activating ] || [ \$(( \$(date +%s) - \$(awk '{print \$2}' '$STATE_ROOT/metrics/mirror.prom' 2>/dev/null || echo 0) )) -lt $((BACKUP_MAX_AGE_H * 3600)) ]"
+fi
+
+if [ -f /etc/apcupsd/apcupsd.conf ]; then
+  echo "POWER"
+  chk "apcupsd running"                 "systemctl is-active -q apcupsd.service"
+  # COMMLOST means a power cut would not shut the server down.
+  chk "UPS answering apcupsd"           "ups_field STATUS | grep -qv COMMLOST"
+  chk "UPS on mains power"              "ups_field STATUS | grep -qw ONLINE"
+  chk "UPS metrics timer enabled"       "systemctl is-enabled -q arr-ups-metrics.timer"
+fi
 
 echo "SERVICES"
 for s in "prowlarr 9696" "radarr 7878" "sonarr 8989" "lidarr 8686" "bazarr 6767" "seerr 5055" "questarr 5000/api/health" "jellyfin 8096" "plex 32400" "navidrome 4533/ping" "needle 4535/api/health" "slskd 5030/health" "uptime-kuma 3003" "dozzle 8888/healthcheck" "jellydash 3004/healthz.php" "sabnzbd 8085" "sftpgo 8090/healthz" "scrutiny 3006/api/health" "changedetection 3007" "shelfmark 8084/api/health" "calibre-web-automated 8083/login"; do

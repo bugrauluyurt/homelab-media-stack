@@ -101,7 +101,7 @@ scripts/cleanuparr-state                    # prints e.g. "live downloadcleaner=
 
 ## Disk space
 
-`stack-health` fails when the media drive or the system disk is 90% full or more, and Glance's
+`stack-health` fails when the media drive, the backup drive or the system disk is 90% full or more, and Glance's
 Lab page shows the media drive's free space, how fast it has grown over the last week, and the
 date it would be full at that rate (in red when that is less than 30 days away).
 
@@ -114,13 +114,15 @@ What takes the space, and what to know before freeing it:
 - **Usenet downloads** are moved into the library when complete; nothing stays behind.
 - **Settings backups** live on the media drive under `$STORAGE_MOUNT/backups`; see
   [Backups](../flows/backups.md) for how they are thinned.
+- **The backup drive** holds a copy of the media drive plus up to 30 days of deleted and replaced
+  files in `.trash/`, so after a big clear-out it stays fuller than the media drive for 30 days.
 - **On the system disk**, Prometheus keeps at most 30 days and 4 GB, container logs are capped at
   three 10 MB files per container, and `stack-update` keeps one rollback image per app.
 
 ## Drive health
 
-Every 6 hours `arr-health.timer` runs `stack-health --notify`, which reads the media drive's SMART
-data and pushes a failure to your phone. It checks three things:
+Every 6 hours `arr-health.timer` runs `stack-health --notify`, which reads the SMART data of the
+media drive, and of the backup drive when there is one, and pushes a failure to your phone. It checks three things:
 
 | Check | Fails when |
 |---|---|
@@ -146,6 +148,8 @@ run:
   the second copy exists on the system disk.
 - Glance's Lab page shows when the settings were last backed up, in red after 48 hours.
 - `cat /var/lib/arr-backup/last-success` prints the time of the last successful run.
+- With a backup drive, `health` also checks that the media drive was mirrored in the last 48
+  hours, and Glance shows when ([Backups](../flows/backups.md#the-media-mirror)).
 
 What is backed up, where, the offsite copy and every way to restore: [Backups](../flows/backups.md).
 
