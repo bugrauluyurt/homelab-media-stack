@@ -7,3 +7,7 @@ devices:
     type: sat
   - device: /dev/sdb
     type: sat
+    # The backup drive sleeps between mirrors: skip it asleep rather than wake it (storage-mirror reads it nightly).
+    commands:
+      metrics_info_args: '--info --json -n standby'
+      metrics_smart_args: '--xall --json -n standby'

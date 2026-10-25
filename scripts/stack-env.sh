@@ -76,6 +76,25 @@ import json, sys
 print(", ".join(check["message"].split(": ", 1)[-1] for check in json.load(sys.stdin) if check["source"] == "IndexerLongTermStatusCheck"))'
 }
 
+# drive_smart MOUNT CHECK: whether the disk under MOUNT passes health, sectors (any bad sector means failure is near) or
+# temperature (under 55C). A USB bridge needs -d sat; a drive asleep passes unwoken and is read the next time it is used.
+drive_smart() {
+  local disk device_type=()
+  disk=$(disk_of_mount "$1")
+  [ "$(lsblk -dno TRAN "$disk")" = usb ] && device_type=(-d sat)
+
+  sudo smartctl -j -n standby -a "${device_type[@]}" "$disk" | python3 -c '
+import json, sys
+smart = json.load(sys.stdin)
+if any(message["string"].startswith(("Device is in STANDBY mode", "Device is in SLEEP mode")) for message in smart["smartctl"].get("messages", [])):
+    sys.exit(0)
+ata = {attribute["name"]: attribute["raw"]["value"] for attribute in smart.get("ata_smart_attributes", {}).get("table", [])}
+bad_sectors = sum(ata.get(name, 0) for name in ("Reallocated_Sector_Ct", "Current_Pending_Sector", "Offline_Uncorrectable"))
+bad_sectors += smart.get("nvme_smart_health_information_log", {}).get("media_errors", 0)
+passed = {"health": smart["smart_status"]["passed"], "sectors": bad_sectors == 0, "temperature": smart["temperature"]["current"] < 55}
+sys.exit(not passed[sys.argv[1]])' "$2"
+}
+
 # service_enabled NAME: whether NAME is in an active compose profile.
 service_enabled() {
   [ -n "${ENABLED_SERVICES:-}" ] || ENABLED_SERVICES=$(docker compose --project-directory "$REPO" config --services 2>/dev/null)

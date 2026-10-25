@@ -149,7 +149,7 @@ module that is switched off are skipped. A few of the less obvious ones, and why
 
 | Section | Check | Why |
 |---|---|---|
-| STORAGE | SMART health, no bad sectors, under 55 °C | Any reallocated, pending or uncorrectable sector means failure is approaching. A drive behind a USB bridge needs `smartctl -d sat` |
+| STORAGE | SMART health, no bad sectors, under 55 °C | Any reallocated, pending or uncorrectable sector means failure is approaching. A drive behind a USB bridge needs `smartctl -d sat`. A drive that is asleep passes without being woken; the backup drive, which sleeps between mirrors, is read after each nightly copy instead ([Backups](backups.md#the-media-mirror)) |
 | HARDWARE | Not throttled or under-voltage, SoC under 80 °C | Only where `vcgencmd` exists (a Raspberry Pi). The low four bits of `get_throttled` mean under-voltage, frequency capped, throttled or soft temperature limit, right now |
 | SYSTEMD | Every container has a memory limit | A container created while the memory cgroup was unavailable silently loses its limit, and compose won't recreate it later because its config is unchanged |
 | STORAGE | Backup drive mounted, read-only between mirrors | Only with `BACKUP_UUID` set. Read-only, nothing but `storage-mirror` can change the copy |
@@ -213,7 +213,7 @@ and the `journalctl` command for the rest.
 | Unit | Job |
 |---|---|
 | `arr-backup.service` | The nightly backup ([Backups](backups.md)) |
-| `arr-mirror.service` | The nightly media mirror ([Backups](backups.md#the-media-mirror)) |
+| `arr-mirror.service` | The nightly media mirror, and the backup drive's SMART checks after it ([Backups](backups.md#the-media-mirror)) |
 | `arr-updates.service` | The daily update check ([Updates](updates.md)) |
 | `arr-firewall.service` | The host firewall ([Security](../security.md)) |
 | `arr-stack.service` | Starting the stack ([Storage and boot](storage-and-boot.md)) |
@@ -248,6 +248,7 @@ flowchart LR
 | Software transcode, new Jellyfin device, failed Jellyfin login, request stuck 48 hours | `activity-watch` (`arr-watch.timer`) | This page |
 | "VPN forwarded port restored", "VPN still has no forwarded port" | `vpn-port-sync` (`arr-port-sync.timer`) | [VPN and ports](vpn-and-ports.md) |
 | "*unit* failed", with its last log lines | `stack-failure-notify` | This page |
+| "arr-mirror.service failed" with "the backup drive failed its SMART health, sectors or temperature check" | `storage-mirror`, after each nightly copy, through `stack-failure-notify` | [Backups](backups.md#the-media-mirror) |
 | On battery, power restored, shutting down, UPS not responding or responding again, replace the battery | `ups-event` (apcupsd) | [Power](power.md) |
 | Health errors, a download that needs a manual import, failed downloads or imports | Radarr, Sonarr, Lidarr, Prowlarr | `configure-arr.py` |
 | A request is available to watch, or failed to reach Sonarr or Radarr | Seerr | `configure-seerr.py` |

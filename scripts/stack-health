@@ -32,22 +32,6 @@ disk_below() { [ "$(df --output=pcent "$1" | tail -1 | tr -dc 0-9)" -lt "$2" ]; 
 chk "media drive under 90% full"        "disk_below '$STORAGE_MOUNT' 90"
 chk "system disk under 90% full"         "disk_below / 90"
 
-# drive_smart MOUNT CHECK: smartctl's JSON reads the same for SATA, NVMe and USB drives (a USB bridge needs -d sat);
-# any bad sector means failure is near.
-drive_smart() {
-  local disk device_type=()
-  disk=$(disk_of_mount "$1")
-  [ "$(lsblk -dno TRAN "$disk")" = usb ] && device_type=(-d sat)
-
-  sudo smartctl -j -a "${device_type[@]}" "$disk" | python3 -c '
-import json, sys
-smart = json.load(sys.stdin)
-ata = {attribute["name"]: attribute["raw"]["value"] for attribute in smart.get("ata_smart_attributes", {}).get("table", [])}
-bad_sectors = sum(ata.get(name, 0) for name in ("Reallocated_Sector_Ct", "Current_Pending_Sector", "Offline_Uncorrectable"))
-bad_sectors += smart.get("nvme_smart_health_information_log", {}).get("media_errors", 0)
-passed = {"health": smart["smart_status"]["passed"], "sectors": bad_sectors == 0, "temperature": smart["temperature"]["current"] < 55}
-sys.exit(not passed[sys.argv[1]])' "$2"
-}
 chk "media drive SMART health passed"    "drive_smart '$STORAGE_MOUNT' health"
 chk "media drive: no bad sectors"        "drive_smart '$STORAGE_MOUNT' sectors"
 chk "media drive under 55C"              "drive_smart '$STORAGE_MOUNT' temperature"

@@ -90,6 +90,29 @@ notify title tag body
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(result.stdout.strip(), expected)
 
+    def test_drive_smart_passes_a_sleeping_drive_and_judges_an_awake_one(self):
+        stubs = 'sudo() { "$@"; }; findmnt() { echo /dev/sdb1; }; lsblk() { echo usb; }; smartctl() { printf "%s" "$SMART_JSON"; }; '
+        asleep = json.dumps({'smartctl': {'exit_status': 2, 'messages': [
+            {'string': 'Device is in STANDBY mode, exit(2)', 'severity': 'information'}]}})
+
+        def awake(passed=True, temperature=40, reallocated=0):
+            return json.dumps({'smartctl': {'exit_status': 0}, 'smart_status': {'passed': passed},
+                               'temperature': {'current': temperature},
+                               'ata_smart_attributes': {'table': [{'name': 'Reallocated_Sector_Ct', 'raw': {'value': reallocated}}]}})
+
+        cases = [(asleep, 'health', 0), (asleep, 'temperature', 0), (awake(), 'health', 0), (awake(), 'sectors', 0),
+                 (awake(), 'temperature', 0), (awake(passed=False), 'health', 1), (awake(reallocated=8), 'sectors', 1),
+                 (awake(temperature=55), 'temperature', 1)]
+        for smart_json, smart_check, expected in cases:
+            with self.subTest(smart_check=smart_check, smart_json=smart_json[:60]):
+                result = self.shell(stubs + f'drive_smart /mnt/backup {smart_check}', SMART_JSON=smart_json)
+                self.assertEqual(result.returncode, expected, result.stderr)
+
+        calls = self.shell('sudo() { "$@"; }; findmnt() { echo /dev/sdb1; }; lsblk() { echo usb; }; '
+                           'smartctl() { echo "$*" >&2; printf "%s" "$SMART_JSON"; }; drive_smart /mnt/backup health', SMART_JSON=asleep)
+        self.assertIn('-n standby', calls.stderr)
+        self.assertIn('-d sat', calls.stderr)
+
     def test_retry_budget_and_manual_check_boundary(self):
         unit = (ROOT / 'host/systemd/arr-health.service').read_text()
         for value in ['Restart=on-failure', 'RestartSec=5min',

@@ -82,7 +82,7 @@ drive has gone, so writes in flight can be lost. A UPS avoids that for a power c
 
 A [backup drive](#the-backup-drive) is read-only between mirrors and needs no unmount when you
 switch the media drive off alone. If both drives sit in one dock that you switch off, stop a
-running mirror and unmount the backup drive too: `sudo systemctl stop arr-mirror.service`, then
+running mirror and unmount the backup drive too, even while it is asleep: `sudo systemctl stop arr-mirror.service`, then
 `sudo umount /mnt/backup` (your `BACKUP_MOUNT`).
 
 ### The empty mount point
@@ -123,13 +123,21 @@ UUID=<BACKUP_UUID>  /mnt/backup  ext4  ro,noatime,nofail,x-systemd.device-timeou
 ```
 
 [`99-arr-backup.rules`](../reference/systemd.md#99-arr-backuprules) mounts it when it appears, and
-`nofail` lets the server boot without it. The stack never depends on it: nothing is wanted by or
-bound to its mount unit, `arr-stack.service` neither waits for it nor stops without it, and only
-[`arr-mirror.service`](../reference/systemd.md#arr-mirrorservice) uses it, remounting it
+`nofail` lets the server boot without it. The stack never depends on it: nothing is bound to its
+mount unit, `arr-stack.service` neither waits for it nor stops without it, and only
+[`arr-mirror.service`](../reference/systemd.md#arr-mirrorservice) writes to it, remounting it
 read-write for the copy and read-only after. Its empty mount point is immutable too
 (`sudo chattr +i /mnt/backup`). Without `BACKUP_UUID`, `host-install` skips its udev rule and
 nothing mirror-related runs. Setting it up is in
 [Host setup](../operations/host.md#the-backup-drive).
+
+Between mirrors the drive sleeps. Its mount unit wants
+[`arr-spindown.service`](../reference/systemd.md#arr-spindownservice), so each time it mounts, at
+boot or when it is plugged in, the drive gets a 10-minute idle timer; it forgets the timer
+without power, hence every mount. The nightly mirror wakes it (about 10 seconds to spin up), and
+while it is awake the run reads its SMART health and has Scrutiny record it
+([Backups](backups.md#the-media-mirror)). `stack-health`, `drive-metrics` and Scrutiny's hourly
+run leave a sleeping drive asleep.
 
 ## What stack-up does
 
@@ -184,7 +192,7 @@ Nothing needs starting by hand:
    *inactive* afterwards; the rules stay. See [Security](../security.md).
 3. The drives mount (from `/etc/fstab` if they are on, or later through udev), and
    `arr-stack.service` runs `stack-up` once the media drive is there. The backup drive plays no
-   part in this. After a power cut, the UPS's part is in [Power](power.md).
+   part in this; when it mounts, `arr-spindown.service` gives it its idle timer. After a power cut, the UPS's part is in [Power](power.md).
 4. The timers take over, as below. `arr-port-sync.service` is ordered after `arr-stack.service`.
 
 ### The timers
@@ -235,10 +243,12 @@ list is in [Getting started](../getting-started.md)). Check them with
 | `99-arr-storage.rules` | Asks for the mount unit when the drive with `STORAGE_UUID` appears | [systemd](../reference/systemd.md#99-arr-storagerules) |
 | `99-arr-backup.rules` | The same for the backup drive with `BACKUP_UUID`, which nothing else waits for | [systemd](../reference/systemd.md#99-arr-backuprules) |
 | `arr-stack.service` | Starts the stack with the drive, stops it without | [systemd](../reference/systemd.md#arr-stackservice) |
+| `arr-spindown.service` | Gives the backup drive its idle timer each time it mounts | [systemd](../reference/systemd.md#arr-spindownservice) |
+| `storage-spindown` | Sets that 10-minute timer with `smartctl` | [scripts](../reference/scripts.md#storage-spindown) |
 | `stack-up` | Starts the containers and settles the VPN | [scripts](../reference/scripts.md#stack-up) |
 | `drive-off` | Stops, unmounts and spins the drive down | [scripts](../reference/scripts.md#drive-off) |
 | `host-install` | Renders and installs the units and the udev rule | [scripts](../reference/scripts.md#host-install) |
-| `stack-env.sh` | `STORAGE_MOUNT`, `BACKUP_MOUNT`, profiles, and the disk behind a mount | [scripts](../reference/scripts.md#stack-envsh) |
+| `stack-env.sh` | `STORAGE_MOUNT`, `BACKUP_MOUNT`, profiles, the disk behind a mount, and its SMART checks | [scripts](../reference/scripts.md#stack-envsh) |
 | `arr-firewall.service` | Loads the firewall at boot | [systemd](../reference/systemd.md#arr-firewallservice) |
 | `arr-notify-failure@.service` | Pushes a failed unit's log to ntfy | [systemd](../reference/systemd.md#arr-notify-failureservice) |
 

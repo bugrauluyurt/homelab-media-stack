@@ -10,6 +10,18 @@ Read-only. The media drive is mounted at `STORAGE_MOUNT` (`.env`, default `/mnt/
 `/mnt/backup`, read-only); check it the same way with `MOUNT` set to that path. `smartctl` needs
 `sudo`. A drive in a USB enclosure needs `-d sat`; internal SATA and NVMe drives don't.
 
+The backup drive sleeps between mirrors: `arr-spindown.service` gives it a 10-minute idle timer.
+Any read wakes it (about 10 seconds to spin up), so check first whether it is asleep, without
+waking it:
+
+```bash
+sudo smartctl -n standby -i -d sat /dev/disk/by-id/<disk>    # exit 2 and "STANDBY mode": asleep
+```
+
+Asleep, its latest reading is from the nightly mirror (Scrutiny, or `journalctl -u arr-mirror`).
+Avoid commands that wake it unless the user needs a fresh reading; it goes back to sleep after 10
+idle minutes.
+
 With two USB drives, `/dev/sda` and `/dev/sdb` can swap at boot, so name a disk by its stable
 path when you check it directly:
 
@@ -18,7 +30,12 @@ ls -l /dev/disk/by-id/ | grep -v part
 sudo smartctl -a -d sat /dev/disk/by-id/<disk>
 ```
 
-`stack-health` checks SMART health, bad sectors and temperature on both drives.
+`stack-health` checks SMART health, bad sectors and temperature on both drives; a drive that is
+asleep passes unread. `storage-mirror` runs the same checks on the backup drive after each nightly
+copy and fails, pushing to ntfy, when one fails.
+
+The `-n standby` below skips a sleeping drive (exit 2) instead of waking it; drop it to read the
+drive anyway.
 
 ```bash
 STACK=${MEDIA_STACK_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}; [ -x "$STACK/scripts/stack-health" ] || STACK=~/homelab-media-stack
@@ -27,8 +44,8 @@ SOURCE=$(findmnt -no SOURCE "$MOUNT" | sed 's/\[.*//')
 PARENT=$(lsblk -no PKNAME "$SOURCE" | head -1)
 DEV=/dev/${PARENT:-${SOURCE#/dev/}}
 TYPE=$([ "$(lsblk -dno TRAN "$DEV")" = usb ] && echo "-d sat")
-sudo smartctl $TYPE -H "$DEV"
-sudo smartctl $TYPE -A "$DEV" | grep -iE 'temp|realloc|pending|uncorr|crc|power_on|start_stop|media_err|percent'
+sudo smartctl $TYPE -n standby -H "$DEV"
+sudo smartctl $TYPE -n standby -A "$DEV" | grep -iE 'temp|realloc|pending|uncorr|crc|power_on|start_stop|media_err|percent'
 [ -n "$TYPE" ] && cat "/sys/block/${DEV#/dev/}/device/../../../../speed" 2>/dev/null
 sudo journalctl -k --since '-7 days' --no-pager | grep -ciE 'uas.*(abort|reset)|reset SuperSpeed|USB disconnect|I/O error'
 ```
@@ -38,7 +55,9 @@ empty for internal drives.
 
 Scrutiny (`http://<host>:3006`, `curl -s localhost:3006/api/summary`) keeps the
 same attributes as history, collected every hour, so a trend is visible without sudo. It has the
-backup drive too only with the `compose.backup-drive.yml` override on.
+backup drive too only with the `compose.backup-drive.yml` override on, and its hourly run skips
+that drive while it sleeps, so the backup drive's history is mostly one point a night, recorded by
+the mirror.
 
 With `arr-drive-metrics.timer` enabled, each drive's temperature is read every minute, without
 waking a sleeping drive: Grafana's Media Server: Overview dashboard has it in the Drive
