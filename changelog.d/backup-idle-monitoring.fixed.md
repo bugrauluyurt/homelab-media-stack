@@ -1,1 +1,0 @@
-- Stop minute-by-minute SMART temperature polling of the backup drive outside mirror runs so its idle sleep timer can expire. Keep live monitoring during mirrors and use the dashboard's existing labelled last-reading fallback instead of publishing stale live temperatures.

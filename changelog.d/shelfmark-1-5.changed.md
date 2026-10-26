@@ -1,1 +1,0 @@
-- Update the standard Shelfmark image to v1.5.0 for download recovery, metadata, client integration and security fixes.

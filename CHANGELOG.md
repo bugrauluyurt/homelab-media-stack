@@ -7,6 +7,34 @@ a minor version adds features, and a patch fixes bugs. A change records its entr
 next version, and merging the release pull request writes the entries here and publishes it
 ([how releases work](docs/operations/releasing.md)).
 
+## 3.5.0 - 2026-10-25
+
+### Added
+- A second drive can now hold a nightly copy of the whole media drive: set `BACKUP_UUID` and
+  `storage-mirror` mirrors it at 05:30 with hardlinks kept, read-only between runs, and keeps
+  deleted or replaced files in a dated trash for 30 days. `stack-health`, Glance and ntfy watch it.
+- An APC UPS on USB now shuts the server down cleanly near the end of its battery (5 minutes or
+  10% left) and powers it back on when mains returns: install apcupsd and rerun `host-install`.
+  Power events push to ntfy, and a new Grafana dashboard and a Glance line show the UPS readings.
+- The backup drive now spins down after 10 idle minutes (`arr-spindown.service`, run each time it
+  mounts), so it no longer heats the dock around the clock. `stack-health` and Scrutiny leave a
+  sleeping drive asleep, and `storage-mirror` reads its SMART health and Scrutiny history after each
+  nightly copy while it is awake, alerting when a check fails.
+- Drive temperatures are visible live: `drive-metrics` reads both drives every minute without waking
+  a sleeping one, for a new "Drive temperatures" graph in Grafana and a "Drives" block in Glance.
+  Scrutiny now collects hourly, and `compose.backup-drive.yml` adds the backup drive to it.
+- `stack-health` now fails when Prowlarr reports an indexer down for more than 6 hours and names it,
+  so the six-hourly check pushes it to ntfy. Before, one dead indexer stayed silent while others worked.
+
+### Changed
+- Scrutiny follows its releases again: the `master-omnibus` image stopped updating in February 2026,
+  so the stack now runs `latest-omnibus` (v0.9.5), which `stack-update` keeps current.
+- Update the standard Shelfmark image to v1.5.1 for format handling, search, download recovery and security fixes.
+- Update the standard Shelfmark image to v1.5.0 for download recovery, metadata, client integration and security fixes.
+
+### Fixed
+- Stop minute-by-minute SMART temperature polling of the backup drive outside mirror runs so its idle sleep timer can expire. Keep live monitoring during mirrors and use the dashboard's existing labelled last-reading fallback instead of publishing stale live temperatures.
+
 ## 3.4.1 - 2026-10-19
 
 ### Fixed
