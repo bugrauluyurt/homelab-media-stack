@@ -14,9 +14,14 @@ APPS = {
     "radarr":   {"port": 7878, "api": "v3", "root": "/data/media/movies", "cat": "radarr"},
     "sonarr":   {"port": 8989, "api": "v3", "root": "/data/media/tv",     "cat": "sonarr"},
     "lidarr":   {"port": 8686, "api": "v1", "root": "/data/media/music",  "cat": "music"},
-    "prowlarr": {"port": 9696, "api": "v1"},
+    "prowlarr": {"port": 9696, "api": "v1", "cat": "prowlarr"},
 }
-CATEGORY_FIELD = {"radarr": "movieCategory", "sonarr": "tvCategory", "lidarr": "musicCategory"}
+CATEGORY_FIELD = {"radarr": "movieCategory", "sonarr": "tvCategory", "lidarr": "musicCategory",
+                  "prowlarr": "category"}
+
+# Grabs from Prowlarr's own search: console (1000 and its subcategories) and PC games go where
+# Questarr finds them; everything else lands in the client's default category, `prowlarr`.
+PROWLARR_GRAB_CATEGORIES = [{"clientCategory": "games", "categories": [1000, 4050]}]
 
 # Newznab categories each app syncs from Prowlarr: movies, TV, audio.
 SYNC_CATEGORIES = {"radarr": [2000, 2010, 2020, 2030, 2040, 2045, 2050, 2060],
@@ -92,6 +97,9 @@ def ensure_download_client(app):
         "tags": [],
     }
 
+    if app == "prowlarr":
+        body["categories"] = PROWLARR_GRAB_CATEGORIES
+
     # forceSave: qBittorrent is unreachable until the VPN key is supplied.
     call(app, "POST", "/downloadclient?forceSave=true", body)
     print(f"  + {app}: added qBittorrent (category '{cat}')")
@@ -137,9 +145,12 @@ def ensure_sabnzbd_client(app):
     schema = next(x for x in call(app, "GET", "/downloadclient/schema") if x["implementation"] == "Sabnzbd")
 
     values = {"host": "sabnzbd", "port": 8080, "apiKey": sab_key, "useSsl": False,
-              CATEGORY_FIELD[app]: {"lidarr": "music", "radarr": "movies", "sonarr": "tv"}[app]}
+              CATEGORY_FIELD[app]: {"lidarr": "music", "radarr": "movies", "sonarr": "tv", "prowlarr": "prowlarr"}[app]}
     body = {**schema, "name": "SABnzbd", "enable": True, "priority": 1,
             "fields": [{**f, "value": values.get(f["name"], f.get("value"))} for f in schema["fields"]]}
+
+    if app == "prowlarr":
+        body["categories"] = PROWLARR_GRAB_CATEGORIES
 
     call(app, "POST", "/downloadclient?forceSave=true", body)
     print(f"  + {app}: added SABnzbd")
@@ -396,6 +407,8 @@ if __name__ == "__main__":
     print("[prowlarr]")
     for a in ("radarr", "sonarr", *(("lidarr",) if music else ())):
         ensure_prowlarr_app(a)
+    ensure_download_client("prowlarr")
+    ensure_sabnzbd_client("prowlarr")
     ensure_usenet_indexers()
     ensure_ntfy("prowlarr")
 

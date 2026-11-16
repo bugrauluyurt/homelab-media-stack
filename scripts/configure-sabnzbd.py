@@ -19,7 +19,7 @@ from stack_env import CONFIG, ENV, REPO, set_env, sabnzbd_key
 
 URL = "http://127.0.0.1:8085/api"
 SERVER = "usenet"
-CATEGORIES = {"movies": "movies", "tv": "tv", "music": "music", "games": "games"}
+CATEGORIES = {"movies": "movies", "tv": "tv", "music": "music", "games": "games", "prowlarr": "prowlarr"}
 
 # Hostnames the UI is opened by (from Homepage's allow-list) plus "sabnzbd" for
 # other containers; SABnzbd rejects any other hostname. IPs are always allowed.
