@@ -157,7 +157,7 @@ Completes Jellyfin's startup wizard: the admin account from `JELLYFIN_USER` (def
 
 ### configure-sabnzbd.py
 
-Configures SABnzbd: the Usenet server from `USENET_*`, download folders `/data/usenet/incomplete` and `/data/usenet/complete` on the media drive (same filesystem as `media/`, so imports are instant moves), the web login, the host names it answers to, the networks it treats as local, and one category per app (`movies`, `tv`, `music`, `games`). It tests the server connection and exits with an error when the test fails.
+Configures SABnzbd: the Usenet server from `USENET_*`, download folders `/data/usenet/incomplete` and `/data/usenet/complete` on the media drive (same filesystem as `media/`, so imports are instant moves), the web login, the host names it answers to, the networks it treats as local, and one category per app (`movies`, `tv`, `music`, `games`, `prowlarr`). It tests the server connection and exits with an error when the test fails.
 
 - **File:** [`scripts/configure-sabnzbd.py`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/configure-sabnzbd.py)
 - **Runs:** by hand, before [`configure-arr.py`](#configure-arrpy) when you use Usenet.
@@ -174,7 +174,7 @@ Sets up Radarr and Sonarr, Lidarr when the music module is on, and Prowlarr's li
 - Radarr and Sonarr: root folder (`/data/media/movies`, `/data/media/tv`); hardlinks, extra files and media info on, recycle bin off; qBittorrent at `gluetun:QBIT_PORT` (category `radarr` or `sonarr`); SABnzbd when `USENET_HOST` is set; a delay profile preferring Usenet, with torrents waiting 60 minutes; a Jellyfin connection that rescans on import; an `Audio Description` custom format scored -10000 in the `HD Bluray + WEB` (Radarr) and `WEB-1080p` (Sonarr) profiles; ntfy alerts for health issues, manual interaction, failed downloads and failed imports when `NTFY_TOPIC` is set.
 - Sonarr only: new series folders named `{Series Title} [tvdbid-{TvdbId}]`, an auto-tag `french` for French-language series, which picks Bazarr's French profile, and a delay profile for that tag with no torrent wait, because new French episodes come from the ratio trackers, where an early grab earns ratio.
 - Lidarr: root folder `/data/media/music` with new artists unmonitored, hardlinks, qBittorrent (category `music`), SABnzbd, a delay profile of Soulseek, then Usenet, then torrents after 60 minutes, every import list off, ntfy.
-- Prowlarr: Radarr, Sonarr (and Lidarr) linked with full sync and their Newznab categories, NZBgeek and NZBFinder, each when its API key (`NZBGEEK_API_KEY`, `NZBFINDER_API_KEY`) is set, ntfy.
+- Prowlarr: Radarr, Sonarr (and Lidarr) linked with full sync and their Newznab categories; qBittorrent and SABnzbd (when `USENET_HOST` is set) for grabs from its own search page, into category `prowlarr`, except console and PC games, which go to `games` so Questarr finds them; NZBgeek and NZBFinder, each when its API key (`NZBGEEK_API_KEY`, `NZBFINDER_API_KEY`) is set, ntfy.
 
 - **File:** [`scripts/configure-arr.py`](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/scripts/configure-arr.py)
 - **Runs:** by hand, after [`configure-sabnzbd.py`](#configure-sabnzbdpy).

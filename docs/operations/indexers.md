@@ -35,6 +35,10 @@ flowchart LR
   the host it was called on into its download links, and Questarr refuses links whose host
   differs from the indexer's address
   ([known issue](https://github.com/bugrauluyurt/homelab-media-stack/blob/main/ai/homelab-plugin/skills/stack-logs/references/known-issues.md#questarr-says-added-to-qbittorrent-but-nothing-downloads)).
+- **Grabbing from Prowlarr's own search** sends the release to qBittorrent or SABnzbd, set up by
+  `configure-arr.py`. Console and PC games land in the `games` category, where Questarr finds
+  them; everything else in `prowlarr` (`/data/torrents/prowlarr`, `/data/usenet/complete/prowlarr`),
+  which no app imports from.
 - **Soulseek** is not a Prowlarr indexer: `configure-lidarr.py` adds it to Lidarr directly
   through the Tubifarry plugin, searched first ([Music flow](../flows/music.md)).
 
