@@ -1,0 +1,32 @@
+name: obsidian-homelab
+
+services:
+  webdav:
+    image: rclone/rclone:1.76.0
+    restart: unless-stopped
+    network_mode: host
+    user: "${PUID:-1000}:${PGID:-1000}"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    volumes:
+      - type: bind
+        source: ${VAULT_SERVICE_ROOT:?Set an absolute private storage path}/data
+        target: /vaults
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${VAULT_SERVICE_ROOT:?Set an absolute private storage path}/htpasswd
+        target: /auth/htpasswd
+        read_only: true
+        bind:
+          create_host_path: false
+    command:
+      - serve
+      - webdav
+      - /vaults
+      - --addr=127.0.0.1:${VAULT_HTTP_PORT:-8087}
+      - --config=/dev/null
+      - --htpasswd=/auth/htpasswd
+      - --dir-cache-time=1s
+      - --allow-origin=app://obsidian.md

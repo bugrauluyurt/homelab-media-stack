@@ -27,6 +27,7 @@ nav = [
     { "AI agent" = "flows/ai-agent.md" },
   ] },
   { "Using it" = [
+    { "Obsidian" = "using/obsidian.md" },
     { "Requesting" = "using/requesting.md" },
     { "Watching" = "using/watching.md" },
     { "Music" = "using/music.md" },
