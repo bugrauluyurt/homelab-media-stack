@@ -7,6 +7,14 @@ a minor version adds features, and a patch fixes bugs. A change records its entr
 next version, and merging the release pull request writes the entries here and publishes it
 ([how releases work](docs/operations/releasing.md)).
 
+## 3.6.0 - 2026-11-27
+
+### Added
+- Sync Obsidian vaults across desktop and mobile devices using an optional WebDAV service on your tailnet.
+- Prowlarr can download from its own search page: `configure-arr.py` adds qBittorrent and SABnzbd
+  to it. Console and PC games go to the `games` category, where Questarr finds them; everything
+  else goes to a new `prowlarr` category.
+
 ## 3.5.0 - 2026-10-25
 
 ### Added

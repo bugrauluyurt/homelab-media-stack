@@ -1,1 +1,0 @@
-- Sync Obsidian vaults across desktop and mobile devices using an optional WebDAV service on your tailnet.
