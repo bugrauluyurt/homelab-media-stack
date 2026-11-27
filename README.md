@@ -187,6 +187,7 @@ From the home network without Tailscale, only Jellyfin (`http://<lan-ip>:8096`),
 | [Viewers](docs/flows/viewers.md) | Giving someone access: Tailscale invite, policy, accounts |
 | [AI agent](docs/flows/ai-agent.md) | The always-on Telegram agent and the skills |
 | **Using it** | |
+| [Obsidian](docs/using/obsidian.md) | Sync notes across desktop and mobile devices over Tailscale |
 | [Requesting](docs/using/requesting.md) | Asking for movies and shows in Seerr |
 | [Watching](docs/using/watching.md) | Players, Jellyfin's look and plugins, watching away from home, Plex |
 | [Music](docs/using/music.md) | Needle and Navidrome for listeners |
